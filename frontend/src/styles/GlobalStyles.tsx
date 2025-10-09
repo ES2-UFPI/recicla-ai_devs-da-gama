@@ -52,7 +52,7 @@ export function GlobalStyles() {
         }
 
         a:hover, a:focus {
-          color: ${theme.palette.secondary.main};
+          color: ${theme.palette.primary.light};
           text-decoration: underline;
         }
 
