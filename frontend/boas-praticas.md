@@ -149,6 +149,7 @@ Tente seguir um padrão para as mensagens de commit. Isso organiza o histórico 
 - `style`: ajusta formatação do código (mudanças que não afetam a lógica)
 - `refactor`: melhora a lógica do componente de card (refatoração de código)
 - `chore`: adiciona nova dependência (mudanças de build, pacotes, etc.)
+- Sempre coloque o número da issue em que você está trabalhando no nome do commit "#XX" e faça o push para a branch seu-nome#XX
 
 ### Variáveis de Ambiente
 
