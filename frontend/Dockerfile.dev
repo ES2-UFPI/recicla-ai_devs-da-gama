@@ -1,0 +1,39 @@
+## Dockerfile de desenvolvimento para app React (Vite)
+## - Executa Vite Dev Server (porta 5173) compatível com docker-compose
+## - Ideal para uso com bind mount do código
+
+FROM node:20-alpine
+
+# Evita criação de diretórios como root ao instalar dependências localmente
+USER node
+WORKDIR /app
+
+# Copia apenas manifests para instalar deps inicialmente (cache)
+COPY --chown=node:node package*.json ./
+
+# Instala dependências de desenvolvimento
+RUN if [ -f package-lock.json ]; then \
+			npm ci --no-audit --no-fund; \
+		else \
+			npm install --no-audit --no-fund; \
+		fi
+
+# Expoe a porta do Vite
+EXPOSE 5173
+
+ENV NODE_ENV=development
+
+# Ativa hot reload corretamente em ambientes Docker
+ENV CHOKIDAR_USEPOLLING=true
+ENV WATCHPACK_POLLING=true
+
+# Com bind mount, o código será montado em /app
+# Se quiser pré-copiar o código (não necessário com volumes), descomente:
+# COPY --chown=node:node . .
+
+# Configurações recomendadas para Vite em containers
+ENV VITE_HOST=0.0.0.0
+
+# Comando padrão: usar npm run dev com host 0.0.0.0
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
