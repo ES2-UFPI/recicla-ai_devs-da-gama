@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../../hooks/useAuth';
 import { Box, Button, TextField, Typography, Alert, CircularProgress, MenuItem } from '@mui/material';
 import { maskTelefone } from '../mask';
 import {
@@ -17,6 +18,7 @@ const fallbackRoles: Role[] = [
 ];
 
 export function CadastroForm() {
+  const { register, isLoading } = useAuth();
   const [form, setForm] = useState<CadastroFormData>({
     nome: '',
     email: '',
@@ -28,7 +30,6 @@ export function CadastroForm() {
     estado: '',
   });
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof CadastroFormData, string>>>({});
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [roles] = useState<Role[]>(fallbackRoles);
@@ -100,11 +101,22 @@ export function CadastroForm() {
       setError('Por favor, corrija os campos destacados.');
       return;
     }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    // Converter CadastroFormData para RegisterData
+    const registerData = {
+      name: form.nome,
+      email: form.email,
+      senha: form.senha,
+      telefone: form.telefone,
+      role: form.role,
+      cidade: form.cidade,
+      estado: form.estado,
+    };
+    try {
+      await register(registerData);
       setSuccess('Cadastro realizado com sucesso!');
-    }, 1200);
+    } catch {
+      setError('Erro ao cadastrar. Tente novamente.');
+    }
   };
 
   return (
@@ -222,10 +234,10 @@ export function CadastroForm() {
         variant="contained"
         color="primary"
         size="large"
-        disabled={loading}
+        disabled={isLoading}
         sx={{ mt: 1, fontWeight: 600 }}
       >
-        {loading ? <CircularProgress size={24} color="inherit" /> : 'Cadastrar'}
+        {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Cadastrar'}
       </Button>
       <Typography variant="body2" sx={{ textAlign: 'center', mt: 2, color: 'text.secondary' }}>
         Já tem uma conta? <a href="/login" style={{ color: '#388e3c', textDecoration: 'underline' }}>Entrar</a>

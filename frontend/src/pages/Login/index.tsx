@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { validateEmail } from './validation';
 import { Box, Button, TextField, Typography, Alert, CircularProgress } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../../layouts/AuthLayout';
-
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -10,6 +11,14 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const { login, isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
+  // Redireciona para home se já autenticado
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -24,17 +33,23 @@ export default function Login() {
     setEmailError(emailValidation);
     if (emailValidation) return;
     setLoading(true);
-    // Simulação de login (substitua por chamada real à API)
-    setTimeout(() => {
+    try {
+      await login({ email, password });
+      navigate('/', { replace: true });
+    } catch {
+      setError('E-mail ou senha inválidos.');
+    } finally {
       setLoading(false);
-      if (email === 'demo@recicla.ai' && password === '12345678') {
-        // Redirecionar ou setar auth
-        alert('Login realizado com sucesso!');
-      } else {
-        setError('E-mail ou senha inválidos.');
-      }
-    }, 1000);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress size={48} color="primary" />
+      </Box>
+    );
+  }
 
   return (
     <AuthLayout title="Entrar no ReciclaAi" subtitle="Acesse sua conta para continuar">

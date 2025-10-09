@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppBar,
@@ -27,6 +28,7 @@ const navLinks = [
 ];
 
 export function Navbar() {
+  const { user, logout } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const location = useLocation();
@@ -53,8 +55,7 @@ export function Navbar() {
 
   const handleLogout = () => {
     handleCloseUserMenu();
-    // TODO: Implementar lógica de logout quando AuthContext estiver pronto
-    console.log('Logout realizado');
+    logout();
     navigate('/login');
   };
 
@@ -141,7 +142,7 @@ export function Navbar() {
                 fontWeight: 600,
               }}
             >
-                U
+              {user?.name?.[0]?.toUpperCase() || 'U'}
             </Avatar>
           </IconButton>
         </Box>
