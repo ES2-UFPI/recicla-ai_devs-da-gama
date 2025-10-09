@@ -1,21 +1,33 @@
 import { useState } from 'react';
+import { validateEmail } from './validation';
 import { Box, Button, TextField, Typography, Alert, CircularProgress } from '@mui/material';
 import { AuthLayout } from '../../layouts/AuthLayout';
+
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEmail(value);
+    setEmailError(validateEmail(value));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const emailValidation = validateEmail(email);
+    setEmailError(emailValidation);
+    if (emailValidation) return;
     setLoading(true);
     // Simulação de login (substitua por chamada real à API)
     setTimeout(() => {
       setLoading(false);
-      if (email === 'demo@recicla.ai' && password === '123456') {
+      if (email === 'demo@recicla.ai' && password === '12345678') {
         // Redirecionar ou setar auth
         alert('Login realizado com sucesso!');
       } else {
@@ -32,11 +44,13 @@ export default function Login() {
           label="E-mail"
           type="email"
           value={email}
-          onChange={e => setEmail(e.target.value)}
+          onChange={handleEmailChange}
           required
           autoFocus
           fullWidth
           autoComplete="email"
+          error={!!emailError}
+          helperText={emailError}
         />
         <TextField
           label="Senha"
@@ -59,6 +73,10 @@ export default function Login() {
         </Button>
         <Typography variant="body2" sx={{ textAlign: 'center', mt: 2, color: 'text.secondary' }}>
           Esqueceu a senha? <a href="#" style={{ color: '#388e3c', textDecoration: 'underline' }}>Recuperar acesso</a>
+        </Typography>
+        <Typography variant="body2" sx={{ textAlign: 'center', mt: 1, color: 'text.secondary' }}>
+          Ainda não tem um cadastro?{' '}
+          <a href="/cadastro" style={{ color: '#388e3c', textDecoration: 'underline' }}>Cadastre-se</a>
         </Typography>
       </Box>
     </AuthLayout>
