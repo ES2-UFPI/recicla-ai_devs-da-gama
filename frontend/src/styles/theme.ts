@@ -38,9 +38,9 @@ export const theme = createTheme({
       paper: '#ffffff',
     },
     info: {
-      main: '#a1887f', // Marrom claro (elemento terroso)
-      light: '#d7ccc8',
-      dark: '#6d4c41',
+      main: '#00acc1', // Ciano (informação/andamento)
+      light: '#4dd0e1',
+      dark: '#007c91',
       contrastText: '#fff',
     },
     text: {
