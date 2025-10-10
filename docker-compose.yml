@@ -3,13 +3,13 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: dockerfile
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
-    environment:
-      - NODE_ENV=production
+    env_file:
+      - ./backend/.env
     networks:
       - app-network
 
