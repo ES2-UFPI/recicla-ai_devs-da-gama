@@ -19,9 +19,11 @@ import HomeIcon from '@mui/icons-material/Home';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import RedeemIcon from '@mui/icons-material/Redeem';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 const navLinks = [
   { label: 'Página Inicial', icon: <HomeIcon fontSize="small" />, to: '/' },
+  { label: 'Resíduos', icon: <DeleteIcon fontSize="small" />, to: '/residuos' },
   { label: 'Agendamentos', icon: <CalendarMonthIcon fontSize="small" />, to: '/agendamentos' },
   { label: 'Recompensas', icon: <RedeemIcon fontSize="small" />, to: '/recompensas' },
   { label: 'Ranking', icon: <EmojiEventsIcon fontSize="small" />, to: '/ranking' },
