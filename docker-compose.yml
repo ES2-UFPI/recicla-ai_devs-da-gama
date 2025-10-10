@@ -4,6 +4,9 @@ services:
     build:
       context: ./backend
       dockerfile: dockerfile
+    container_name: reciclaai-backend
+    depends_on:
+      - mongodb
     ports:
       - "8000:8000"
     volumes:
@@ -38,6 +41,22 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
+    networks:
+      - app-network
+
+  # MongoDB local para desenvolvimento
+  mongodb:
+    image: mongo:7
+    container_name: reciclaai-mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin123
+      - MONGO_INITDB_DATABASE=ReciclaAi
+    volumes:
+      - ./data/db:/data/db
     networks:
       - app-network
 
