@@ -8,6 +8,7 @@ import { useTheme } from '@mui/material/styles';
  */
 export function GlobalStyles() {
   const theme = useTheme();
+  
   return (
     <Global
       styles={css`
@@ -17,12 +18,14 @@ export function GlobalStyles() {
           margin: 0;
           padding: 0;
         }
+
         html {
           height: 100%;
           font-size: 16px;
           scroll-behavior: smooth;
           background: ${theme.palette.background.default};
         }
+
         body {
           min-height: 100vh;
           width: 100vw;
@@ -33,51 +36,66 @@ export function GlobalStyles() {
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
           overflow-x: hidden;
+          margin: 0;
+          padding: 0;
         }
+
+        #root {
+          min-height: 100vh;
+          width: 100%;
+        }
+
         a {
           color: ${theme.palette.primary.main};
           text-decoration: none;
           transition: color 0.2s;
         }
+
         a:hover, a:focus {
-          color: ${theme.palette.secondary.main};
+          color: ${theme.palette.primary.light};
           text-decoration: underline;
         }
+
         button, input, select, textarea {
           font-family: inherit;
           font-size: 1rem;
         }
+
         img, svg {
           max-width: 100%;
           display: block;
         }
+
         /* Responsividade: ajusta base do html para mobile/tablet/web */
         @media (max-width: 600px) {
           html { font-size: 15px; }
-          body { padding: 0 0.5rem; }
         }
+
         @media (min-width: 601px) and (max-width: 900px) {
           html { font-size: 16px; }
-          body { padding: 0 1.5rem; }
         }
+
         @media (min-width: 901px) {
           html { font-size: 17px; }
-          body { padding: 0 2.5rem; }
         }
+
         /* Scrollbar customizada (webkit) */
         ::-webkit-scrollbar {
           width: 10px;
           background: ${theme.palette.background.default};
         }
+
         ::-webkit-scrollbar-thumb {
           background: ${theme.palette.primary.light};
           border-radius: 8px;
         }
+
         /* Seleção de texto com cor do tema */
         ::selection {
           background: ${theme.palette.primary.light};
           color: #fff;
         }
+
         /* Acessibilidade: foco visível */
         :focus-visible {
           outline: 2px solid ${theme.palette.secondary.main};
