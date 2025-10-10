@@ -1,8 +1,8 @@
 
 import { useState, useEffect } from 'react';
-import type { AuthContextType, User, LoginCredentials, RegisterData } from '../types/auth';
-import { cookies } from '../utils/cookies';
+import type { AuthContextType, User, LoginCredentials, RegisterData, AuthResponse } from '../types/auth';
 import { AuthContext } from './AuthContext';
+import api from '../services/api';
 
 interface AuthProviderProps {
   children: React.ReactNode;
@@ -12,79 +12,62 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Verifica se existe token ao carregar a aplicação
+  // Valida sessão via cookie httpOnly ao carregar a aplicação
   useEffect(() => {
-    const token = cookies.getToken();
-    
-    if (token) {
-      // TODO: Quando backend estiver pronto, validar o token com a API
-      // Por enquanto, usar dados mock
-      const mockUser: User = {
-        id: '1',
-        name: 'Demo User',
-        email: 'demo@recicla.ai',
-        telefone: '(86) 99999-9999',
-        role: 'produtor',
-        estado: 'PI',
-        cidade: 'Teresina',
-      };
-      setUser(mockUser);
-    }
-    
-    setIsLoading(false);
+    (async () => {
+      try {
+        const { data } = await api.get<User>('/auth/me');
+        setUser(data);
+      } catch {
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   }, []);
 
-  // Login (MOCK - substitua pela chamada real à API)
+  // Login usando cookie httpOnly
   async function login(credentials: LoginCredentials) {
     setIsLoading(true);
-    // Simulação de delay de rede
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // Validação mock (substitua pela chamada real)
-    if (credentials.email === 'demo@recicla.ai' && credentials.password === '12345678') {
-      const mockToken = 'mock-jwt-token-12345';
-      const mockUser: User = {
-        id: '1',
-        name: 'Demo User',
-        email: 'demo@recicla.ai',
-        telefone: '(86) 99999-9999',
-        role: 'produtor',
-        estado: 'PI',
-        cidade: 'Teresina',
-      };
-      cookies.setToken(mockToken);
-      setUser(mockUser);
-    } else {
-      setIsLoading(false);
+    try {
+      await api.post<AuthResponse | unknown>('/auth/login', credentials);
+      // Cookie httpOnly é definido pelo backend. Buscar usuário atual.
+      const { data: me } = await api.get<User>('/auth/me');
+      setUser(me);
+    } catch {
       throw new Error('Credenciais inválidas');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }
 
-  // Registro (MOCK - substitua pela chamada real à API)
+  // Registro usando cookie httpOnly
   async function register(data: RegisterData) {
     setIsLoading(true);
-    // Simulação de delay de rede
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // Mock de registro bem-sucedido
-    const mockToken = 'mock-jwt-token-67890';
-    const mockUser: User = {
-      id: '2',
-      name: data.name,
-      email: data.email,
-      telefone: data.telefone,
-      role: data.role as 'produtor' | 'coletor' | 'receptor',
-      estado: data.estado,
-      cidade: data.cidade,
-    };
-    cookies.setToken(mockToken);
-    setUser(mockUser);
-    setIsLoading(false);
+    try {
+      await api.post<AuthResponse | unknown>('/auth/register', data);
+      // Dependendo da sua regra de negócio, o backend pode já autenticar após registro
+      try {
+        const { data: me } = await api.get<User>('/auth/me');
+        setUser(me);
+      } catch {
+        // Caso não autentique automaticamente, usuário permanece deslogado
+        setUser(null);
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  // Logout
-  function logout() {
-    cookies.removeToken();
-    setUser(null);
+  // Logout via backend e limpa estado local
+  async function logout() {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // mesmo em erro de rede, limpar estado local
+    } finally {
+      setUser(null);
+    }
   }
 
   const value: AuthContextType = {

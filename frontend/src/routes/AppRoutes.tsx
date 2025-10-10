@@ -5,6 +5,8 @@ import Login from '../pages/Login';
 import Cadastro from '../pages/Cadastro';
 import Home from '../pages/Home';
 import Perfil from '../pages/Perfil';
+import Residuo from '../pages/Residuo';
+
 import { ProtectedRoute } from './ProtectedRoute';
 
 export function AppRoutes() {
@@ -18,6 +20,11 @@ export function AppRoutes() {
       <Route path="/" element={
         <ProtectedRoute>
           <Home />
+        </ProtectedRoute>
+      } />
+      <Route path="/residuos" element={
+        <ProtectedRoute>
+          <Residuo />
         </ProtectedRoute>
       } />
       {/* Rota Perfil */}
