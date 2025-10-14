@@ -1,3 +1,4 @@
+from enum import Enum
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
@@ -39,6 +40,24 @@ class Residue(BaseModel):
     foto: Optional[str] = None  # URL ou caminho da foto
     categoriaId: str
     produtorId: str
+
+    class Config:
+        allow_population_by_field_name = True
+        json_encoders = {ObjectId: str}
+
+class StatusAgendamento(str, Enum):
+    PENDENTE = "pendente"
+    ACEITO = "aceito"
+    CANCELADO = "cancelado"
+
+class Scheduling(BaseModel):
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    produtorId: str
+    residuosId: list[str]
+    disponibilidade: list[str]
+    local: str
+    status: StatusAgendamento = StatusAgendamento.PENDENTE
+    observacoes: Optional[str] = None
 
     class Config:
         allow_population_by_field_name = True
