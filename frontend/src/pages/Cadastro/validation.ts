@@ -23,14 +23,14 @@ export function validateTelefone(telefone: string): string {
 export function validateSenha(senha: string): string {
   if (!senha) return 'Senha é obrigatória.';
   if (senha.length < 8) return 'Senha deve ter pelo menos 8 caracteres.';
-  if (!/[A-Za-z]/.test(senha) || !/\d/.test(senha)) return 'Senha deve conter pelo menos uma letra e um número.';
+  if (!/[A-Z]/.test(senha)) return 'Senha deve conter pelo menos uma letra maiúscula.';
+  if (!/\d/.test(senha)) return 'Senha deve conter pelo menos um número.';
+  if (!/[!@#$%&*]/.test(senha)) return 'Senha deve conter pelo menos um caractere especial (!@#$%&*).';
   return '';
 }
 
 export function validateConfirmacaoSenha(senha: string, confirmacao: string): string {
   if (!confirmacao) return 'Confirme a senha.';
-  if (confirmacao.length < 8) return 'Confirmação deve ter pelo menos 8 caracteres.';
-  if (!/[A-Za-z]/.test(confirmacao) || !/\d/.test(confirmacao)) return 'Confirmação deve conter pelo menos uma letra e um número.';
   if (senha !== confirmacao) return 'As senhas não coincidem.';
   return '';
 }

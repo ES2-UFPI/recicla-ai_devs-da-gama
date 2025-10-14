@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { validateEmail } from './validation';
 import { Box, Button, TextField, Typography, Alert, CircularProgress } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
@@ -11,14 +11,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
-  // Redireciona para home se já autenticado
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/', { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -36,20 +30,34 @@ export default function Login() {
     try {
       await login({ email, password });
       navigate('/', { replace: true });
-    } catch {
-      setError('E-mail ou senha inválidos.');
+    } catch (err: unknown) {
+      // Tratamento específico de erros da API
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { 
+          response?: { 
+            data?: { detail?: string }; 
+            status?: number 
+          } 
+        };
+        const detail = axiosError.response?.data?.detail;
+        const status = axiosError.response?.status;
+        
+        // Por segurança, não diferenciar entre "usuário não existe" e "senha incorreta"
+        // para prevenir enumeração de usuários
+        if (status === 401 || status === 404) {
+          setError('E-mail ou senha inválidos.');
+        } else if (detail) {
+          setError(detail);
+        } else {
+          setError('Erro ao fazer login. Tente novamente.');
+        }
+      } else {
+        setError('Erro ao fazer login. Verifique sua conexão e tente novamente.');
+      }
     } finally {
       setLoading(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CircularProgress size={48} color="primary" />
-      </Box>
-    );
-  }
 
   return (
     <AuthLayout title="Entrar no ReciclaAi" subtitle="Acesse sua conta para continuar">
