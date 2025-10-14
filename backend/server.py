@@ -1,18 +1,26 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.infra.database.config.database import get_client
-from src.routers.users_router import router as users_router
+from src.routers.user_router import router as users_router
+from src.routers.auth_router import router as auth_router
 
 app = FastAPI(title="ReciclaAI API", version="0.1.0")
 
+# Configuração CORS para suportar cookies HTTP-only
+# Em produção, substitua "*" pelo domínio específico do frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",  # Vite dev
+        "http://localhost:8000",  # Própria API
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Incluir routers
+app.include_router(auth_router)
 app.include_router(users_router)
 
 @app.get("/health")

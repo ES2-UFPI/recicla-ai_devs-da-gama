@@ -1,7 +1,55 @@
-# recicla-ai_devs-da-gama
+# ReciclaAI Backend
+
+
+## Sistema de Autenticação JWT
+
+**Implementado:** Autenticação JWT com cookies HTTP-only
+
+Este backend implementa um sistema completo de autenticação baseado em **JWT com cookies HTTP-only**, garantindo máxima segurança contra ataques XSS e CSRF.
+
+### Início Rápido
+
+```bash
+# 1. Configurar variáveis de ambiente
+cp .env.example .env
+python -c "import secrets; print(secrets.token_urlsafe(32))"  # Gerar JWT_SECRET_KEY
+
+# 2. Instalar dependências
+pip install -r requirements.txt
+
+# 3. Iniciar servidor
+uvicorn server:app --reload
+
+# 4. Testar
+python test_auth.py
+```
+
+### Documentação Completa
+
+- **[Guia de Início Rápido](QUICK_START.md)** - 5 passos para começar
+- **[Guia Completo de Autenticação](AUTH_README.md)** - Documentação detalhada
+- **[Arquitetura](ARQUITETURA_AUTH.md)** - Diagramas e fluxos
+- **[Comandos Úteis](COMANDOS_UTEIS.md)** - Referência de comandos
+- **[Checklist de Produção](PRODUCAO_CHECKLIST.md)** - Deploy em produção
+- **[Índice Geral](INDICE_DOCUMENTACAO.md)** - Navegação completa
+
+### Endpoints de Autenticação
+
+| Endpoint | Método | Descrição |
+|----------|--------|-----------|
+| `/auth/login` | POST | Login com e-mail/telefone e senha |
+| `/auth/logout` | POST | Logout e revogação de tokens |
+| `/auth/refresh` | POST | Renovação de access token |
+| `/auth/me` | GET | Dados do usuário autenticado |
+| `/users` | POST | Cadastro de novo usuário |
+
+**Swagger UI:** http://localhost:8000/docs
+
+---
 
 ## Grupo 3 - Engenharia de Software II (2025.2)
-## Integrantes
+
+### Integrantes
 * Gabriel Lopes Bastos (G4brielLB)
 * José Victor Vieira de Oliveira (vickminari)
 * Pedro Emanuel Moreira Carvalho (PedroEmanuelMoreiraCarvalho)
