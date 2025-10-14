@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { validateEmail } from './validation';
 import { Box, Button, TextField, Typography, Alert, CircularProgress } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
@@ -11,14 +11,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
-  // Redireciona para home se já autenticado
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/', { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -42,14 +36,6 @@ export default function Login() {
       setLoading(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CircularProgress size={48} color="primary" />
-      </Box>
-    );
-  }
 
   return (
     <AuthLayout title="Entrar no ReciclaAi" subtitle="Acesse sua conta para continuar">

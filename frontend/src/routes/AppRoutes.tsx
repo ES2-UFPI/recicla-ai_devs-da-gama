@@ -8,14 +8,22 @@ import Perfil from '../pages/Perfil';
 import Residuo from '../pages/Residuo';
 
 import { ProtectedRoute } from './ProtectedRoute';
+import { PublicRoute } from './PublicRoute';
 
 export function AppRoutes() {
   return (
     <Routes>
-      {/* Rota de Login */}
-      <Route path="/login" element={<Login />} />
-      {/* Rota de Cadastro */}
-      <Route path="/cadastro" element={<Cadastro />} />
+      {/* Rotas Públicas - Redireciona para home se já autenticado */}
+      <Route path="/login" element={
+        <PublicRoute>
+          <Login />
+        </PublicRoute>
+      } />
+      <Route path="/cadastro" element={
+        <PublicRoute>
+          <Cadastro />
+        </PublicRoute>
+      } />
       {/* Rota Home */}
       <Route path="/" element={
         <ProtectedRoute>
