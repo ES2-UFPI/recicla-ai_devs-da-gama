@@ -18,7 +18,7 @@ const fallbackRoles: Role[] = [
 ];
 
 export function CadastroForm() {
-  const { register, isLoading } = useAuth();
+  const { register } = useAuth();
   const [form, setForm] = useState<CadastroFormData>({
     nome: '',
     email: '',
@@ -30,6 +30,7 @@ export function CadastroForm() {
     estado: '',
   });
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof CadastroFormData, string>>>({});
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [roles] = useState<Role[]>(fallbackRoles);
@@ -111,11 +112,49 @@ export function CadastroForm() {
       cidade: form.cidade,
       estado: form.estado,
     };
+    setLoading(true);
     try {
       await register(registerData);
       setSuccess('Cadastro realizado com sucesso!');
-    } catch {
-      setError('Erro ao cadastrar. Tente novamente.');
+    } catch (err: unknown) {
+      // Tratamento específico de erros da API
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { 
+          response?: { 
+            data?: { 
+              detail?: string | Array<{ msg: string; loc: string[] }>
+            }; 
+            status?: number 
+          } 
+        };
+        const detail = axiosError.response?.data?.detail;
+        const status = axiosError.response?.status;
+        
+        if (status === 409) {
+          // Conflito - E-mail já cadastrado
+          setError(typeof detail === 'string' ? detail : 'E-mail já cadastrado.');
+        } else if (status === 422) {
+          // Erro de validação do Pydantic
+          if (Array.isArray(detail)) {
+            // Múltiplos erros de validação
+            const errorMessages = detail.map(err => err.msg).join('; ');
+            setError(errorMessages || 'Dados inválidos. Verifique os campos e tente novamente.');
+          } else {
+            setError(typeof detail === 'string' ? detail : 'Dados inválidos. Verifique os campos e tente novamente.');
+          }
+        } else if (status === 400) {
+          // Requisição inválida
+          setError(typeof detail === 'string' ? detail : 'Requisição inválida. Verifique os dados e tente novamente.');
+        } else if (typeof detail === 'string') {
+          setError(detail);
+        } else {
+          setError('Erro ao cadastrar. Tente novamente.');
+        }
+      } else {
+        setError('Erro ao cadastrar. Verifique sua conexão e tente novamente.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -234,10 +273,10 @@ export function CadastroForm() {
         variant="contained"
         color="primary"
         size="large"
-        disabled={isLoading}
+        disabled={loading}
         sx={{ mt: 1, fontWeight: 600 }}
       >
-        {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Cadastrar'}
+        {loading ? <CircularProgress size={24} color="inherit" /> : 'Cadastrar'}
       </Button>
       <Typography variant="body2" sx={{ textAlign: 'center', mt: 2, color: 'text.secondary' }}>
         Já tem uma conta? <a href="/login" style={{ color: '#388e3c', textDecoration: 'underline' }}>Entrar</a>

@@ -29,47 +29,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Login usando cookie httpOnly
   async function login(credentials: LoginCredentials) {
-    setIsLoading(true);
-    try {
-      // Backend espera { credential, password }
-      await api.post('/auth/login', {
-        credential: credentials.email,
-        password: credentials.password,
-      });
-      // Cookie httpOnly é definido pelo backend. Buscar usuário atual.
-      const { data: me } = await api.get<{ name: string; email: string; role_id: string }>('/auth/me');
-      setUser(mapUserFromMe(me));
-    } catch {
-      throw new Error('Credenciais inválidas');
-    } finally {
-      setIsLoading(false);
-    }
+    // Backend espera { credential, password }
+    await api.post('/auth/login', {
+      credential: credentials.email,
+      password: credentials.password,
+    });
+    // Cookie httpOnly é definido pelo backend. Buscar usuário atual.
+    const { data: me } = await api.get<{ name: string; email: string; role_id: string }>('/auth/me');
+    setUser(mapUserFromMe(me));
+    // ⚠️ IMPORTANTE: Não manipular isLoading aqui!
+    // O componente de Login já gerencia seu próprio loading state.
+    // Se houver erro, ele propaga automaticamente para o componente tratar.
   }
 
   // Registro usando cookie httpOnly
   async function register(data: RegisterData) {
-    setIsLoading(true);
+    // O backend atual expõe criação de usuário em /users (não autentica automaticamente)
+    // Mapear RegisterData -> UserCreate (backend): name, email, phone, password, role_id, cidade_id, estado_id
+    await api.post('/users', {
+      name: data.name,
+      email: data.email,
+      phone: data.telefone,
+      password: data.senha,
+      role_id: data.role,
+      cidade_id: data.cidade,
+      estado_id: data.estado,
+    });
+    // Após cadastro, opcionalmente fazer login automático
     try {
-      // O backend atual expõe criação de usuário em /users (não autentica automaticamente)
-      // Mapear RegisterData -> UserCreate (backend): name, email, phone, password, role_id, cidade_id, estado_id
-      await api.post('/users', {
-        name: data.name,
-        email: data.email,
-        phone: data.telefone,
-        password: data.senha,
-        role_id: data.role,
-        cidade_id: data.cidade,
-        estado_id: data.estado,
-      });
-      // Após cadastro, opcionalmente fazer login automático
-      try {
-        await login({ email: data.email, password: data.senha });
-      } catch {
-        setUser(null);
-      }
-    } finally {
-      setIsLoading(false);
+      await login({ email: data.email, password: data.senha });
+    } catch {
+      setUser(null);
     }
+    // ⚠️ IMPORTANTE: Não manipular isLoading aqui!
+    // O componente CadastroForm já gerencia seu próprio loading state.
+    // Se houver erro, ele propaga automaticamente para o componente tratar.
   }
 
   // Logout via backend e limpa estado local

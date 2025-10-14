@@ -30,8 +30,30 @@ export default function Login() {
     try {
       await login({ email, password });
       navigate('/', { replace: true });
-    } catch {
-      setError('E-mail ou senha inválidos.');
+    } catch (err: unknown) {
+      // Tratamento específico de erros da API
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { 
+          response?: { 
+            data?: { detail?: string }; 
+            status?: number 
+          } 
+        };
+        const detail = axiosError.response?.data?.detail;
+        const status = axiosError.response?.status;
+        
+        // Por segurança, não diferenciar entre "usuário não existe" e "senha incorreta"
+        // para prevenir enumeração de usuários
+        if (status === 401 || status === 404) {
+          setError('E-mail ou senha inválidos.');
+        } else if (detail) {
+          setError(detail);
+        } else {
+          setError('Erro ao fazer login. Tente novamente.');
+        }
+      } else {
+        setError('Erro ao fazer login. Verifique sua conexão e tente novamente.');
+      }
     } finally {
       setLoading(false);
     }

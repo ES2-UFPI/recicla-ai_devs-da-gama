@@ -21,11 +21,12 @@ api.interceptors.response.use(
     // 1. Não é erro 401
     // 2. Já tentou fazer refresh
     // 3. A requisição original já é para endpoints de auth (login/register/refresh/logout)
-    const isAuthEndpoint = url.includes('/auth/login') || 
-                          url.includes('/auth/register') || 
-                          url.includes('/auth/refresh') || 
-                          url.includes('/auth/logout') ||
-                          url.includes('/users'); // Cadastro de usuário
+  const isAuthEndpoint = url.includes('/auth/login') || 
+              url.includes('/auth/register') || 
+              url.includes('/auth/refresh') || 
+              url.includes('/auth/logout') ||
+              url.includes('/auth/me') ||
+              url.includes('/users'); // Cadastro de usuário
 
     if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
