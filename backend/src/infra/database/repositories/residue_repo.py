@@ -66,9 +66,123 @@ async def update_residue(residue_id: str, updates: Dict[str, Any]) -> bool:
 
 
 async def delete_residue(residue_id: str) -> bool:
+    """
+    Deleta resíduo (apenas se status permitir).
+    Regra de negócio: Não pode deletar resíduos COLETADOS ou ENTREGUES.
+    
+    Args:
+        residue_id: ID do resíduo
+        
+    Returns:
+        bool: True se deletou com sucesso, False se não encontrou ou não pode deletar
+    """
     try:
         _id = ObjectId(residue_id)
     except Exception:
         return False
+    
+    # Validar status antes de deletar
+    residue = await find_by_id(residue_id)
+    if not residue:
+        return False
+    
+    status = residue.get("status", "DISPONIVEL")
+    if status in ["COLETADO", "ENTREGUE"]:
+        # Não permitir deletar resíduos já processados
+        return False
+    
     result = await _collection().delete_one({"_id": _id})
     return result.deleted_count > 0
+
+
+# ============ MÉTODOS DE INTEGRAÇÃO COM HISTÓRICO ============
+
+async def atualizar_status(
+    residuo_id: str, 
+    novo_status: str,
+    usuario_id: str,
+    detalhes: Optional[Dict[str, Any]] = None
+) -> bool:
+    """
+    Atualiza status do resíduo e registra no histórico (Observer Pattern).
+    
+    Transições válidas:
+    DISPONIVEL → AGENDADO → COLETADO → ENTREGUE
+    Qualquer status → CANCELADO
+    
+    Args:
+        residuo_id: ID do resíduo
+        novo_status: Novo status (DISPONIVEL, AGENDADO, COLETADO, ENTREGUE, CANCELADO)
+        usuario_id: Quem realizou a mudança
+        detalhes: Informações adicionais
+    
+    Returns:
+        bool: True se atualizou com sucesso
+    """
+    from datetime import datetime
+    from src.infra.database.repositories import historico_repo
+    
+    # 1. Buscar resíduo atual
+    residuo = await find_by_id(residuo_id)
+    if not residuo:
+        return False
+    
+    # 2. Atualizar status
+    updates = {"status": novo_status}
+    success = await update_residue(residuo_id, updates)
+    if not success:
+        return False
+    
+    # 3. Registrar no histórico (Observer Pattern)
+    historico_doc = {
+        "residuo_id": residuo_id,
+        "acao": novo_status,
+        "usuario_id": usuario_id,
+        "data_acao": datetime.utcnow(),
+        "detalhes": detalhes or {}
+    }
+    await historico_repo.criar_historico(historico_doc)
+    
+    return True
+
+
+async def update_residue_with_history(
+    residuo_id: str,
+    updates: Dict[str, Any],
+    usuario_id: str,
+    acao: str,
+    detalhes: Optional[Dict[str, Any]] = None
+) -> bool:
+    """
+    Atualiza resíduo e registra mudança no histórico (Observer Pattern).
+    Use este método quando precisar rastrear mudanças além de status.
+    
+    Args:
+        residuo_id: ID do resíduo
+        updates: Campos a atualizar
+        usuario_id: Quem realizou a ação
+        acao: Tipo de ação (CRIADO, AGENDADO, COLETADO, ENTREGUE)
+        detalhes: Informações adicionais sobre a ação
+    
+    Returns:
+        bool: True se atualizou com sucesso
+    """
+    from datetime import datetime
+    from src.infra.database.repositories import historico_repo
+    
+    # 1. Atualizar resíduo
+    success = await update_residue(residuo_id, updates)
+    if not success:
+        return False
+    
+    # 2. Registrar no histórico (Observer Pattern)
+    historico_doc = {
+        "residuo_id": residuo_id,
+        "acao": acao,
+        "usuario_id": usuario_id,
+        "data_acao": datetime.utcnow(),
+        "detalhes": detalhes or {}
+    }
+    await historico_repo.criar_historico(historico_doc)
+    
+    return True
