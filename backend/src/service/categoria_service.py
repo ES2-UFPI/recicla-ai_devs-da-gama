@@ -15,7 +15,7 @@ from typing import List, Optional
 from fastapi import HTTPException
 
 from src.infra.database.repositories import categoria_repo
-from src.infra.database.models.models import CategoriaResiduo
+from src.infra.database.models import CategoriaResiduo
 from src.schemas.categoria_schema import (
     CategoriaResponseDTO,
     CategoriaCreateDTO,
