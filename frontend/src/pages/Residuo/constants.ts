@@ -4,10 +4,11 @@ import type { ResiduoStatus, UnidadeMedida } from '../../types/residuo';
 import type { ChipProps } from '@mui/material';
 
 export const statusColor: Record<ResiduoStatus, ChipProps['color']> = {
-  CRIADO: 'secondary',
+  DISPONIVEL: 'secondary',
   AGENDADO: 'warning',
   COLETADO: 'info',
   ENTREGUE: 'success',
+  CANCELADO: 'error',
 };
 
 // Cores padronizadas de reciclagem (seguindo convenção internacional)
@@ -17,10 +18,11 @@ export const categoriaColor: Record<string, string> = {
   vidro: '#4CAF50', // Verde
   metal: '#FFC107', // Amarelo
   organico: '#795548', // Marrom
-  eletronico: '#FF9800', // Laranja (mantido para futuros dados)
+  eletronico: '#FF9800', // Laranja
 };
 
-export const unidades: UnidadeMedida[] = ['unidade', 'kg', 'g', 'L', 'mL'];
+// Backend só aceita 'kg' ou 'unidade'
+export const unidades: UnidadeMedida[] = ['kg', 'unidade'];
 
 export const formatarData = (iso: string) =>
   format(new Date(iso), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
