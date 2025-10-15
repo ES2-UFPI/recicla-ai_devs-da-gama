@@ -16,7 +16,7 @@ from datetime import datetime
 from fastapi import HTTPException
 
 from src.infra.database.repositories import residue_repo, categoria_repo, historico_repo
-from src.infra.database.models.models import CategoriaResiduo, Residue, StatusResiduo
+from src.infra.database.models import CategoriaResiduo, Residue, StatusResiduo
 from src.schemas.residue_schema import (
     ResidueCreate, 
     ResidueResponse, 
