@@ -14,7 +14,9 @@ def _to_response(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
 		return None
 	# Ensure _id is a string for JSON serialization / response models
 	_id = doc.get("_id")
-	return {**doc, "_id": str(_id) if isinstance(_id, ObjectId) else _id}
+	id_str = str(_id) if isinstance(_id, ObjectId) else _id
+	# Retorna ambos '_id' e 'id' para compatibilidade
+	return {**doc, "_id": id_str, "id": id_str}
 
 
 async def find_by_email(email: str) -> Optional[Dict[str, Any]]:

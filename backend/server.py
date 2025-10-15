@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.infra.database.config.database import get_client
 from src.routers.user_router import router as users_router
 from src.routers.auth_router import router as auth_router
+from src.routers.residue_router import router as residue_router
+from src.routers.categoria_router import router as categoria_router
+from src.routers.dev_router import router as dev_router
 
 app = FastAPI(title="ReciclaAI API", version="0.1.0")
 
@@ -21,7 +24,10 @@ app.add_middleware(
 
 # Incluir routers
 app.include_router(auth_router)
-app.include_router(users_router)
+app.include_router(users_router)  # Módulo de Usuários
+app.include_router(residue_router)  # Módulo de Resíduos
+app.include_router(categoria_router)  # Módulo de Categorias
+app.include_router(dev_router)  # Módulo de Desenvolvimento (seed, debug, etc.)
 
 @app.get("/health")
 async def health():
