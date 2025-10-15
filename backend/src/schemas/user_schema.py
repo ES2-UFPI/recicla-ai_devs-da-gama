@@ -64,6 +64,8 @@ class UserCreate(BaseModel):
             raise ValueError("Addresses must be a list of Endereco instances.")
 
         for address in addresses:
+            if address.cep[5] != '-':
+                raise ValueError("CEP deve estar no formato '12345-678'.")
             if sum(ch.isdigit() for ch in address.cep) != 8:
                 # contando apenas dígitos
                 raise ValueError("CEP deve conter exatamente 8 dígitos numéricos.")
@@ -127,6 +129,8 @@ class UserUpdate(BaseModel):
             raise ValueError("Addresses must be a list of Endereco instances.")
 
         for address in addresses:
+            if address.cep[5] != '-':
+                raise ValueError("CEP deve estar no formato '12345-678'.")
             if sum(ch.isdigit() for ch in address.cep) != 8:
                 # contando apenas dígitos
                 raise ValueError("CEP deve conter exatamente 8 dígitos numéricos.")
