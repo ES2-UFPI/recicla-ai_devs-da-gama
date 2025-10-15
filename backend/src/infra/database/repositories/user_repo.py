@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorCollection
 
@@ -36,3 +36,95 @@ async def find_by_id(user_id: str) -> Optional[Dict[str, Any]]:
 		return None
 	doc = await _collection().find_one({"_id": _id})
 	return _to_response(doc)
+
+
+
+def _to_object_id(user_id: str) -> Optional[ObjectId]:
+	try:
+		return ObjectId(user_id)
+	except Exception:
+		return None
+
+
+async def find_by_phone(phone: str) -> Optional[Dict[str, Any]]:
+	doc = await _collection().find_one({"phone": phone})
+	return _to_response(doc)
+
+
+async def update_user(user_id: str, updates: Dict[str, Any]) -> bool:
+	"""Atualização genérica. Aceita campos como name, email, phone, password_hash, role_id, addresses, cidade_id, estado_id."""
+	_id = _to_object_id(user_id)
+	if not _id:
+		return False
+
+	# Prevent updating immutable fields
+	updates = {k: v for k, v in updates.items() if k not in {"_id", "id"}}
+	if not updates:
+		return False
+
+	result = await _collection().update_one({"_id": _id}, {"$set": updates})
+	return result.matched_count > 0
+
+
+async def get_addresses(user_id: str) -> Optional[List[Dict[str, Any]]]:
+	"""Retorna uma lista de endereços para o usuário"""
+	_id = _to_object_id(user_id)
+	if not _id:
+		return None
+	doc = await _collection().find_one({"_id": _id}, {"addresses": 1})
+	if not doc:
+		return None
+	return doc.get("addresses", []) or []
+
+
+async def add_address(user_id: str, address: Dict[str, Any]) -> bool:
+	"""Adiciona um novo endereço ao array de endereços do usuário"""
+	_id = _to_object_id(user_id)
+	if not _id:
+		return False
+	# Ensure addresses field exists and push new address
+	result = await _collection().update_one(
+		{"_id": _id},
+		{"$push": {"addresses": address}}
+	)
+	return result.matched_count > 0
+
+
+async def update_address(user_id: str, apelido: str, updates: Dict[str, Any]) -> bool:
+	"""
+	Atualiza um endereço pelo seu apelido
+	Apenas os campos fornecidos serão atualizados
+	"""
+	_id = _to_object_id(user_id)
+	if not _id:
+		return False
+
+	if not updates:
+		return False
+
+	# Build $set for the positional operator
+	set_updates: Dict[str, Any] = {}
+	for k, v in updates.items():
+		if k in {"apelido", "cep", "logradouro", "numero", "latitude", "longitude", "complemento"}:
+			set_updates[f"addresses.$.{k}"] = v
+
+	if not set_updates:
+		return False
+
+	result = await _collection().update_one(
+		{"_id": _id, "addresses.apelido": apelido},
+		{"$set": set_updates}
+	)
+	return result.matched_count > 0 and result.modified_count > 0
+
+
+async def remove_address(user_id: str, apelido: str) -> bool:
+	"""Remove um endereço de um usuário, pelo seu apelido"""
+	_id = _to_object_id(user_id)
+	if not _id:
+		return False
+	result = await _collection().update_one(
+		{"_id": _id},
+		{"$pull": {"addresses": {"apelido": apelido}}}
+	)
+	return result.matched_count > 0 and result.modified_count > 0
