@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import type { AuthContextType, User, LoginCredentials, RegisterData, AuthResponse } from '../types/auth';
+import type { AuthContextType, User, LoginCredentials, RegisterData } from '../types/auth';
 import { AuthContext } from './AuthContext';
 import api from '../services/api';
 
@@ -16,9 +16,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await api.get<User>('/auth/me');
-        setUser(data);
+        const { data } = await api.get<{ name: string; email: string; role_id: string }>('/auth/me');
+        setUser(mapUserFromMe(data));
       } catch {
+        // Usuário não autenticado ou sessão expirada - comportamento esperado
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -28,35 +29,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Login usando cookie httpOnly
   async function login(credentials: LoginCredentials) {
-    setIsLoading(true);
-    try {
-      await api.post<AuthResponse | unknown>('/auth/login', credentials);
-      // Cookie httpOnly é definido pelo backend. Buscar usuário atual.
-      const { data: me } = await api.get<User>('/auth/me');
-      setUser(me);
-    } catch {
-      throw new Error('Credenciais inválidas');
-    } finally {
-      setIsLoading(false);
-    }
+    // Backend espera { credential, password }
+    await api.post('/auth/login', {
+      credential: credentials.email,
+      password: credentials.password,
+    });
+    // Cookie httpOnly é definido pelo backend. Buscar usuário atual.
+    const { data: me } = await api.get<{ name: string; email: string; role_id: string }>('/auth/me');
+    setUser(mapUserFromMe(me));
+    // ⚠️ IMPORTANTE: Não manipular isLoading aqui!
+    // O componente de Login já gerencia seu próprio loading state.
+    // Se houver erro, ele propaga automaticamente para o componente tratar.
   }
 
   // Registro usando cookie httpOnly
   async function register(data: RegisterData) {
-    setIsLoading(true);
+    // O backend atual expõe criação de usuário em /users (não autentica automaticamente)
+    // Mapear RegisterData -> UserCreate (backend): name, email, phone, password, role_id, cidade_id, estado_id
+    await api.post('/users', {
+      name: data.name,
+      email: data.email,
+      phone: data.telefone,
+      password: data.senha,
+      role_id: data.role,
+      cidade_id: data.cidade,
+      estado_id: data.estado,
+    });
+    // Após cadastro, opcionalmente fazer login automático
     try {
-      await api.post<AuthResponse | unknown>('/auth/register', data);
-      // Dependendo da sua regra de negócio, o backend pode já autenticar após registro
-      try {
-        const { data: me } = await api.get<User>('/auth/me');
-        setUser(me);
-      } catch {
-        // Caso não autentique automaticamente, usuário permanece deslogado
-        setUser(null);
-      }
-    } finally {
-      setIsLoading(false);
+      await login({ email: data.email, password: data.senha });
+    } catch {
+      setUser(null);
     }
+    // ⚠️ IMPORTANTE: Não manipular isLoading aqui!
+    // O componente CadastroForm já gerencia seu próprio loading state.
+    // Se houver erro, ele propaga automaticamente para o componente tratar.
   }
 
   // Logout via backend e limpa estado local
@@ -84,4 +91,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
       {children}
     </AuthContext.Provider>
   );
+}
+
+// Helpers
+function mapUserFromMe(me: { name: string; email: string; role_id: string }): User {
+  // Backend retorna apenas name, email, role_id no /auth/me atualmente.
+  // Preenchemos campos adicionais com valores vazios até que endpoints de perfil estejam disponíveis.
+  return {
+    id: '',
+    name: me.name,
+    email: me.email,
+    telefone: '',
+    role: mapRoleIdToRole(me.role_id),
+    estado: '',
+    cidade: '',
+  };
+}
+
+function mapRoleIdToRole(roleId: string): User['role'] {
+  // Adeque este mapeamento quando os role_ids reais forem definidos.
+  const normalized = roleId?.toLowerCase?.() ?? '';
+  if (normalized.includes('prod')) return 'produtor';
+  if (normalized.includes('col')) return 'coletor';
+  if (normalized.includes('rec')) return 'receptor';
+  // default
+  return 'produtor';
 }

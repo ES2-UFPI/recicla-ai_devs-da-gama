@@ -14,7 +14,9 @@ from src.infra.security.jwt_handler import (
 	create_refresh_token,
 	get_token_expiration,
 	verify_token_type,
-	get_user_id_from_token
+	get_user_id_from_token,
+	ACCESS_TOKEN_EXPIRE_MINUTES,
+	REFRESH_TOKEN_EXPIRE_DAYS
 )
 from src.infra.security.token_blacklist import token_blacklist
 
@@ -34,6 +36,9 @@ COOKIE_SAMESITE: Literal["lax", "strict", "none"] = (
 	else "lax"  # fallback padrão
 )
 
+# Calcula max_age dos cookies baseado nas configurações JWT
+ACCESS_TOKEN_COOKIE_MAX_AGE = ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Converte minutos para segundos
+REFRESH_TOKEN_COOKIE_MAX_AGE = REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60  # Converte dias para segundos
 
 class AuthService:
 	"""
@@ -110,7 +115,7 @@ class AuthService:
 			httponly=True,  # Não acessível via JavaScript (XSS protection)
 			secure=COOKIE_SECURE,  # Apenas HTTPS em produção
 			samesite=COOKIE_SAMESITE,  # CSRF protection
-			max_age=15 * 60,  # 15 minutos em segundos
+			max_age=ACCESS_TOKEN_COOKIE_MAX_AGE,  # 15 minutos em segundos
 			path="/",
 			domain=COOKIE_DOMAIN
 		)
@@ -121,7 +126,7 @@ class AuthService:
 			httponly=True,
 			secure=COOKIE_SECURE,
 			samesite=COOKIE_SAMESITE,
-			max_age=7 * 24 * 60 * 60,  # 7 dias em segundos
+			max_age=REFRESH_TOKEN_COOKIE_MAX_AGE,  # 7 dias em segundos
 			path="/",
 			domain=COOKIE_DOMAIN
 		)
@@ -186,7 +191,7 @@ class AuthService:
 			httponly=True,
 			secure=COOKIE_SECURE,
 			samesite=COOKIE_SAMESITE,
-			max_age=15 * 60,
+			max_age=ACCESS_TOKEN_COOKIE_MAX_AGE,  # 15 minutos em segundos
 			path="/",
 			domain=COOKIE_DOMAIN
 		)
