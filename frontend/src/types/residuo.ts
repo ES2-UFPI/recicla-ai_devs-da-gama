@@ -1,6 +1,8 @@
-export type ResiduoStatus = 'CRIADO' | 'AGENDADO' | 'COLETADO' | 'ENTREGUE';
+// Tipos compatíveis com o backend FastAPI
+export type ResiduoStatus = 'DISPONIVEL' | 'AGENDADO' | 'COLETADO' | 'ENTREGUE' | 'CANCELADO';
 
-export type UnidadeMedida = 'unidade' | 'kg' | 'g' | 'L' | 'mL';
+// Backend só aceita 'kg' ou 'unidade'
+export type UnidadeMedida = 'kg' | 'unidade';
 
 export interface HistoricoEvento {
   etapa: ResiduoStatus;
@@ -17,12 +19,16 @@ export interface Residuo {
   categoriaId: string;
   produtorId: string;
   status: ResiduoStatus;
+  valorEstimado: number; // Valor calculado pelo backend
   historico?: HistoricoEvento[];
 }
 
 export interface Categoria {
   id: string;
-  nome: string;
+  nome: string; // Mapeado de 'tipo' do backend
+  tipo?: string; // Campo original do backend (opcional para manter compatibilidade)
+  preco_por_kg?: number;
+  preco_por_unidade?: number;
 }
 
 // Tipo usado no cliente para criar um resíduo (antes do upload real para API)
