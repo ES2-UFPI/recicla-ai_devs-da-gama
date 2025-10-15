@@ -13,12 +13,13 @@ def _collection() -> AsyncIOMotorCollection:
 def _to_response(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """
     Converte documento do MongoDB para formato de resposta.
-    Serializa ObjectId para string.
+    Serializa ObjectId para string e adiciona campo 'id' para compatibilidade com Pydantic.
     """
     if not doc:
         return None
     _id = doc.get("_id")
-    return {**doc, "_id": str(_id) if isinstance(_id, ObjectId) else _id}
+    id_str = str(_id) if isinstance(_id, ObjectId) else _id
+    return {**doc, "_id": id_str, "id": id_str}
 
 
 def _to_response_many(docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

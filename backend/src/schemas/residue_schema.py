@@ -10,15 +10,24 @@ class ResidueCreate(BaseModel):
     DTO para criação de resíduo.
     O produtorId virá automaticamente do JWT (usuário autenticado).
     """
-    quantidade: float = Field(..., gt=0, description="Quantidade em kg", example=12.5)
+    quantidade: float = Field(..., gt=0, description="Quantidade em kg ou unidades", example=12.5)
+    tipo_medida: str = Field(default="kg", description="Tipo de medida: 'kg' ou 'unidade'", example="kg")
     foto: Optional[str] = Field(None, description="URL da foto do resíduo", example="http://example.com/foto.jpg")
     categoriaId: str = Field(..., description="ID da categoria do resíduo", example="60c72b2f9b1d4c3a4c8e4d3e")
+    
+    @field_validator('tipo_medida')
+    @classmethod
+    def validar_tipo_medida(cls, v):
+        if v not in ["kg", "unidade"]:
+            raise ValueError('tipo_medida deve ser "kg" ou "unidade"')
+        return v
     
     class Config:
         schema_extra = {
             "example": {
-                "quantidade": 12.5,
-                "foto": "http://example.com/foto.jpg",
+                "quantidade": 10,
+                "tipo_medida": "unidade",
+                "foto": "http://example.com/garrafas.jpg",
                 "categoriaId": "60c72b2f9b1d4c3a4c8e4d3e"
             }
         }
@@ -29,14 +38,23 @@ class ResidueUpdate(BaseModel):
     DTO para atualização de resíduo.
     Todos os campos são opcionais.
     """
-    quantidade: Optional[float] = Field(None, gt=0, description="Nova quantidade em kg", example=15.0)
+    quantidade: Optional[float] = Field(None, gt=0, description="Nova quantidade em kg ou unidades", example=15.0)
+    tipo_medida: Optional[str] = Field(None, description="Novo tipo de medida: 'kg' ou 'unidade'", example="unidade")
     foto: Optional[str] = Field(None, description="Nova URL da foto", example="http://example.com/foto2.jpg")
     categoriaId: Optional[str] = Field(None, description="Novo ID da categoria", example="60c72b2f9b1d4c3a4c8e4d3e")
+    
+    @field_validator('tipo_medida')
+    @classmethod
+    def validar_tipo_medida(cls, v):
+        if v is not None and v not in ["kg", "unidade"]:
+            raise ValueError('tipo_medida deve ser "kg" ou "unidade"')
+        return v
     
     class Config:
         schema_extra = {
             "example": {
                 "quantidade": 15.0,
+                "tipo_medida": "unidade",
                 "foto": "http://example.com/foto_atualizada.jpg"
             }
         }
@@ -52,7 +70,8 @@ class ResidueResponse(BaseModel):
     id: str = Field(..., description="ID do resíduo")
     produtorId: str = Field(..., description="ID do produtor")
     categoriaId: str = Field(..., description="ID da categoria")
-    quantidade: float = Field(..., description="Quantidade em kg")
+    quantidade: float = Field(..., description="Quantidade em kg ou unidades")
+    tipo_medida: str = Field(..., description="Tipo de medida: 'kg' ou 'unidade'")
     foto: Optional[str] = Field(None, description="URL da foto")
     valorEstimado: float = Field(..., description="Valor estimado calculado")
     status: str = Field(..., description="Status atual (DISPONIVEL, AGENDADO, COLETADO, ENTREGUE)")
@@ -65,9 +84,10 @@ class ResidueResponse(BaseModel):
                 "id": "60c72b2f9b1d4c3a4c8e4d3e",
                 "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
                 "categoriaId": "60c72b2f9b1d4c3a4c8e4d3b",
-                "quantidade": 12.5,
-                "foto": "http://example.com/foto.jpg",
-                "valorEstimado": 31.25,
+                "quantidade": 10,
+                "tipo_medida": "unidade",
+                "foto": "http://example.com/garrafas.jpg",
+                "valorEstimado": 1.50,
                 "status": "DISPONIVEL",
                 "dataCadastro": "2025-10-14T10:30:00Z"
             }

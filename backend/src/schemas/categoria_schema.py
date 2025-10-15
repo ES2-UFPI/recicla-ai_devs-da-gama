@@ -11,6 +11,7 @@ class CategoriaResponseDTO(BaseModel):
     tipo: str = Field(..., description="Tipo da categoria (Plástico, Vidro, Papel, Metal, Eletrônico)")
     descricao: str = Field(..., description="Descrição detalhada")
     preco_por_kg: float = Field(..., description="Preço de referência por kg")
+    preco_por_unidade: Optional[float] = Field(None, description="Preço de referência por unidade")
     ativo: bool = Field(..., description="Status da categoria")
     
     class Config:
@@ -18,9 +19,10 @@ class CategoriaResponseDTO(BaseModel):
         schema_extra = {
             "example": {
                 "id": "60c72b2f9b1d4c3a4c8e4d3e",
-                "tipo": "Plástico",
-                "descricao": "Garrafas PET, sacolas plásticas, embalagens de produtos",
-                "preco_por_kg": 2.50,
+                "tipo": "Vidro",
+                "descricao": "Garrafas de vidro, potes, frascos",
+                "preco_por_kg": 1.50,
+                "preco_por_unidade": 0.15,
                 "ativo": True
             }
         }
@@ -48,6 +50,11 @@ class CategoriaCreateDTO(BaseModel):
         gt=0, 
         description="Preço de referência por kg em reais"
     )
+    preco_por_unidade: Optional[float] = Field(
+        None, 
+        gt=0, 
+        description="Preço de referência por unidade em reais (opcional)"
+    )
     ativo: bool = Field(
         default=True, 
         description="Define se a categoria está ativa"
@@ -56,9 +63,10 @@ class CategoriaCreateDTO(BaseModel):
     class Config:
         schema_extra = {
             "example": {
-                "tipo": "Plástico",
-                "descricao": "Garrafas PET, sacolas plásticas, embalagens de produtos de limpeza e alimentos",
-                "preco_por_kg": 2.50,
+                "tipo": "Vidro",
+                "descricao": "Garrafas de vidro, potes, frascos - ideal para contagem por unidade",
+                "preco_por_kg": 1.50,
+                "preco_por_unidade": 0.15,
                 "ativo": True
             }
         }
@@ -86,6 +94,11 @@ class CategoriaUpdateDTO(BaseModel):
         gt=0,
         description="Preço de referência por kg"
     )
+    preco_por_unidade: Optional[float] = Field(
+        None, 
+        gt=0,
+        description="Preço de referência por unidade"
+    )
     ativo: Optional[bool] = Field(
         None,
         description="Status da categoria"
@@ -95,6 +108,7 @@ class CategoriaUpdateDTO(BaseModel):
         schema_extra = {
             "example": {
                 "preco_por_kg": 3.00,
+                "preco_por_unidade": 0.20,
                 "descricao": "Descrição atualizada com mais detalhes"
             }
         }
@@ -108,13 +122,15 @@ class CategoriaListResponseDTO(BaseModel):
     id: str
     tipo: str
     preco_por_kg: float
+    preco_por_unidade: Optional[float] = None
     
     class Config:
         orm_mode = True
         schema_extra = {
             "example": {
                 "id": "60c72b2f9b1d4c3a4c8e4d3e",
-                "tipo": "Plástico",
-                "preco_por_kg": 2.50
+                "tipo": "Vidro",
+                "preco_por_kg": 0.80,
+                "preco_por_unidade": 0.15
             }
         }

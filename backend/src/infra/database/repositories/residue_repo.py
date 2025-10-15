@@ -14,7 +14,9 @@ def _to_response(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if not doc:
         return None
     _id = doc.get("_id")
-    return {**doc, "_id": str(_id) if isinstance(_id, ObjectId) else _id}
+    id_str = str(_id) if isinstance(_id, ObjectId) else _id
+    # Retorna ambos '_id' e 'id' para compatibilidade
+    return {**doc, "_id": id_str, "id": id_str}
 
 
 def _to_response_many(docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
