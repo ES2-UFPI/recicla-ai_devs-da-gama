@@ -33,6 +33,11 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { Navbar } from '../../components/Navbar';
+import { EnderecoSelector } from '../../components/EnderecoSelector';
+import { DisponibilidadeSelector } from '../../components/DisponibilidadeSelector';
+import { ResiduoSelector } from '../../components/ResiduoSelector';
+import type { Endereco } from '../../types/endereco';
+import type { ResiduoParaAgendamento } from '../../components/ResiduoSelector';
 
 // Interface para Resíduo (simplificado para exibição)
 interface ResiduoAgendamento {
@@ -54,14 +59,44 @@ interface Agendamento {
   residuos?: ResiduoAgendamento[]; // Dados populados para exibição
 }
 
-// Mock data
+// Mock data - Resíduos disponíveis do usuário
+const mockResiduosDisponiveis: ResiduoParaAgendamento[] = [
+  { id: 'res1', quantidade: 15, unidade: 'kg', categoria: 'Eletrônicos' },
+  { id: 'res2', quantidade: 8, unidade: 'kg', categoria: 'Plástico' },
+  { id: 'res3', quantidade: 25, unidade: 'kg', categoria: 'Papel' },
+  { id: 'res4', quantidade: 50, unidade: 'kg', categoria: 'Metal' },
+  { id: 'res5', quantidade: 12, unidade: 'unidade', categoria: 'Vidro' },
+];
+
+// Mock data - Endereços salvos do usuário
+const mockEnderecosSalvos: Endereco[] = [
+  {
+    apelido: 'Casa',
+    cep: '64000-000',
+    logradouro: 'Rua das Flores',
+    numero: '123',
+    latitude: '-5.0892',
+    longitude: '-42.8034',
+    complemento: 'Apto 101',
+  },
+  {
+    apelido: 'Trabalho',
+    cep: '64001-000',
+    logradouro: 'Avenida Central',
+    numero: '456',
+    latitude: '-5.0950',
+    longitude: '-42.8100',
+  },
+];
+
+// Mock data - Agendamentos existentes
 const mockAgendamentos: Agendamento[] = [
   {
     id: '1',
     produtorId: 'user123',
     residuosId: ['res1', 'res2'],
     disponibilidade: ['2025-10-20T14:00', '2025-10-20T16:00', '2025-10-21T09:00', '2025-10-21T11:00'],
-    local: 'Rua A, 123 - Centro',
+    local: 'Rua das Flores, 123 - Apto 101',
     status: 'aceito',
     observacoes: 'Portão verde',
     residuos: [
@@ -74,7 +109,7 @@ const mockAgendamentos: Agendamento[] = [
     produtorId: 'user123',
     residuosId: ['res3'],
     disponibilidade: ['2025-10-22T10:00', '2025-10-22T12:00'],
-    local: 'Avenida B, 456 - Bairro X',
+    local: 'Avenida Central, 456',
     status: 'pendente',
     residuos: [
       { id: 'res3', quantidade: 25, unidade: 'kg', categoria: 'Papel' },
@@ -132,6 +167,7 @@ export function Agendamento() {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [enderecoSelecionado, setEnderecoSelecionado] = useState<Endereco | null>(null);
   const [formData, setFormData] = useState<Omit<Agendamento, 'id'>>({
     produtorId: 'user123', // Em produção, virá do contexto de autenticação
     residuosId: [],
@@ -153,6 +189,7 @@ export function Agendamento() {
         status: agendamento.status,
         observacoes: agendamento.observacoes || '',
       });
+      setEnderecoSelecionado(null);
     } else {
       setEditingId(null);
       setFormData({
@@ -163,6 +200,7 @@ export function Agendamento() {
         status: 'pendente',
         observacoes: '',
       });
+      setEnderecoSelecionado(null);
     }
     setOpenDialog(true);
   };
@@ -193,13 +231,6 @@ export function Agendamento() {
 
   const handleDelete = (id: string) => {
     setAgendamentos(agendamentos.filter((a) => a.id !== id));
-  };
-
-  const handleInputChange = (
-    field: keyof Omit<Agendamento, 'id'>,
-    value: string
-  ) => {
-    setFormData({ ...formData, [field]: value });
   };
 
   const handleToggleExpanded = (id: string) => {
@@ -271,112 +302,125 @@ export function Agendamento() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {agendamentos.map((agendamento) => (
-                      <Box key={agendamento.id} component={TableRow}>
-                        <TableRow hover>
-                          <TableCell sx={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {agendamento.local}
-                          </TableCell>
-                          <TableCell>
-                            {formatarDisponibilidade(agendamento.disponibilidade)}
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={statusLabelMap[agendamento.status]}
-                              color={statusColorMap[agendamento.status]}
-                              size="small"
-                              sx={{ fontWeight: 600 }}
-                            />
-                          </TableCell>
-                          <TableCell align="right">
-                            <IconButton
-                              size="small"
-                              color="secondary"
-                              aria-label="detalhes"
-                              onClick={() => handleToggleExpanded(agendamento.id)}
-                            >
-                              {expandedId === agendamento.id ? (
-                                <ExpandLessIcon fontSize="small" />
-                              ) : (
-                                <VisibilityIcon fontSize="small" />
-                              )}
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              aria-label="editar"
-                              onClick={() => handleOpenDialog(agendamento)}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              sx={{ color: theme.palette.error.main }}
-                              aria-label="deletar"
-                              onClick={() => handleDelete(agendamento.id)}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={4}>
-                            <Collapse
-                              in={expandedId === agendamento.id}
-                              timeout="auto"
-                              unmountOnExit
-                            >
-                              <Box sx={{ my: 2, mx: { xs: 0.5, sm: 2 } }}>
-                                <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-                                  Resíduos para Coleta
-                                </Typography>
-                                {agendamento.residuos && agendamento.residuos.length > 0 ? (
-                                  <Stack spacing={1}>
-                                    {agendamento.residuos.map((residuo, idx) => (
-                                      <Box
-                                        key={residuo.id}
-                                        sx={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: 2,
-                                          p: 1,
-                                          bgcolor: theme.palette.action.hover,
-                                          borderRadius: '0.5rem',
-                                        }}
-                                      >
-                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                          {idx + 1}.
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ flex: 1 }}>
-                                          {residuo.categoria}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                          {residuo.quantidade} {residuo.unidade}
-                                        </Typography>
-                                      </Box>
-                                    ))}
-                                  </Stack>
+                    {agendamentos.map((agendamento) => {
+                      const isEditable = agendamento.status === 'pendente';
+                      return (
+                        <>
+                          <TableRow 
+                            key={agendamento.id} 
+                            hover 
+                            sx={{ bgcolor: 'background.paper' }}
+                          >
+                            <TableCell sx={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {agendamento.local}
+                            </TableCell>
+                            <TableCell>
+                              {formatarDisponibilidade(agendamento.disponibilidade)}
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={statusLabelMap[agendamento.status]}
+                                color={statusColorMap[agendamento.status]}
+                                size="small"
+                                sx={{ fontWeight: 600 }}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <IconButton
+                                size="small"
+                                color="secondary"
+                                aria-label="detalhes"
+                                onClick={() => handleToggleExpanded(agendamento.id)}
+                              >
+                                {expandedId === agendamento.id ? (
+                                  <ExpandLessIcon fontSize="small" />
                                 ) : (
-                                  <Typography variant="body2" color="text.secondary">
-                                    Nenhum resíduo cadastrado
+                                  <VisibilityIcon fontSize="small" />
+                                )}
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                aria-label="editar"
+                                onClick={() => handleOpenDialog(agendamento)}
+                                disabled={!isEditable}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                sx={{ color: theme.palette.error.main }}
+                                aria-label="deletar"
+                                onClick={() => handleDelete(agendamento.id)}
+                                disabled={!isEditable}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow key={`${agendamento.id}-collapse`}>
+                            <TableCell 
+                              style={{ paddingBottom: 0, paddingTop: 0 }} 
+                              colSpan={4}
+                              sx={{ bgcolor: 'background.paper' }}
+                            >
+                              <Collapse
+                                in={expandedId === agendamento.id}
+                                timeout="auto"
+                                unmountOnExit
+                              >
+                                <Box sx={{ my: 2, mx: { xs: 0.5, sm: 2 } }}>
+                                  <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                                    Resíduos para Coleta
                                   </Typography>
-                                )}
-                                {agendamento.observacoes && (
-                                  <Box sx={{ mt: 2 }}>
-                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                      Observações:
-                                    </Typography>
+                                  {agendamento.residuos && agendamento.residuos.length > 0 ? (
+                                    <Stack spacing={1}>
+                                      {agendamento.residuos.map((residuo, idx) => (
+                                        <Box
+                                          key={residuo.id}
+                                          sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 2,
+                                            p: 1,
+                                            bgcolor: theme.palette.action.hover,
+                                            borderRadius: '0.5rem',
+                                          }}
+                                        >
+                                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                            {idx + 1}.
+                                          </Typography>
+                                          <Typography variant="body2" sx={{ flex: 1 }}>
+                                            {residuo.categoria}
+                                          </Typography>
+                                          <Typography variant="body2" color="text.secondary">
+                                            {residuo.quantidade} {residuo.unidade}
+                                          </Typography>
+                                        </Box>
+                                      ))}
+                                    </Stack>
+                                  ) : (
                                     <Typography variant="body2" color="text.secondary">
-                                      {agendamento.observacoes}
+                                      Nenhum resíduo cadastrado
                                     </Typography>
-                                  </Box>
-                                )}
-                              </Box>
-                            </Collapse>
-                          </TableCell>
-                        </TableRow>
-                      </Box>
-                    ))}
+                                  )}
+                                  {agendamento.observacoes && (
+                                    <Box sx={{ mt: 2 }}>
+                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                        Observações:
+                                      </Typography>
+                                      <Typography variant="body2" color="text.secondary">
+                                        {agendamento.observacoes}
+                                      </Typography>
+                                    </Box>
+                                  )}
+                                </Box>
+                              </Collapse>
+                            </TableCell>
+                          </TableRow>
+                        </>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </Box>
@@ -385,149 +429,154 @@ export function Agendamento() {
             {/* Mobile: Cards em coluna única */}
             {isMobile && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {agendamentos.map((agendamento) => (
-                  <Card
-                    key={agendamento.id}
-                    sx={{
-                      borderRadius: '0.75rem',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-                      transition: 'transform 0.2s, box-shadow 0.2s',
-                      '&:active': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                      },
-                    }}
-                  >
-                    <CardContent>
-                      <Box sx={{ mb: 2 }}>
-                        <Chip
-                          label={statusLabelMap[agendamento.status]}
-                          color={statusColorMap[agendamento.status]}
-                          size="small"
-                          sx={{ fontWeight: 600 }}
-                        />
-                      </Box>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: 1,
-                          mb: 1.5,
-                          color: theme.palette.text.primary,
-                        }}
-                      >
-                        <LocationOnIcon sx={{ fontSize: '1.2rem', mt: 0.25 }} />
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                          {agendamento.local}
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1,
-                          mb: 1,
-                          color: theme.palette.text.secondary,
-                        }}
-                      >
-                        <AccessTimeIcon sx={{ fontSize: '1.2rem' }} />
-                        <Typography variant="body2">
-                          {formatarDisponibilidade(agendamento.disponibilidade)}
-                        </Typography>
-                      </Box>
-                      {agendamento.residuos && agendamento.residuos.length > 0 && (
-                        <Box sx={{ mt: 2 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                            Resíduos: {agendamento.residuos.length}
+                {agendamentos.map((agendamento) => {
+                  const isEditable = agendamento.status === 'pendente';
+                  return (
+                    <Card
+                      key={agendamento.id}
+                      sx={{
+                        borderRadius: '0.75rem',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        '&:active': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                        },
+                      }}
+                    >
+                      <CardContent>
+                        <Box sx={{ mb: 2 }}>
+                          <Chip
+                            label={statusLabelMap[agendamento.status]}
+                            color={statusColorMap[agendamento.status]}
+                            size="small"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        </Box>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 1,
+                            mb: 1.5,
+                            color: theme.palette.text.primary,
+                          }}
+                        >
+                          <LocationOnIcon sx={{ fontSize: '1.2rem', mt: 0.25 }} />
+                          <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                            {agendamento.local}
                           </Typography>
                         </Box>
-                      )}
-                    </CardContent>
-                    <CardActions sx={{ pt: 0 }}>
-                      <Button
-                        size="small"
-                        startIcon={<VisibilityIcon />}
-                        onClick={() => handleToggleExpanded(agendamento.id)}
-                        sx={{
-                          color: theme.palette.secondary.main,
-                          textTransform: 'none',
-                        }}
-                      >
-                        {expandedId === agendamento.id ? 'Ocultar' : 'Ver'}
-                      </Button>
-                      <Button
-                        size="small"
-                        startIcon={<EditIcon />}
-                        onClick={() => handleOpenDialog(agendamento)}
-                        sx={{
-                          color: theme.palette.primary.main,
-                          textTransform: 'none',
-                        }}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        size="small"
-                        startIcon={<DeleteIcon />}
-                        onClick={() => handleDelete(agendamento.id)}
-                        sx={{
-                          color: theme.palette.error.main,
-                          textTransform: 'none',
-                        }}
-                      >
-                        Deletar
-                      </Button>
-                    </CardActions>
-                    {expandedId === agendamento.id && (
-                      <Box sx={{ px: 2, pb: 2 }}>
-                        <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                          Resíduos para Coleta
-                        </Typography>
-                        {agendamento.residuos && agendamento.residuos.length > 0 ? (
-                          <Stack spacing={1}>
-                            {agendamento.residuos.map((residuo, idx) => (
-                              <Box
-                                key={residuo.id}
-                                sx={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 1,
-                                  p: 1,
-                                  bgcolor: theme.palette.action.hover,
-                                  borderRadius: '0.5rem',
-                                }}
-                              >
-                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                  {idx + 1}.
-                                </Typography>
-                                <Typography variant="body2" sx={{ flex: 1 }}>
-                                  {residuo.categoria}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  {residuo.quantidade} {residuo.unidade}
-                                </Typography>
-                              </Box>
-                            ))}
-                          </Stack>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            Nenhum resíduo cadastrado
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            mb: 1,
+                            color: theme.palette.text.secondary,
+                          }}
+                        >
+                          <AccessTimeIcon sx={{ fontSize: '1.2rem' }} />
+                          <Typography variant="body2">
+                            {formatarDisponibilidade(agendamento.disponibilidade)}
                           </Typography>
-                        )}
-                        {agendamento.observacoes && (
-                          <Box sx={{ mt: 1.5 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              Observações:
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {agendamento.observacoes}
+                        </Box>
+                        {agendamento.residuos && agendamento.residuos.length > 0 && (
+                          <Box sx={{ mt: 2 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                              Resíduos: {agendamento.residuos.length}
                             </Typography>
                           </Box>
                         )}
-                      </Box>
-                    )}
-                  </Card>
-                ))}
+                      </CardContent>
+                      <CardActions sx={{ pt: 0 }}>
+                        <Button
+                          size="small"
+                          startIcon={<VisibilityIcon />}
+                          onClick={() => handleToggleExpanded(agendamento.id)}
+                          sx={{
+                            color: theme.palette.secondary.main,
+                            textTransform: 'none',
+                          }}
+                        >
+                          {expandedId === agendamento.id ? 'Ocultar' : 'Ver'}
+                        </Button>
+                        <Button
+                          size="small"
+                          startIcon={<EditIcon />}
+                          onClick={() => handleOpenDialog(agendamento)}
+                          disabled={!isEditable}
+                          sx={{
+                            color: theme.palette.primary.main,
+                            textTransform: 'none',
+                          }}
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          size="small"
+                          startIcon={<DeleteIcon />}
+                          onClick={() => handleDelete(agendamento.id)}
+                          disabled={!isEditable}
+                          sx={{
+                            color: theme.palette.error.main,
+                            textTransform: 'none',
+                          }}
+                        >
+                          Deletar
+                        </Button>
+                      </CardActions>
+                      {expandedId === agendamento.id && (
+                        <Box sx={{ px: 2, pb: 2, bgcolor: 'background.paper' }}>
+                          <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                            Resíduos para Coleta
+                          </Typography>
+                          {agendamento.residuos && agendamento.residuos.length > 0 ? (
+                            <Stack spacing={1}>
+                              {agendamento.residuos.map((residuo, idx) => (
+                                <Box
+                                  key={residuo.id}
+                                  sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                    p: 1,
+                                    bgcolor: theme.palette.action.hover,
+                                    borderRadius: '0.5rem',
+                                  }}
+                                >
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                    {idx + 1}.
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ flex: 1 }}>
+                                    {residuo.categoria}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary">
+                                    {residuo.quantidade} {residuo.unidade}
+                                  </Typography>
+                                </Box>
+                              ))}
+                            </Stack>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              Nenhum resíduo cadastrado
+                            </Typography>
+                          )}
+                          {agendamento.observacoes && (
+                            <Box sx={{ mt: 1.5 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                Observações:
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {agendamento.observacoes}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      )}
+                    </Card>
+                  );
+                })}
               </Box>
             )}
           </>
@@ -574,66 +623,84 @@ export function Agendamento() {
         )}
 
         {/* Dialog para criar/editar agendamento */}
-        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-          <DialogTitle sx={{ fontWeight: 700 }}>
+        <Dialog 
+          open={openDialog} 
+          onClose={handleCloseDialog} 
+          maxWidth="md" 
+          fullWidth
+          fullScreen={isMobile}
+        >
+          <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid', borderColor: 'divider' }}>
             {editingId ? 'Editar Agendamento' : 'Novo Agendamento'}
           </DialogTitle>
-          <DialogContent sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="Local de Coleta"
-              value={formData.local}
-              onChange={(e) => handleInputChange('local', e.target.value)}
-              fullWidth
-              variant="outlined"
-              size="small"
-              placeholder="Ex: Rua A, 123 - Centro"
-            />
-            <TextField
-              label="Observações"
-              value={formData.observacoes}
-              onChange={(e) => handleInputChange('observacoes', e.target.value)}
-              fullWidth
-              multiline
-              rows={2}
-              variant="outlined"
-              size="small"
-              placeholder="Informações adicionais sobre a coleta"
-            />
-            <TextField
-              label="Status"
-              select
-              value={formData.status}
-              onChange={(e) =>
-                handleInputChange(
-                  'status',
-                  e.target.value as Agendamento['status']
-                )
-              }
-              fullWidth
-              variant="outlined"
-              size="small"
-              SelectProps={{
-                native: true,
-              }}
-            >
-              <option value="pendente">Pendente</option>
-              <option value="aceito">Aceito</option>
-              <option value="cancelado">Cancelado</option>
-            </TextField>
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-              Nota: A seleção de resíduos e horários de disponibilidade será implementada em breve.
-            </Typography>
+          <DialogContent sx={{ pt: 3 }}>
+            <Stack spacing={3}>
+              {/* Seleção de Resíduos */}
+              <ResiduoSelector
+                residuosDisponiveis={mockResiduosDisponiveis}
+                onResiduosSelect={(ids) => {
+                  setFormData({ ...formData, residuosId: ids });
+                }}
+                residuosSelecionados={formData.residuosId}
+              />
+
+              <Box sx={{ height: '1px', bgcolor: 'divider', my: 2 }} />
+
+              {/* Seleção de Endereço */}
+              <EnderecoSelector
+                enderecosSalvos={mockEnderecosSalvos}
+                onEnderecoSelect={(endereco) => {
+                  setEnderecoSelecionado(endereco);
+                  // Formatar endereço completo para o campo 'local'
+                  const enderecoCompleto = `${endereco.logradouro}, ${endereco.numero}${
+                    endereco.complemento ? ` - ${endereco.complemento}` : ''
+                  }`;
+                  setFormData({ ...formData, local: enderecoCompleto });
+                }}
+                enderecoSelecionado={enderecoSelecionado}
+              />
+
+              <Box sx={{ height: '1px', bgcolor: 'divider', my: 2 }} />
+
+              {/* Disponibilidade */}
+              <DisponibilidadeSelector
+                onDisponibilidadeChange={(disponibilidade) => {
+                  setFormData({ ...formData, disponibilidade });
+                }}
+              />
+
+              <Box sx={{ height: '1px', bgcolor: 'divider', my: 2 }} />
+
+              {/* Observações */}
+              <TextField
+                label="Observações (opcional)"
+                value={formData.observacoes}
+                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                fullWidth
+                multiline
+                rows={3}
+                variant="outlined"
+                size="small"
+                placeholder="Informações adicionais sobre a coleta (ex: portão azul, interfone 101)"
+              />
+            </Stack>
           </DialogContent>
-          <DialogActions sx={{ p: 2, gap: 1 }}>
-            <Button onClick={handleCloseDialog} variant="outlined">
+          <DialogActions sx={{ p: 2, gap: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+            <Button onClick={handleCloseDialog} variant="outlined" size="large">
               Cancelar
             </Button>
             <Button
               onClick={handleSave}
               variant="contained"
               color="primary"
+              size="large"
+              disabled={
+                formData.residuosId.length === 0 ||
+                !formData.local ||
+                formData.disponibilidade.length === 0
+              }
             >
-              {editingId ? 'Atualizar' : 'Criar'}
+              {editingId ? 'Atualizar' : 'Criar Agendamento'}
             </Button>
           </DialogActions>
         </Dialog>
