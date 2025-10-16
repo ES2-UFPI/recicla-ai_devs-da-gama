@@ -23,7 +23,7 @@ import type { Categoria, Residuo, ResiduoStatus } from '../../types/residuo';
 import { categoriaColor, formatarData, statusColor } from './constants';
 
 export const StatusChip = ({ s }: { s: ResiduoStatus }) => (
-  <Chip size="small" label={s} color={statusColor[s]} variant={s === 'CRIADO' ? 'outlined' : 'filled'} />
+  <Chip size="small" label={s} color={statusColor[s]} variant={s === ('CRIADO' as ResiduoStatus) ? 'outlined' : 'filled'} />
 );
 
 export const CategoriaChip = ({ categoriaId, categorias }: { categoriaId: string; categorias: Categoria[] }) => {
