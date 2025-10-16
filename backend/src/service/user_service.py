@@ -1,7 +1,8 @@
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
+from typing import List, Dict, Any
 
-from src.schemas.user_schema import UserCreate, UserInDB
+from src.schemas.user_schema import UserCreate, UserInDB, UserUpdate, Endereco
 from src.schemas.return_schema import UserPublic
 from src.infra.database.repositories import user_repo
 
@@ -132,3 +133,206 @@ class UserService:
 			email=user["email"],
 			role_id=user["role_id"]
 		)
+
+	@staticmethod
+	async def update_user(user_id: str, payload: UserUpdate) -> UserPublic:
+		"""
+		Atualiza dados de um usuário.
+		
+		Args:
+			user_id: ID do usuário
+			payload: Dados a serem atualizados
+			
+		Returns:
+			UserPublic: Dados públicos do usuário atualizado
+			
+		Raises:
+			HTTPException: Se o usuário não for encontrado ou erro na atualização
+		"""
+		# Verificar se usuário existe
+		user = await user_repo.find_by_id(user_id)
+		if not user:
+			raise HTTPException(
+				status_code=status.HTTP_404_NOT_FOUND,
+				detail="Usuário não encontrado."
+			)
+		
+		# Preparar updates
+		updates = payload.model_dump(exclude_unset=True)
+		
+		# Se estiver atualizando senha, gerar hash
+		if "password" in updates:
+			updates["password_hash"] = pwd_ctx.hash(updates.pop("password"))
+		
+		# Se estiver atualizando email, verificar unicidade
+		if "email" in updates and updates["email"] != user["email"]:
+			existing = await user_repo.find_by_email(updates["email"])
+			if existing:
+				raise HTTPException(
+					status_code=status.HTTP_409_CONFLICT,
+					detail="E-mail já cadastrado por outro usuário."
+				)
+		
+		# Atualizar usuário
+		success = await user_repo.update_user(user_id, updates)
+		if not success:
+			raise HTTPException(
+				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+				detail="Falha ao atualizar usuário."
+			)
+		
+		# Recuperar usuário atualizado
+		updated = await user_repo.find_by_id(user_id)
+		return UserPublic(
+			name=updated["name"],
+			email=updated["email"],
+			role_id=updated["role_id"]
+		)
+
+	@staticmethod
+	async def get_addresses(user_id: str) -> List[Dict[str, Any]]:
+		"""
+		Recupera todos os endereços de um usuário.
+		
+		Args:
+			user_id: ID do usuário
+			
+		Returns:
+			List[Dict]: Lista de endereços
+			
+		Raises:
+			HTTPException: Se o usuário não for encontrado
+		"""
+		user = await user_repo.find_by_id(user_id)
+		if not user:
+			raise HTTPException(
+				status_code=status.HTTP_404_NOT_FOUND,
+				detail="Usuário não encontrado."
+			)
+		
+		addresses = await user_repo.get_addresses(user_id)
+		return addresses or []
+
+	@staticmethod
+	async def add_address(user_id: str, address: Endereco) -> Dict[str, str]:
+		"""
+		Adiciona um novo endereço ao usuário.
+		
+		Args:
+			user_id: ID do usuário
+			address: Dados do endereço
+			
+		Returns:
+			Dict: Mensagem de sucesso
+			
+		Raises:
+			HTTPException: Se o usuário não for encontrado ou erro na adição
+		"""
+		# Verificar se usuário existe
+		user = await user_repo.find_by_id(user_id)
+		if not user:
+			raise HTTPException(
+				status_code=status.HTTP_404_NOT_FOUND,
+				detail="Usuário não encontrado."
+			)
+		
+		# Verificar se já existe endereço com mesmo apelido
+		addresses = await user_repo.get_addresses(user_id)
+		if any(addr.get("apelido") == address.apelido for addr in addresses):
+			raise HTTPException(
+				status_code=status.HTTP_409_CONFLICT,
+				detail=f"Já existe um endereço com o apelido '{address.apelido}'."
+			)
+		
+		# Adicionar endereço
+		success = await user_repo.add_address(user_id, address.model_dump())
+		if not success:
+			raise HTTPException(
+				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+				detail="Falha ao adicionar endereço."
+			)
+		
+		return {"message": f"Endereço '{address.apelido}' adicionado com sucesso."}
+
+	@staticmethod
+	async def update_address(user_id: str, apelido: str, updates: Dict[str, Any]) -> Dict[str, str]:
+		"""
+		Atualiza um endereço existente do usuário.
+		
+		Args:
+			user_id: ID do usuário
+			apelido: Apelido do endereço a ser atualizado
+			updates: Campos a serem atualizados
+			
+		Returns:
+			Dict: Mensagem de sucesso
+			
+		Raises:
+			HTTPException: Se o usuário/endereço não for encontrado ou erro na atualização
+		"""
+		# Verificar se usuário existe
+		user = await user_repo.find_by_id(user_id)
+		if not user:
+			raise HTTPException(
+				status_code=status.HTTP_404_NOT_FOUND,
+				detail="Usuário não encontrado."
+			)
+		
+		# Verificar se endereço existe
+		addresses = await user_repo.get_addresses(user_id)
+		if not any(addr.get("apelido") == apelido for addr in addresses):
+			raise HTTPException(
+				status_code=status.HTTP_404_NOT_FOUND,
+				detail=f"Endereço com apelido '{apelido}' não encontrado."
+			)
+		
+		# Atualizar endereço
+		success = await user_repo.update_address(user_id, apelido, updates)
+		if not success:
+			raise HTTPException(
+				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+				detail="Falha ao atualizar endereço."
+			)
+		
+		return {"message": f"Endereço '{apelido}' atualizado com sucesso."}
+
+	@staticmethod
+	async def remove_address(user_id: str, apelido: str) -> Dict[str, str]:
+		"""
+		Remove um endereço do usuário.
+		
+		Args:
+			user_id: ID do usuário
+			apelido: Apelido do endereço a ser removido
+			
+		Returns:
+			Dict: Mensagem de sucesso
+			
+		Raises:
+			HTTPException: Se o usuário/endereço não for encontrado ou erro na remoção
+		"""
+		# Verificar se usuário existe
+		user = await user_repo.find_by_id(user_id)
+		if not user:
+			raise HTTPException(
+				status_code=status.HTTP_404_NOT_FOUND,
+				detail="Usuário não encontrado."
+			)
+		
+		# Verificar se endereço existe
+		addresses = await user_repo.get_addresses(user_id)
+		if not any(addr.get("apelido") == apelido for addr in addresses):
+			raise HTTPException(
+				status_code=status.HTTP_404_NOT_FOUND,
+				detail=f"Endereço com apelido '{apelido}' não encontrado."
+			)
+		
+		# Remover endereço
+		success = await user_repo.remove_address(user_id, apelido)
+		if not success:
+			raise HTTPException(
+				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+				detail="Falha ao remover endereço."
+			)
+		
+		return {"message": f"Endereço '{apelido}' removido com sucesso."}
