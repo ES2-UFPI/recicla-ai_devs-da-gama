@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useRoleCheck } from '../hooks/useRoleCheck';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppBar,
@@ -19,23 +20,33 @@ import HomeIcon from '@mui/icons-material/Home';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import RedeemIcon from '@mui/icons-material/Redeem';
-// Troque DeleteIcon por RecyclingIcon para um ícone mais relacionado a resíduos
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import RecyclingIcon from '@mui/icons-material/Recycling';
 
-const navLinks = [
-  { label: 'Página Inicial', icon: <HomeIcon fontSize="small" />, to: '/' },
-  { label: 'Resíduos', icon: <RecyclingIcon fontSize="small" />, to: '/residuos' },
-  { label: 'Agendamentos', icon: <CalendarMonthIcon fontSize="small" />, to: '/agendamentos' },
-  { label: 'Recompensas', icon: <RedeemIcon fontSize="small" />, to: '/recompensas' },
-  { label: 'Ranking', icon: <EmojiEventsIcon fontSize="small" />, to: '/ranking' },
+// Definição de todos os links possíveis com seus roles
+const allNavLinks = [
+  { label: 'Página Inicial', icon: <HomeIcon fontSize="small" />, to: '/', roles: ['produtor', 'coletor', 'receptor'] },
+  { label: 'Resíduos', icon: <RecyclingIcon fontSize="small" />, to: '/residuos', roles: ['produtor'] },
+  { label: 'Agendamentos', icon: <CalendarMonthIcon fontSize="small" />, to: '/agendamentos', roles: ['produtor'] },
+  { label: 'Coletas', icon: <LocalShippingIcon fontSize="small" />, to: '/coletas', roles: ['coletor'] },
+  { label: 'Recompensas', icon: <RedeemIcon fontSize="small" />, to: '/recompensas', roles: ['produtor'] },
+  { label: 'Ranking', icon: <EmojiEventsIcon fontSize="small" />, to: '/ranking', roles: ['produtor', 'coletor'] },
+  { label: 'Relatórios', icon: <AssessmentIcon fontSize="small" />, to: '/relatorios', roles: ['produtor', 'receptor'] },
 ];
 
 export function Navbar() {
   const { user, logout } = useAuth();
+  const { hasRole } = useRoleCheck();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Filtra links baseado no role do usuário (memoizado para performance)
+  const navLinks = useMemo(() => {
+    return allNavLinks.filter(link => hasRole(link.roles));
+  }, [hasRole]);
 
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);

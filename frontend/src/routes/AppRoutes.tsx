@@ -9,6 +9,7 @@ import Residuo from '../pages/Residuo';
 
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
+import { RoleBasedRoute } from './RoleBasedRoute';
 
 export function AppRoutes() {
   return (
@@ -32,7 +33,9 @@ export function AppRoutes() {
       } />
       <Route path="/residuos" element={
         <ProtectedRoute>
-          <Residuo />
+          <RoleBasedRoute allowedRoles={['produtor']}>
+            <Residuo />
+          </RoleBasedRoute>
         </ProtectedRoute>
       } />
       {/* Rota Perfil */}
