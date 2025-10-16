@@ -1,6 +1,7 @@
 from fastapi import APIRouter, status, Depends
+from typing import List, Dict, Any
 
-from src.schemas.user_schema import UserCreate
+from src.schemas.user_schema import UserCreate, UserUpdate, Endereco
 from src.schemas.return_schema import UserPublic
 from src.service.user_service import UserService
 from src.infra.security.dependencies import get_current_user
@@ -48,5 +49,118 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
 	return UserPublic(
 		name=current_user["name"],
 		email=current_user["email"],
-		role_id=current_user["role_id"]
+		role_id=current_user["role_id"],
+		addresses=current_user.get("addresses", [])
 	)
+
+
+@router.put("/me", response_model=UserPublic)
+async def update_user(
+	payload: UserUpdate,
+	current_user: dict = Depends(get_current_user)
+):
+	"""
+	Atualiza dados do usuário.
+	
+	Requer autenticação. Apenas o próprio usuário pode se atualizar.
+	Permite atualizar: name, email, phone, password, addresses, cidade_id, estado_id.
+	"""
+	# Verificar se o usuário está atualizando seus próprios dados
+	if current_user.get("id") != current_user.get("id"):
+		from fastapi import HTTPException
+		raise HTTPException(
+			status_code=status.HTTP_403_FORBIDDEN,
+			detail="Você só pode atualizar seus próprios dados."
+		)
+
+	return await UserService.update_user(current_user.get("id"), payload)
+
+
+@router.get("/me/addresses", response_model=List[Endereco])
+async def get_user_addresses(
+	current_user: dict = Depends(get_current_user)
+):
+	"""
+	Lista todos os endereços do usuário.
+	
+	Requer autenticação. Apenas o próprio usuário pode ver seus endereços.
+	"""
+	# Verificar se o usuário está acessando seus próprios endereços
+	if current_user.get("id") != current_user.get("id"):
+		from fastapi import HTTPException
+		raise HTTPException(
+			status_code=status.HTTP_403_FORBIDDEN,
+			detail="Você só pode acessar seus próprios endereços."
+		)
+
+	addresses = await UserService.get_addresses(current_user.get("id"))
+	return addresses
+
+
+@router.post("/me/addresses", status_code=status.HTTP_201_CREATED)
+async def add_user_address(
+	address: Endereco,
+	current_user: dict = Depends(get_current_user)
+):
+	"""
+	Adiciona um novo endereço ao usuário.
+	
+	Requer autenticação. Apenas o próprio usuário pode adicionar endereços.
+	O apelido do endereço deve ser único para o usuário.
+	"""
+	# Verificar se o usuário está adicionando endereço a si mesmo
+	if current_user.get("id") != current_user.get("id"):
+		from fastapi import HTTPException
+		raise HTTPException(
+			status_code=status.HTTP_403_FORBIDDEN,
+			detail="Você só pode adicionar endereços a si mesmo."
+		)
+
+	return await UserService.add_address(current_user.get("id"), address)
+
+
+@router.put("/me/addresses/{apelido}")
+async def update_user_address(
+	apelido: str,
+	updates: Dict[str, Any],
+	current_user: dict = Depends(get_current_user)
+):
+	"""
+	Atualiza um endereço existente do usuário.
+	
+	Requer autenticação. Apenas o próprio usuário pode atualizar seus endereços.
+	Identificação do endereço é feita pelo apelido.
+	
+	Campos atualizáveis: cep, logradouro, numero, latitude, longitude, complemento.
+	"""
+	# Verificar se o usuário está atualizando seu próprio endereço
+	if current_user.get("id") != current_user.get("id"):
+		from fastapi import HTTPException
+		raise HTTPException(
+			status_code=status.HTTP_403_FORBIDDEN,
+			detail="Você só pode atualizar seus próprios endereços."
+		)
+
+	return await UserService.update_address(current_user.get("id"), apelido, updates)
+
+
+@router.delete("/me/addresses/{apelido}")
+async def remove_user_address(
+	apelido: str,
+	current_user: dict = Depends(get_current_user)
+):
+	"""
+	Remove um endereço do usuário.
+	
+	Requer autenticação. Apenas o próprio usuário pode remover seus endereços.
+	Identificação do endereço é feita pelo apelido.
+	"""
+	# Verificar se o usuário está removendo seu próprio endereço
+	if current_user.get("id") != current_user.get("id"):
+		from fastapi import HTTPException
+		raise HTTPException(
+			status_code=status.HTTP_403_FORBIDDEN,
+			detail="Você só pode remover seus próprios endereços."
+		)
+
+	return await UserService.remove_address(current_user.get("id"), apelido)
