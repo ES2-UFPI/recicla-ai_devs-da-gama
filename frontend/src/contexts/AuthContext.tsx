@@ -16,10 +16,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     (async () => {
       try {
+        // Tenta buscar usuário atual
+        // O interceptor do axios tentará refresh automaticamente se o access_token estiver expirado
         const { data } = await api.get<{ name: string; email: string; role_id: string }>('/auth/me');
         setUser(mapUserFromMe(data));
       } catch {
-        // Usuário não autenticado ou sessão expirada - comportamento esperado
+        // Se falhou mesmo após tentativa de refresh, usuário não está autenticado
+        // Isso pode acontecer se:
+        // 1. Não há tokens (primeira visita)
+        // 2. Access token expirado E refresh token também expirado/inválido
         setUser(null);
       } finally {
         setIsLoading(false);
