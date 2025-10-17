@@ -1,6 +1,20 @@
 import api from './api';
 import type { Scheduling, SchedulingCreate, SchedulingUpdate } from '../types/scheduling';
 
+// Normaliza objetos vindos da API:
+// - Garante que "id" exista (mapeando de "_id" quando necessário)
+// - Converte status para minúsculas para alinhar com o tipo do frontend
+function normalizeScheduling(obj: unknown): Scheduling {
+  const o = obj as Record<string, unknown>;
+  const id = (o?.id as string) ?? (o?._id as string);
+  const status = String(o?.status ?? '');
+  return {
+    ...(o as object),
+    id,
+    status,
+  } as Scheduling;
+}
+
 export const schedulingService = {
   // Listar agendamentos do produtor autenticado
   async listMySchedulings(
@@ -11,25 +25,26 @@ export const schedulingService = {
     const response = await api.get('/schedules/', {
       params: { status, skip, limit }
     });
-    return response.data;
+    const data = Array.isArray(response.data) ? response.data : [];
+    return data.map(normalizeScheduling);
   },
 
   // Obter agendamento por ID
   async getById(id: string): Promise<Scheduling> {
     const response = await api.get(`/schedules/${id}`);
-    return response.data;
+    return normalizeScheduling(response.data);
   },
 
   // Criar agendamento
   async create(data: SchedulingCreate): Promise<Scheduling> {
     const response = await api.post('/schedules/', data);
-    return response.data;
+    return normalizeScheduling(response.data);
   },
 
   // Atualizar agendamento
   async update(id: string, data: SchedulingUpdate): Promise<Scheduling> {
     const response = await api.patch(`/schedules/${id}`, data);
-    return response.data;
+    return normalizeScheduling(response.data);
   },
 
   // Atualizar status do agendamento
@@ -37,7 +52,7 @@ export const schedulingService = {
     const response = await api.patch(`/schedules/${id}/status`, {
       status: newStatus
     });
-    return response.data;
+    return normalizeScheduling(response.data);
   },
 
   // Deletar agendamento

@@ -21,8 +21,8 @@ import {
   Chip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import CancelIcon from '@mui/icons-material/Cancel';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -33,8 +33,10 @@ import { DisponibilidadeSelector } from '../../components/DisponibilidadeSelecto
 import { ResiduoSelector } from '../../components/ResiduoSelector';
 import { schedulingService } from '../../services/scheduling.service';
 import { residueService } from '../../services/residue.service';
+import { categoriaService } from '../../services/categoria.service';
 import type { Scheduling, SchedulingCreate, DisponibilidadeSlot } from '../../types/scheduling';
 import type { Residue } from '../../types/residue';
+import type { Categoria } from '../../types/categoria';
 
 // Mapa de cores para status
 const statusColorMap: Record<
@@ -49,10 +51,10 @@ const statusColorMap: Record<
 
 // Mapa de labels para status
 const statusLabelMap: Record<string, string> = {
-  pendente: 'Pendente',
-  aceito: 'Aceito',
-  cancelado: 'Cancelado',
-  coletado: 'Coletado',
+  pendente: 'PENDENTE',
+  aceito: 'ACEITO',
+  cancelado: 'CANCELADO',
+  coletado: 'COLETADO',
 };
 
 // Função para formatar disponibilidade
@@ -69,6 +71,7 @@ export function Agendamento() {
   // Estados principais
   const [agendamentos, setAgendamentos] = useState<Scheduling[]>([]);
   const [residuosMap, setResiduosMap] = useState<Map<string, Residue>>(new Map());
+  const [categoriasMap, setCategoriasMap] = useState<Map<string, Categoria>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -92,18 +95,24 @@ export function Agendamento() {
       setLoading(true);
       setError(null);
       
-      // Buscar agendamentos e resíduos em paralelo
-      const [schedulings, residues] = await Promise.all([
+      // Buscar agendamentos, resíduos e categorias em paralelo
+      const [schedulings, residues, categorias] = await Promise.all([
         schedulingService.listMySchedulings(),
         residueService.listMyResidues(),
+        categoriaService.listActive(),
       ]);
       
       setAgendamentos(schedulings);
       
       // Criar mapa de resíduos para lookup rápido
-      const map = new Map<string, Residue>();
-      residues.forEach((residue) => map.set(residue.id, residue));
-      setResiduosMap(map);
+      const residuesMap = new Map<string, Residue>();
+      residues.forEach((residue) => residuesMap.set(residue.id, residue));
+      setResiduosMap(residuesMap);
+      
+      // Criar mapa de categorias para lookup rápido
+      const categoriasMapTemp = new Map<string, Categoria>();
+      categorias.forEach((cat) => categoriasMapTemp.set(cat.id, cat));
+      setCategoriasMap(categoriasMapTemp);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
       const error = err as { response?: { data?: { detail?: string } } };
@@ -187,19 +196,19 @@ export function Agendamento() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja deletar este agendamento?')) {
+  const handleCancel = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja cancelar este agendamento? Os resíduos voltarão a ficar disponíveis para nova coleta.')) {
       return;
     }
 
     try {
-      await schedulingService.delete(id);
-      setSuccessMessage('Agendamento deletado com sucesso!');
+      await schedulingService.updateStatus(id, 'cancelado');
+      setSuccessMessage('Agendamento cancelado com sucesso!');
       await fetchData();
     } catch (err) {
-      console.error('Erro ao deletar agendamento:', err);
+      console.error('Erro ao cancelar agendamento:', err);
       const error = err as { response?: { data?: { detail?: string } } };
-      setError(error.response?.data?.detail || 'Erro ao deletar agendamento');
+      setError(error.response?.data?.detail || 'Erro ao cancelar agendamento');
     }
   };
 
@@ -208,7 +217,28 @@ export function Agendamento() {
   };
 
   const isAgendamentoEditavel = (status: string) => {
-    return status === 'pendente';
+    // Apenas agendamentos pendentes podem ser editados
+    return status === 'PENDENTE';
+  };
+
+  const isAgendamentoCancelavel = (status: string) => {
+    // Agendamentos pendentes ou aceitos podem ser cancelados
+    return status === 'PENDENTE' || status === 'ACEITO';
+  };
+
+  // Converter DisponibilidadeSlot (dd/mm/aaaa) para FaixaDisponibilidade (YYYY-MM-DD)
+  const convertToFaixaDisponibilidade = (disponibilidades: DisponibilidadeSlot[]) => {
+    return disponibilidades.map((slot) => {
+      // Converter dd/mm/aaaa para YYYY-MM-DD
+      const [dia, mes, ano] = slot.data.split('/');
+      const dataYYYYMMDD = `${ano}-${mes}-${dia}`;
+      
+      return {
+        data: dataYYYYMMDD,
+        horarioInicio: slot.hora_inicio,
+        horarioFim: slot.hora_fim,
+      };
+    });
   };
 
   return (
@@ -272,11 +302,12 @@ export function Agendamento() {
           </Box>
         ) : agendamentos.length > 0 ? (
           <Stack spacing={2}>
-            {agendamentos.map((agendamento) => {
+            {agendamentos.map((agendamento, idx) => {
               const isEditable = isAgendamentoEditavel(agendamento.status);
+              const isCancelable = isAgendamentoCancelavel(agendamento.status);
               return (
                 <Card
-                  key={agendamento.id}
+                  key={`${agendamento.id}-${idx}`}
                   sx={{
                     borderRadius: '0.75rem',
                     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
@@ -297,29 +328,34 @@ export function Agendamento() {
                       }}
                     >
                       <Chip
-                        label={statusLabelMap[agendamento.status]}
-                        color={statusColorMap[agendamento.status]}
+                        label={statusLabelMap[agendamento.status] || agendamento.status || 'Desconhecido'}
+                        color={statusColorMap[agendamento.status] || 'default'}
                         size="small"
                         sx={{ fontWeight: 600 }}
                       />
                       <Box sx={{ display: 'flex', gap: 1 }}>
+                        {/* Botão Editar - apenas para pendentes */}
                         {isEditable && (
-                          <>
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => handleOpenDialog(agendamento)}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleDelete(agendamento.id)}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleOpenDialog(agendamento)}
+                            title="Editar agendamento"
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        )}
+                        
+                        {/* Botão Cancelar - para pendentes e aceitos */}
+                        {isCancelable && (
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleCancel(agendamento.id)}
+                            title="Cancelar agendamento"
+                          >
+                            <CancelIcon fontSize="small" />
+                          </IconButton>
                         )}
                       </Box>
                     </Box>
@@ -371,16 +407,17 @@ export function Agendamento() {
                         </Typography>
                       </Box>
                       <Stack spacing={0.5} sx={{ pl: 4 }}>
-                        {agendamento.residuosId.map((residuoId) => {
+                        {agendamento.residuosId.map((residuoId, idx) => {
                           const residuo = getResiduoInfo(residuoId);
+                          const categoria = residuo ? categoriasMap.get(residuo.categoriaId) : null;
+                          const categoriaNome = categoria?.tipo || 'Categoria não encontrada';
                           return (
                             <Typography
-                              key={residuoId}
+                              key={`${residuoId}-${idx}`}
                               variant="caption"
                               color="text.secondary"
                             >
-                              • {residuo?.quantidade} {residuo?.tipo_medida}
-                              {residuo && ` (Categoria: ${residuo.categoriaId})`}
+                              • {residuo?.quantidade || '?'} {residuo?.tipo_medida || 'unidade'} ({categoriaNome})
                             </Typography>
                           );
                         })}
@@ -480,7 +517,14 @@ export function Agendamento() {
               <Box sx={{ height: '1px', bgcolor: 'divider', my: 2 }} />
 
               {/* Disponibilidade */}
-              <DisponibilidadeSelector onDisponibilidadeChange={setDisponibilidade} />
+              <DisponibilidadeSelector 
+                onDisponibilidadeChange={setDisponibilidade}
+                disponibilidadeInicial={
+                  disponibilidade.length > 0 
+                    ? convertToFaixaDisponibilidade(disponibilidade)
+                    : []
+                }
+              />
 
               <Box sx={{ height: '1px', bgcolor: 'divider', my: 2 }} />
 
