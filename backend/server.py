@@ -30,6 +30,8 @@ app.include_router(users_router)  # Módulo de Usuários
 app.include_router(residue_router)  # Módulo de Resíduos
 app.include_router(categoria_router)  # Módulo de Categorias
 app.include_router(dev_router)  # Módulo de Desenvolvimento (seed, debug, etc.)
+app.include_router(scheduling_router)  # Módulo de Agendamentos
+app.include_router(geo_router)  # Módulo de Geocoding
 
 @app.get("/health")
 async def health():
