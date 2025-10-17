@@ -12,7 +12,8 @@ class Endereco(BaseModel):
     """
     Modelo de endereço associado ao usuário.
     """
-    apelido: str = Field(..., description="Apelido do endereço, ex: 'Casa', 'Trabalho'")
+    id: int = Field(..., description="ID incremental do endereço, ex: 1, 2, 3")
+    apelido: Optional[str] = Field(None, description="Apelido opcional do endereço, ex: 'Casa', 'Trabalho'")
     cep: str = Field(..., description="CEP do endereço, ex: '12345-678'")
     logradouro: str = Field(..., description="Logradouro do endereço, ex: 'Rua A'")
     numero: str = Field(..., description="Número do endereço, ex: '123'")

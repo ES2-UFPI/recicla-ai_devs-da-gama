@@ -36,11 +36,21 @@ async def criar_agendamento(
     """
     Cria um novo agendamento de coleta.
 
-    Regras sugeridas:
-    - Apenas produtores podem criar (se desejar, valide role_id == "produtor")
-    - Evita duplicidade de PENDENTE por resíduo (feito no service)
+    Regras:
+    - Requer autenticação (token JWT via cookie)
+    - O produtorId é obtido automaticamente do usuário autenticado
+    - Apenas produtores podem criar agendamentos
+    - Evita duplicidade de agendamento PENDENTE por resíduo
     """
-    return await scheduling_service.criar_agendamento(dados)
+    # Opcional: Validar se o usuário é produtor
+    if current_user.get("role_id") != "produtor":
+        raise HTTPException(403, "Apenas produtores podem criar agendamentos")
+    
+    produtor_id = current_user.get("id")
+    if not produtor_id:
+        raise HTTPException(401, "Usuário não autenticado corretamente")
+    
+    return await scheduling_service.criar_agendamento(dados, produtor_id)
 
 
 @router.get(
@@ -52,7 +62,14 @@ async def obter_agendamento(
     scheduling_id: str,
     current_user: dict = Depends(get_current_user),
 ) -> SchedulingInDB:
-    return await scheduling_service.obter_agendamento(scheduling_id)
+    """
+    Obtém um agendamento específico por ID.
+    
+    Regras de autorização:
+    - Produtor: pode ver apenas seus próprios agendamentos
+    - Cooperativa/Reciclador: pode ver qualquer agendamento (para aceitar coletas)
+    """
+    return await scheduling_service.obter_agendamento(scheduling_id, current_user)
 
 
 @router.get(
@@ -68,12 +85,20 @@ async def listar_agendamentos(
     skip: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
 ) -> List[SchedulingInDB]:
+    """
+    Lista agendamentos com filtros opcionais.
+    
+    Regras de autorização:
+    - Produtor: lista apenas seus próprios agendamentos (filtro produtorId é ignorado)
+    - Cooperativa/Reciclador: lista todos os agendamentos disponíveis
+    """
     return await scheduling_service.listar_agendamentos(
         produtorId=produtorId,
         residuoId=residuoId,
         status=status,
         limit=limit,
         skip=skip,
+        current_user=current_user,
     )
 
 
@@ -87,7 +112,14 @@ async def atualizar_agendamento(
     dados: SchedulingUpdate,
     current_user: dict = Depends(get_current_user),
 ) -> SchedulingInDB:
-    return await scheduling_service.atualizar_agendamento(scheduling_id, dados)
+    """
+    Atualiza dados do agendamento.
+    
+    Regras de autorização:
+    - Produtor: pode editar apenas seus próprios agendamentos
+    - Cooperativa/Reciclador: NÃO pode editar (apenas atualizar status)
+    """
+    return await scheduling_service.atualizar_agendamento(scheduling_id, dados, current_user)
 
 
 @router.patch(
@@ -100,10 +132,17 @@ async def atualizar_status(
     body: Dict[str, Any],
     current_user: dict = Depends(get_current_user),
 ) -> SchedulingInDB:
+    """
+    Atualiza apenas o status do agendamento.
+    
+    Regras de autorização:
+    - Produtor: pode atualizar status dos próprios agendamentos
+    - Cooperativa/Reciclador: pode atualizar status de qualquer agendamento
+    """
     new_status = body.get("status")
     if not new_status:
         raise HTTPException(400, "Campo 'status' é obrigatório")
-    return await scheduling_service.atualizar_status(scheduling_id, new_status)
+    return await scheduling_service.atualizar_status(scheduling_id, new_status, current_user)
 
 
 @router.delete(
@@ -115,5 +154,12 @@ async def deletar_agendamento(
     scheduling_id: str,
     current_user: dict = Depends(get_current_user),
 ) -> None:
-    await scheduling_service.deletar_agendamento(scheduling_id)
+    """
+    Deleta um agendamento.
+    
+    Regras de autorização:
+    - Produtor: pode deletar apenas seus próprios agendamentos
+    - Cooperativa/Reciclador: NÃO pode deletar agendamentos
+    """
+    await scheduling_service.deletar_agendamento(scheduling_id, current_user)
     return None

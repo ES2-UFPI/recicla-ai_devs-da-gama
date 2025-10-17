@@ -6,6 +6,7 @@ from src.routers.auth_router import router as auth_router
 from src.routers.residue_router import router as residue_router
 from src.routers.categoria_router import router as categoria_router
 from src.routers.dev_router import router as dev_router
+from src.routers.scheduling_router import router as scheduling_router
 from src.routers.geo_router import router as geo_router
 
 app = FastAPI(title="ReciclaAI API", version="0.1.0")
@@ -29,7 +30,6 @@ app.include_router(users_router)  # Módulo de Usuários
 app.include_router(residue_router)  # Módulo de Resíduos
 app.include_router(categoria_router)  # Módulo de Categorias
 app.include_router(dev_router)  # Módulo de Desenvolvimento (seed, debug, etc.)
-app.include_router(geo_router)  # Módulo de Geocoding (proxy Nominatim)
 
 @app.get("/health")
 async def health():
