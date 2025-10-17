@@ -27,8 +27,8 @@ async def create_scheduling(doc: Dict[str, Any]) -> str:
 	Espera um documento compatível com o model Scheduling, contendo:
 	- produtorId: str
 	- residuosId: list[str]
-	- disponibilidade: list[str]
-	- local: str
+	- disponibilidade: list[dict] (lista de slots com data, hora_inicio, hora_fim)
+	- local: dict (objeto com address_id, cep, logradouro, numero, etc)
 	- status: str (opcional, default PENDENTE na camada de serviço/model)
 	- observacoes: str (opcional)
 	"""

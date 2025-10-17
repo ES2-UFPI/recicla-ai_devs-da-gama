@@ -78,11 +78,27 @@ async def get_addresses(user_id: str) -> Optional[List[Dict[str, Any]]]:
 
 
 async def add_address(user_id: str, address: Dict[str, Any]) -> bool:
-	"""Adiciona um novo endereço ao array de endereços do usuário"""
+	"""Adiciona um novo endereço ao array de endereços do usuário com ID incremental"""
 	_id = _to_object_id(user_id)
 	if not _id:
 		return False
-	# Ensure addresses field exists and push new address
+	
+	# Buscar o usuário para determinar o próximo ID
+	user = await _collection().find_one({"_id": _id}, {"addresses": 1})
+	if not user:
+		return False
+	
+	# Calcular o próximo ID incremental
+	existing_addresses = user.get("addresses", [])
+	next_id = 1
+	if existing_addresses:
+		max_id = max([addr.get("id", 0) for addr in existing_addresses], default=0)
+		next_id = max_id + 1
+	
+	# Adicionar o ID ao endereço
+	address["id"] = next_id
+	
+	# Adicionar o endereço ao array
 	result = await _collection().update_one(
 		{"_id": _id},
 		{"$push": {"addresses": address}}
@@ -90,9 +106,9 @@ async def add_address(user_id: str, address: Dict[str, Any]) -> bool:
 	return result.matched_count > 0
 
 
-async def update_address(user_id: str, apelido: str, updates: Dict[str, Any]) -> bool:
+async def update_address(user_id: str, address_id: int, updates: Dict[str, Any]) -> bool:
 	"""
-	Atualiza um endereço pelo seu apelido
+	Atualiza um endereço pelo seu ID
 	Apenas os campos fornecidos serão atualizados
 	"""
 	_id = _to_object_id(user_id)
@@ -112,19 +128,19 @@ async def update_address(user_id: str, apelido: str, updates: Dict[str, Any]) ->
 		return False
 
 	result = await _collection().update_one(
-		{"_id": _id, "addresses.apelido": apelido},
+		{"_id": _id, "addresses.id": address_id},
 		{"$set": set_updates}
 	)
 	return result.matched_count > 0 and result.modified_count > 0
 
 
-async def remove_address(user_id: str, apelido: str) -> bool:
-	"""Remove um endereço de um usuário, pelo seu apelido"""
+async def remove_address(user_id: str, address_id: int) -> bool:
+	"""Remove um endereço de um usuário, pelo seu ID"""
 	_id = _to_object_id(user_id)
 	if not _id:
 		return False
 	result = await _collection().update_one(
 		{"_id": _id},
-		{"$pull": {"addresses": {"apelido": apelido}}}
+		{"$pull": {"addresses": {"id": address_id}}}
 	)
 	return result.matched_count > 0 and result.modified_count > 0
