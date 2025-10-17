@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Optional, Any
 from datetime import datetime, timedelta
 
 
@@ -185,11 +185,12 @@ class SchedulingInDB(BaseModel):
     """
     Schema de retorno do agendamento.
     A disponibilidade é armazenada como lista de objetos.
+    O local é armazenado como objeto completo com dados do endereço.
     """
     id: str = Field(..., alias="_id", example="60c72b2f9b1d4c3a4c8e4d3e")
     produtorId: str
     residuosId: list[str]
-    disponibilidade: list[dict]  # Armazena como lista de dicts no banco
-    local: str
+    disponibilidade: list[dict[str, Any]]  # Armazena como lista de dicts no banco
+    local: dict[str, Any]  # Armazena objeto completo do endereço
     status: str
     observacoes: Optional[str] = None
