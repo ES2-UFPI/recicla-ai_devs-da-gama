@@ -218,12 +218,12 @@ export function Agendamento() {
 
   const isAgendamentoEditavel = (status: string) => {
     // Apenas agendamentos pendentes podem ser editados
-    return status === 'PENDENTE';
+    return status === 'pendente';
   };
 
   const isAgendamentoCancelavel = (status: string) => {
     // Agendamentos pendentes ou aceitos podem ser cancelados
-    return status === 'PENDENTE' || status === 'ACEITO';
+    return status === 'pendente' || status === 'aceito';
   };
 
   // Converter DisponibilidadeSlot (dd/mm/aaaa) para FaixaDisponibilidade (YYYY-MM-DD)

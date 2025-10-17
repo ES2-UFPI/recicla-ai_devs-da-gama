@@ -5,7 +5,8 @@ import { categoriaColor } from '../constants';
 export const CategoriaChip = ({ categoriaId, categorias }: { categoriaId: string; categorias: Categoria[] }) => {
   const categoria = categorias.find((c) => c.id === categoriaId);
   const nome = categoria?.nome ?? categoriaId;
-  const cor = categoriaColor[categoriaId] ?? '#9e9e9e';
+  const corKey = (categoria?.nome ?? '').trim().toLowerCase();
+  const cor = (corKey && categoriaColor[corKey]) ? categoriaColor[corKey] : '#9e9e9e';
   return (
     <Chip
       size="small"

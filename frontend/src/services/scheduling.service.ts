@@ -7,7 +7,7 @@ import type { Scheduling, SchedulingCreate, SchedulingUpdate } from '../types/sc
 function normalizeScheduling(obj: unknown): Scheduling {
   const o = obj as Record<string, unknown>;
   const id = (o?.id as string) ?? (o?._id as string);
-  const status = String(o?.status ?? '');
+  const status = String(o?.status ?? '').toLowerCase();
   return {
     ...(o as object),
     id,
