@@ -75,9 +75,73 @@ export function MapSelector({ onLocationSelect, initialPosition }: MapSelectorPr
 
   // Detectar se é mobile para usar proxy CORS
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const corsProxy = 'https://api.allorigins.win/raw?url=';
+
+  // Helper: constrói URL de busca (Nominatim) com parâmetros corretos
+  const buildNominatimSearchUrl = (q: string) => {
+    const u = new URL('https://nominatim.openstreetmap.org/search');
+    u.searchParams.set('format', 'json');
+    u.searchParams.set('q', q);
+    u.searchParams.set('limit', '1');
+    u.searchParams.set('countrycodes', 'br');
+    return u.toString();
+  };
+
+  // Helper: constrói URL de reverse geocoding (Nominatim)
+  const buildNominatimReverseUrl = (lat: number, lon: number) => {
+    const u = new URL('https://nominatim.openstreetmap.org/reverse');
+    u.searchParams.set('format', 'json');
+    u.searchParams.set('lat', String(lat));
+    u.searchParams.set('lon', String(lon));
+    u.searchParams.set('addressdetails', '1');
+    return u.toString();
+  };
+
+  // Helper: tenta múltiplos proxies CORS no mobile
+  const fetchWithProxy = async (targetUrl: string, options?: RequestInit): Promise<Response> => {
+    // Desktop: tenta direto primeiro
+    if (!isMobile) {
+      try {
+        return await fetch(targetUrl, options);
+      } catch (e) {
+        console.warn('Falha no fetch direto, tentando proxies…', e);
+      }
+    }
+
+    // Ordem de proxies para tentar no mobile
+    const candidates: string[] = [
+      // corsproxy.io aceita a URL codificada como query única
+      `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+      // AllOrigins
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+      // isomorphic-git (não codificar a URL inteira)
+      `https://cors.isomorphic-git.org/${targetUrl}`,
+      // thingproxy (não codificar a URL inteira)
+      `https://thingproxy.freeboard.io/fetch/${targetUrl}`,
+    ];
+
+  let lastError: unknown = null;
+    for (const proxyUrl of candidates) {
+      try {
+        const res = await fetch(proxyUrl, { ...options, headers: undefined });
+        if (res.ok) {
+          console.log('✅ Proxy OK:', proxyUrl);
+          return res;
+        } else {
+          console.warn('⚠️ Proxy respondeu com status', res.status, '->', proxyUrl);
+          lastError = new Error(`Proxy status ${res.status}`);
+        }
+      } catch (e) {
+        console.warn('⚠️ Proxy falhou:', proxyUrl, e);
+        lastError = e;
+      }
+    }
+    throw lastError ?? new Error('Todos os proxies falharam');
+  };
 
   const center: [number, number] = mapCenter;
+  const API_BASE = (typeof import.meta !== 'undefined' && 'env' in import.meta && (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_API_BASE_URL)
+    ? (import.meta as unknown as { env: Record<string, string | undefined> }).env.VITE_API_BASE_URL!
+    : 'http://localhost:8000';
 
   // Função para buscar endereço
   const handleSearchAddress = async () => {
@@ -88,20 +152,21 @@ export function MapSelector({ onLocationSelect, initialPosition }: MapSelectorPr
 
     setSearching(true);
     try {
-      // Usar Nominatim (mais preciso) com proxy em mobile
-      const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-        searchQuery
-      )}&limit=1&countrycodes=br`;
+      // 1) Tenta backend local (mais rápido e estável)
+      const backendUrl = `${API_BASE}/geo/search?q=${encodeURIComponent(searchQuery)}`;
+      let response = await fetch(backendUrl, { credentials: 'include' });
       
-      const url = isMobile ? `${corsProxy}${encodeURIComponent(nominatimUrl)}` : nominatimUrl;
-      
-      const response = await fetch(url);
+      // 2) Se backend indisponível, usa Nominatim com fallback de proxies no mobile
+      if (!response.ok) {
+        const nominatimUrl = buildNominatimSearchUrl(searchQuery);
+        response = await fetchWithProxy(nominatimUrl);
+      }
 
       if (!response.ok) {
         throw new Error('Erro ao buscar endereço');
       }
 
-      const data = await response.json();
+  const data = await response.json();
 
       if (data.length === 0) {
         alert('Endereço não encontrado. Tente ser mais específico (ex: Rua, número, cidade).');
@@ -195,24 +260,22 @@ export function MapSelector({ onLocationSelect, initialPosition }: MapSelectorPr
       return;
     }
 
-    // Buscar endereço via reverse geocoding (Nominatim com proxy em mobile)
+    // Buscar endereço via reverse geocoding (prioriza backend local)
     try {
       console.log('🔍 Buscando endereço para:', { lat: position.lat, lng: position.lng });
-      console.log('📱 Dispositivo:', isMobile ? 'Mobile (usando proxy)' : 'Desktop');
+      console.log('📱 Dispositivo:', isMobile ? 'Mobile (com proxies)' : 'Desktop');
+
+      // 1) Tenta backend local
+      let response = await fetch(
+        `${API_BASE}/geo/reverse?lat=${encodeURIComponent(position.lat)}&lon=${encodeURIComponent(position.lng)}`,
+        { credentials: 'include' }
+      );
       
-      const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.lat}&lon=${position.lng}&addressdetails=1`;
-      const url = isMobile ? `${corsProxy}${encodeURIComponent(nominatimUrl)}` : nominatimUrl;
-      
-      const fetchOptions: RequestInit = isMobile 
-        ? {} 
-        : {
-            headers: {
-              'User-Agent': 'ReciclaAI/1.0',
-              'Accept-Language': 'pt-BR,pt;q=0.9',
-            }
-          };
-      
-      const response = await fetch(url, fetchOptions);
+      // 2) Se falhar, usa Nominatim com proxies
+      if (!response.ok) {
+        const nominatimUrl = buildNominatimReverseUrl(position.lat, position.lng);
+        response = await fetchWithProxy(nominatimUrl);
+      }
       
       console.log('📡 Response status:', response.status);
       
