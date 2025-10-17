@@ -119,9 +119,9 @@ async def add_user_address(
 	return await UserService.add_address(current_user.get("id"), address)
 
 
-@router.put("/me/addresses/{apelido}")
+@router.put("/me/addresses/{address_id}")
 async def update_user_address(
-	apelido: str,
+	address_id: int,
 	updates: Dict[str, Any],
 	current_user: dict = Depends(get_current_user)
 ):
@@ -129,9 +129,9 @@ async def update_user_address(
 	Atualiza um endereço existente do usuário.
 	
 	Requer autenticação. Apenas o próprio usuário pode atualizar seus endereços.
-	Identificação do endereço é feita pelo apelido.
+	Identificação do endereço é feita pelo ID.
 	
-	Campos atualizáveis: cep, logradouro, numero, latitude, longitude, complemento.
+	Campos atualizáveis: apelido, cep, logradouro, numero, latitude, longitude, complemento.
 	"""
 	# Verificar se o usuário está atualizando seu próprio endereço
 	if current_user.get("id") != current_user.get("id"):
@@ -141,19 +141,19 @@ async def update_user_address(
 			detail="Você só pode atualizar seus próprios endereços."
 		)
 
-	return await UserService.update_address(current_user.get("id"), apelido, updates)
+	return await UserService.update_address(current_user.get("id"), address_id, updates)
 
 
-@router.delete("/me/addresses/{apelido}")
+@router.delete("/me/addresses/{address_id}")
 async def remove_user_address(
-	apelido: str,
+	address_id: int,
 	current_user: dict = Depends(get_current_user)
 ):
 	"""
 	Remove um endereço do usuário.
 	
 	Requer autenticação. Apenas o próprio usuário pode remover seus endereços.
-	Identificação do endereço é feita pelo apelido.
+	Identificação do endereço é feita pelo ID.
 	"""
 	# Verificar se o usuário está removendo seu próprio endereço
 	if current_user.get("id") != current_user.get("id"):
@@ -163,4 +163,4 @@ async def remove_user_address(
 			detail="Você só pode remover seus próprios endereços."
 		)
 
-	return await UserService.remove_address(current_user.get("id"), apelido)
+	return await UserService.remove_address(current_user.get("id"), address_id)
