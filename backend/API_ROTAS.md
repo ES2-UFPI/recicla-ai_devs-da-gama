@@ -902,18 +902,51 @@ Reativa uma categoria previamente desativada - apenas administradores.
 
 Cria um novo agendamento de coleta.
 
-**Autenticação:** ✅ Requerida
+**Autenticação:** ✅ Requerida (role: produtor)
+
+**Regras de Autorização:**
+- ✅ **Produtor:** Pode criar (produtorId é obtido automaticamente do token)
+- ❌ **Coletor/Reciclador:** Bloqueado
+- ✅ **Admin:** Pode criar para qualquer produtor
 
 **Corpo da Requisição:**
 ```json
 {
-  "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
   "residuosId": ["60c72b2f9b1d4c3a4c8e4d3e", "60c72b2f9b1d4c3a4c8e4d3f"],
-  "disponibilidade": ["2023-10-01T10:00", "2023-10-02T14:00"],
-  "local": "Rua Exemplo, 123, Cidade, Estado",
+  "disponibilidade": [
+    {
+      "data": "20/10/2025",
+      "hora_inicio": "10:30",
+      "hora_fim": "18:00"
+    },
+    {
+      "data": "21/10/2025",
+      "hora_inicio": "11:00",
+      "hora_fim": "17:00"
+    }
+  ],
+  "address_id": 1,
   "observacoes": "Deixar os resíduos na portaria."
 }
 ```
+
+**Campos:**
+- `residuosId`: Array com IDs dos resíduos a serem coletados
+- `disponibilidade`: Array de slots de disponibilidade (mínimo 1 slot)
+- `address_id`: **ID do endereço do produtor** a ser usado na coleta (deve existir no perfil)
+- `observacoes`: Instruções adicionais (opcional)
+
+**Estrutura de Disponibilidade:**
+- `data`: formato `dd/mm/aaaa` (ex: `20/10/2025`)
+- `hora_inicio`: formato `hh:mm` (ex: `10:30`)
+- `hora_fim`: formato `hh:mm` (ex: `18:00`)
+
+**Validações Automáticas:**
+- ✅ Formato de data e hora
+- ✅ Hora de início < hora de fim
+- ✅ Hora de início não pode estar muito no passado (tolerância: 30 minutos)
+- ✅ Pelo menos 1 slot de disponibilidade obrigatório
+- ✅ `address_id` deve existir no perfil do produtor
 
 **Resposta de Sucesso (201):**
 ```json
@@ -921,10 +954,88 @@ Cria um novo agendamento de coleta.
   "id": "60c72b2f9b1d4c3a4c8e4d50",
   "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
   "residuosId": ["60c72b2f9b1d4c3a4c8e4d3e", "60c72b2f9b1d4c3a4c8e4d3f"],
-  "disponibilidade": ["2023-10-01T10:00", "2023-10-02T14:00"],
-  "local": "Rua Exemplo, 123, Cidade, Estado",
+  "disponibilidade": [
+    {
+      "data": "20/10/2025",
+      "hora_inicio": "10:30",
+      "hora_fim": "18:00"
+    },
+    {
+      "data": "21/10/2025",
+      "hora_inicio": "11:00",
+      "hora_fim": "17:00"
+    }
+  ],
+  "local": {
+    "address_id": 1,
+    "apelido": "Casa",
+    "cep": "64000-000",
+    "logradouro": "Rua Exemplo",
+    "numero": "123",
+    "complemento": "Apto 101",
+    "latitude": "-5.0892",
+    "longitude": "-42.8019"
+  },
   "status": "PENDENTE",
   "observacoes": "Deixar os resíduos na portaria."
+}
+```
+
+**Estrutura do Campo `local`:**
+O backend busca automaticamente os dados completos do endereço a partir do `address_id`:
+- `address_id`: ID de referência do endereço
+- `apelido`: Apelido do endereço (opcional)
+- `cep`: CEP do endereço
+- `logradouro`: Nome da rua/avenida
+- `numero`: Número do imóvel
+- `complemento`: Complemento (opcional)
+- `latitude`: Coordenada para mapas (opcional)
+- `longitude`: Coordenada para mapas (opcional)
+
+**Observações:**
+- O endereço é salvo como **snapshot** no agendamento
+- Se o produtor alterar/deletar o endereço no perfil, o agendamento mantém os dados originais
+- Cooperativas visualizam o endereço completo diretamente no agendamento
+
+**Erros Comuns:**
+
+**403 - Apenas produtores podem criar:**
+```json
+{
+  "detail": "Apenas produtores podem criar agendamentos"
+}
+```
+
+**422 - Formato de data inválido:**
+```json
+{
+  "detail": [
+    {
+      "type": "value_error",
+      "loc": ["body", "disponibilidade", 0, "data"],
+      "msg": "Value error, Data deve estar no formato dd/mm/aaaa (ex: 17/10/2025)"
+    }
+  ]
+}
+```
+
+**422 - Horário de início >= fim:**
+```json
+{
+  "detail": [
+    {
+      "type": "value_error",
+      "loc": ["body", "disponibilidade"],
+      "msg": "Value error, Erro no slot 1: Horário de início (18:00) deve ser anterior ao horário de fim (10:00)"
+    }
+  ]
+}
+```
+
+**404 - Endereço não encontrado:**
+```json
+{
+  "detail": "Endereço com ID 5 não encontrado no perfil do produtor"
 }
 ```
 
@@ -937,6 +1048,11 @@ Retorna detalhes de um agendamento específico.
 
 **Autenticação:** ✅ Requerida
 
+**Regras de Autorização:**
+- ✅ **Produtor:** Pode ver apenas seus próprios agendamentos
+- ✅ **Coletor/Reciclador:** Pode ver qualquer agendamento (para aceitar coletas)
+- ✅ **Admin:** Pode ver qualquer agendamento
+
 **Exemplo:** `http://localhost:8000/schedules/60c72b2f9b1d4c3a4c8e4d50`
 
 **Resposta de Sucesso (200):**
@@ -945,10 +1061,32 @@ Retorna detalhes de um agendamento específico.
   "id": "60c72b2f9b1d4c3a4c8e4d50",
   "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
   "residuosId": ["60c72b2f9b1d4c3a4c8e4d3e"],
-  "disponibilidade": ["2023-10-01T10:00"],
-  "local": "Rua Exemplo, 123",
+  "disponibilidade": [
+    {
+      "data": "20/10/2025",
+      "hora_inicio": "10:00",
+      "hora_fim": "17:00"
+    }
+  ],
+  "local": {
+    "address_id": 1,
+    "apelido": "Casa",
+    "cep": "64000-000",
+    "logradouro": "Rua Exemplo",
+    "numero": "123",
+    "complemento": "Apto 101",
+    "latitude": "-5.0892",
+    "longitude": "-42.8019"
+  },
   "status": "PENDENTE",
   "observacoes": "Deixar na portaria"
+}
+```
+
+**Erro 403 - Produtor tentando ver agendamento de outro:**
+```json
+{
+  "detail": "Você só pode visualizar seus próprios agendamentos"
 }
 ```
 
@@ -961,10 +1099,15 @@ Lista agendamentos com filtros opcionais.
 
 **Autenticação:** ✅ Requerida
 
+**Regras de Autorização:**
+- ✅ **Produtor:** Lista **apenas seus próprios** agendamentos (filtro `produtorId` é **ignorado**)
+- ✅ **Coletor/Reciclador:** Lista **todos** os agendamentos (pode filtrar por `produtorId`)
+- ✅ **Admin:** Lista todos os agendamentos
+
 **Parâmetros de Query (todos opcionais):**
-- `produtorId`: filtrar por produtor
+- `produtorId`: filtrar por produtor (ignorado para produtores)
 - `residuoId`: filtrar por resíduo
-- `status`: filtrar por status (PENDENTE, CONFIRMADO, COLETADO, CANCELADO)
+- `status`: filtrar por status (PENDENTE, ACEITO, CANCELADO)
 - `skip`: paginação - registros a pular (padrão: 0)
 - `limit`: paginação - máximo de registros (padrão: 100, máx: 500)
 
@@ -977,33 +1120,76 @@ Lista agendamentos com filtros opcionais.
     "id": "60c72b2f9b1d4c3a4c8e4d50",
     "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
     "residuosId": ["60c72b2f9b1d4c3a4c8e4d3e"],
-    "disponibilidade": ["2023-10-01T10:00"],
-    "local": "Rua Exemplo, 123",
+    "disponibilidade": [
+      {
+        "data": "20/10/2025",
+        "hora_inicio": "10:00",
+        "hora_fim": "17:00"
+      }
+    ],
+    "local": {
+      "address_id": 1,
+      "apelido": "Casa",
+      "cep": "64000-000",
+      "logradouro": "Rua Exemplo",
+      "numero": "123",
+      "complemento": "Apto 101",
+      "latitude": "-5.0892",
+      "longitude": "-42.8019"
+    },
     "status": "PENDENTE",
     "observacoes": null
   }
 ]
 ```
 
+**Observações:**
+- Produtores veem apenas seus próprios agendamentos (segurança automática)
+- Coletores veem todos os agendamentos disponíveis para aceitar coletas
+
 ---
 
 ### Atualizar Agendamento
-**PATCH** `http://localhost:8000/schedules/{scheduling_id}`
+**PUT** `http://localhost:8000/schedules/{schedulingId}`
 
-Atualiza dados de um agendamento.
+Atualiza agendamento existente.
 
 **Autenticação:** ✅ Requerida
 
+**Regras de Autorização:**
+- ✅ **Produtor:** Pode atualizar **apenas seus próprios** agendamentos
+- ❌ **Coletor/Reciclador:** **NÃO PODEM** atualizar agendamentos (use `PATCH /schedules/{schedulingId}/status`)
+- ✅ **Admin:** Pode atualizar qualquer agendamento
+
 **Exemplo:** `http://localhost:8000/schedules/60c72b2f9b1d4c3a4c8e4d50`
 
-**Corpo da Requisição (todos os campos são opcionais):**
+**Body (JSON) - todos os campos opcionais:**
 ```json
 {
-  "disponibilidade": ["2023-10-03T15:00"],
-  "local": "Novo endereço, 456",
-  "observacoes": "Atualização de observações"
+  "residuosId": ["60c72b2f9b1d4c3a4c8e4d3e"],
+  "disponibilidade": [
+    {
+      "data": "25/10/2025",
+      "hora_inicio": "09:00",
+      "hora_fim": "18:00"
+    }
+  ],
+  "address_id": 2,
+  "observacoes": "Observação atualizada"
 }
 ```
+
+**Campos opcionais:**
+- `residuosId`: Atualizar lista de resíduos
+- `disponibilidade`: Atualizar slots de disponibilidade
+- `address_id`: **Alterar endereço da coleta** (usa outro endereço do perfil do produtor)
+- `observacoes`: Atualizar observações
+
+**Validações de Disponibilidade:**
+- ✅ **data:** formato `dd/mm/aaaa` (ex: 20/10/2025)
+- ✅ **hora_inicio e hora_fim:** formato `hh:mm` (ex: 10:00)
+- ✅ **Lógica:** `hora_inicio` < `hora_fim`
+- ✅ **Temporal:** Data/hora **não pode ser no passado** (tolerância: 30 minutos)
 
 **Resposta de Sucesso (200):**
 ```json
@@ -1011,36 +1197,102 @@ Atualiza dados de um agendamento.
   "id": "60c72b2f9b1d4c3a4c8e4d50",
   "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
   "residuosId": ["60c72b2f9b1d4c3a4c8e4d3e"],
-  "disponibilidade": ["2023-10-03T15:00"],
-  "local": "Novo endereço, 456",
+  "disponibilidade": [
+    {
+      "data": "25/10/2025",
+      "hora_inicio": "09:00",
+      "hora_fim": "18:00"
+    }
+  ],
+  "local": {
+    "address_id": 2,
+    "apelido": "Trabalho",
+    "cep": "64001-000",
+    "logradouro": "Av. Principal",
+    "numero": "500",
+    "complemento": "Sala 10",
+    "latitude": "-5.0920",
+    "longitude": "-42.8050"
+  },
   "status": "PENDENTE",
-  "observacoes": "Atualização de observações"
+  "observacoes": "Observação atualizada"
 }
 ```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Coletor tentando atualizar:
+```json
+{
+  "detail": "Coletores e recicladores não podem editar agendamentos"
+}
+```
+
+**403 Forbidden** - Produtor tentando atualizar agendamento de outro produtor:
+```json
+{
+  "detail": "Você não tem permissão para acessar este agendamento"
+}
+```
+
+**422 Unprocessable Entity** - Formato de data inválido:
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "disponibilidade", 0, "data"],
+      "msg": "Data deve estar no formato dd/mm/aaaa (ex: 20/10/2025)",
+      "type": "value_error"
+    }
+  ]
+}
+```
+
+**422 Unprocessable Entity** - hora_inicio >= hora_fim:
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "disponibilidade", 0],
+      "msg": "hora_inicio (18:00) deve ser menor que hora_fim (09:00)",
+      "type": "value_error"
+    }
+  ]
+}
+```
+
+**Observações:**
+- Coletores devem usar `PATCH /schedules/{schedulingId}/status` para aceitar/cancelar
+- Apenas o produtor proprietário pode editar seus agendamentos
 
 ---
 
 ### Atualizar Status do Agendamento
-**PATCH** `http://localhost:8000/schedules/{scheduling_id}/status`
+**PATCH** `http://localhost:8000/schedules/{schedulingId}/status`
 
 Atualiza apenas o status de um agendamento.
 
 **Autenticação:** ✅ Requerida
+
+**Regras de Autorização:**
+- ✅ **Produtor:** Pode atualizar status **apenas de seus próprios** agendamentos
+- ✅ **Coletor:** Pode atualizar status de **qualquer** agendamento (para aceitar/cancelar coletas)
+- ❌ **Reciclador:** Não pode atualizar status
+- ✅ **Admin:** Pode atualizar status de qualquer agendamento
 
 **Exemplo:** `http://localhost:8000/schedules/60c72b2f9b1d4c3a4c8e4d50/status`
 
 **Corpo da Requisição:**
 ```json
 {
-  "status": "CONFIRMADO"
+  "status": "ACEITO"
 }
 ```
 
 **Status possíveis:**
-- PENDENTE
-- CONFIRMADO
-- COLETADO
-- CANCELADO
+- `PENDENTE`
+- `ACEITO`
+- `CANCELADO`
 
 **Resposta de Sucesso (200):**
 ```json
@@ -1048,21 +1300,54 @@ Atualiza apenas o status de um agendamento.
   "id": "60c72b2f9b1d4c3a4c8e4d50",
   "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
   "residuosId": ["60c72b2f9b1d4c3a4c8e4d3e"],
-  "disponibilidade": ["2023-10-01T10:00"],
-  "local": "Rua Exemplo, 123",
-  "status": "CONFIRMADO",
+  "disponibilidade": [
+    {
+      "data": "20/10/2025",
+      "hora_inicio": "10:00",
+      "hora_fim": "17:00"
+    }
+  ],
+  "local": {
+    "address_id": 1,
+    "apelido": "Casa",
+    "cep": "64000-000",
+    "logradouro": "Rua Exemplo",
+    "numero": "123",
+    "complemento": "Apto 101",
+    "latitude": "-5.0892",
+    "longitude": "-42.8019"
+  },
+  "status": "ACEITO",
   "observacoes": null
 }
 ```
 
+**Erros Comuns:**
+
+**403 Forbidden** - Produtor tentando atualizar status de agendamento de outro:
+```json
+{
+  "detail": "Você não tem permissão para acessar este agendamento"
+}
+```
+
+**Observações:**
+- Coletores usam este endpoint para aceitar coletas agendadas por produtores
+- Produtores podem cancelar seus próprios agendamentos
+
 ---
 
 ### Deletar Agendamento
-**DELETE** `http://localhost:8000/schedules/{scheduling_id}`
+**DELETE** `http://localhost:8000/schedules/{schedulingId}`
 
 Deleta um agendamento.
 
 **Autenticação:** ✅ Requerida
+
+**Regras de Autorização:**
+- ✅ **Produtor:** Pode deletar **apenas seus próprios** agendamentos
+- ❌ **Coletor/Reciclador:** **NÃO PODEM** deletar agendamentos
+- ✅ **Admin:** Pode deletar qualquer agendamento
 
 **Exemplo:** `http://localhost:8000/schedules/60c72b2f9b1d4c3a4c8e4d50`
 
@@ -1070,6 +1355,26 @@ Deleta um agendamento.
 ```
 No Content
 ```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Coletor tentando deletar:
+```json
+{
+  "detail": "Coletores e recicladores não podem deletar agendamentos"
+}
+```
+
+**403 Forbidden** - Produtor tentando deletar agendamento de outro produtor:
+```json
+{
+  "detail": "Você não tem permissão para acessar este agendamento"
+}
+```
+
+**Observações:**
+- Coletores devem cancelar agendamentos via `PATCH /schedules/{schedulingId}/status` (status: CANCELADO)
+- Apenas o produtor proprietário pode deletar permanentemente seus agendamentos
 
 ---
 
