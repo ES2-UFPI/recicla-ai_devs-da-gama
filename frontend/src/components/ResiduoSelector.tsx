@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -10,10 +10,16 @@ import {
   Stack,
   Divider,
   Button,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import RecyclingIcon from '@mui/icons-material/Recycling';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { useNavigate } from 'react-router-dom';
+import { residueService } from '../services/residue.service';
+import { categoriaService } from '../services/categoria.service';
+import type { Residue } from '../types/residue';
+import type { Categoria } from '../types/categoria';
 
 export interface ResiduoParaAgendamento {
   id: string;
@@ -23,18 +29,51 @@ export interface ResiduoParaAgendamento {
 }
 
 interface ResiduoSelectorProps {
-  residuosDisponiveis: ResiduoParaAgendamento[];
   onResiduosSelect: (residuosIds: string[]) => void;
   residuosSelecionados?: string[];
 }
 
 export function ResiduoSelector({
-  residuosDisponiveis,
   onResiduosSelect,
   residuosSelecionados = [],
 }: ResiduoSelectorProps) {
   const navigate = useNavigate();
   const [selecionados, setSelecionados] = useState<string[]>(residuosSelecionados);
+  const [residuosDisponiveis, setResiduosDisponiveis] = useState<Residue[]>([]);
+  const [categoriasMap, setCategoriasMap] = useState<Map<string, Categoria>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Buscar resíduos disponíveis e categorias
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Buscar resíduos e categorias em paralelo
+        const [residues, categorias] = await Promise.all([
+          residueService.listPendingResidues(),
+          categoriaService.listActive(),
+        ]);
+        
+        setResiduosDisponiveis(residues);
+        
+        // Criar mapa de categorias para lookup rápido
+        const map = new Map<string, Categoria>();
+        categorias.forEach((cat) => map.set(cat.id, cat));
+        setCategoriasMap(map);
+      } catch (err) {
+        console.error('Erro ao buscar dados:', err);
+        const error = err as { response?: { data?: { detail?: string } } };
+        setError(error.response?.data?.detail || 'Erro ao carregar resíduos disponíveis');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const handleToggle = (residuoId: string) => {
     const currentIndex = selecionados.indexOf(residuoId);
@@ -71,7 +110,7 @@ export function ResiduoSelector({
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Selecione os resíduos que você deseja agendar para coleta.
+        Selecione os resíduos que você deseja agendar para coleta. Apenas resíduos com status "Disponível" podem ser agendados.
       </Typography>
 
       {/* Botão para adicionar novo resíduo */}
@@ -85,7 +124,21 @@ export function ResiduoSelector({
         Adicionar novo resíduo
       </Button>
 
-      {residuosDisponiveis.length === 0 ? (
+      {/* Loading state */}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {/* Error state */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {!loading && !error && residuosDisponiveis.length === 0 ? (
         <Paper
           elevation={0}
           sx={{
@@ -102,7 +155,7 @@ export function ResiduoSelector({
             Cadastre seus resíduos primeiro na página de Resíduos.
           </Typography>
         </Paper>
-      ) : (
+      ) : !loading && !error ? (
         <>
           <FormControlLabel
             control={
@@ -161,16 +214,16 @@ export function ResiduoSelector({
                     />
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="body2" fontWeight={600}>
-                        {residuo.categoria}
+                        {categoriasMap.get(residuo.categoriaId)?.tipo || 'Categoria Desconhecida'}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {residuo.quantidade} {residuo.unidade}
+                        {residuo.quantidade} {residuo.tipo_medida}
                       </Typography>
                     </Box>
                     <Chip
-                      label={residuo.categoria}
+                      label="Disponível"
                       size="small"
-                      color="primary"
+                      color="success"
                       variant="outlined"
                     />
                   </Box>
@@ -196,7 +249,7 @@ export function ResiduoSelector({
             </Box>
           )}
         </>
-      )}
+      ) : null}
     </Box>
   );
 }

@@ -13,6 +13,8 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
+import type { DisponibilidadeSlot } from '../types/scheduling';
+
 export interface FaixaDisponibilidade {
   data: string; // YYYY-MM-DD
   horarioInicio: string; // HH:mm
@@ -20,7 +22,7 @@ export interface FaixaDisponibilidade {
 }
 
 interface DisponibilidadeSelectorProps {
-  onDisponibilidadeChange: (disponibilidade: string[]) => void;
+  onDisponibilidadeChange: (disponibilidade: DisponibilidadeSlot[]) => void;
   disponibilidadeInicial?: FaixaDisponibilidade[];
 }
 
@@ -60,13 +62,19 @@ export function DisponibilidadeSelector({
   };
 
   const atualizarDisponibilidade = (faixasAtualizadas: FaixaDisponibilidade[]) => {
-    // Converter para o formato do backend: [horarioInicio1, horarioFim1, horarioInicio2, horarioFim2, ...]
-    const disponibilidadeArray: string[] = [];
+    // Converter para o formato do backend: lista de DisponibilidadeSlot
+    const disponibilidadeArray: DisponibilidadeSlot[] = [];
     faixasAtualizadas.forEach((faixa) => {
       if (faixa.data && faixa.horarioInicio && faixa.horarioFim) {
-        // Formato ISO: YYYY-MM-DDTHH:mm
-        disponibilidadeArray.push(`${faixa.data}T${faixa.horarioInicio}`);
-        disponibilidadeArray.push(`${faixa.data}T${faixa.horarioFim}`);
+        // Converter de YYYY-MM-DD para dd/mm/aaaa
+        const [ano, mes, dia] = faixa.data.split('-');
+        const dataFormatada = `${dia}/${mes}/${ano}`;
+        
+        disponibilidadeArray.push({
+          data: dataFormatada,
+          hora_inicio: faixa.horarioInicio,
+          hora_fim: faixa.horarioFim,
+        });
       }
     });
     onDisponibilidadeChange(disponibilidadeArray);
