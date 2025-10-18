@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
   Box,
-  Paper,
-  Typography,
+  Button,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   FormControl,
   FormLabel,
   RadioGroup,
@@ -10,22 +14,101 @@ import {
   Radio,
   Select,
   MenuItem,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
+  Paper,
+  Typography,
   Alert,
   CircularProgress,
-  Stack,
   Chip,
+  Stack,
+  Stepper,
+  Step,
+  StepLabel,
+  Divider,
+  Snackbar,
 } from '@mui/material';
 import AddLocationIcon from '@mui/icons-material/AddLocation';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
+import EditLocationIcon from '@mui/icons-material/EditLocation';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
 import { userService } from '../services/user.service';
+import { cepService } from '../services/cep.service';
+import { geoService } from '../services/geo.service';
 import type { Endereco } from '../types/user';
-import { MapSelector } from './MapSelector';
+import type { ReverseResult } from '../services/geo.service';
+
+// Fix ícones Leaflet
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+const DefaultIcon = L.icon({
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
+
+// ============================================================================
+// TIPOS
+// ============================================================================
+
+type FluxoTipo = 'texto-primeiro' | 'localizacao-primeiro';
+
+interface EnderecoForm {
+  apelido?: string;
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento?: string;
+  latitude: string;
+  longitude: string;
+}
+
+interface PosicaoMapa {
+  lat: number;
+  lng: number;
+}
+
+// ============================================================================
+// COMPONENTES INTERNOS DO MAPA
+// ============================================================================
+
+// Componente para capturar cliques e atualizar marcador
+function MapClickHandler({
+  onPositionChange,
+}: {
+  onPositionChange: (pos: PosicaoMapa) => void;
+}) {
+  useMapEvents({
+    click(e) {
+      onPositionChange({
+        lat: e.latlng.lat,
+        lng: e.latlng.lng,
+      });
+    },
+  });
+  return null;
+}
+
+// Componente para recentrar o mapa quando a posição muda
+function MapRecenter({ center }: { center: PosicaoMapa }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([center.lat, center.lng], 16);
+  }, [center.lat, center.lng, map]);
+  return null;
+}
+
+// ============================================================================
+// COMPONENTE PRINCIPAL
+// ============================================================================
 
 interface EnderecoSelectorProps {
   onEnderecoIdSelect: (addressId: number) => void;
@@ -36,6 +119,7 @@ export function EnderecoSelector({
   onEnderecoIdSelect,
   enderecoIdSelecionado,
 }: EnderecoSelectorProps) {
+  // ========== ESTADOS PRINCIPAIS ==========
   const [modo, setModo] = useState<'salvos' | 'novo'>('salvos');
   const [enderecos, setEnderecos] = useState<Endereco[]>([]);
   const [enderecoSelecionado, setEnderecoSelecionado] = useState<number | null>(
@@ -43,9 +127,14 @@ export function EnderecoSelector({
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ========== ESTADOS DO DIÁLOGO ==========
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [salvandoEndereco, setSalvandoEndereco] = useState(false);
-  const [novoEndereco, setNovoEndereco] = useState<Omit<Endereco, 'id'>>({
+  const [fluxoEscolhido, setFluxoEscolhido] = useState<FluxoTipo | null>(null);
+  const [etapaAtual, setEtapaAtual] = useState(0);
+
+  // ========== ESTADOS DO FORMULÁRIO ==========
+  const [form, setForm] = useState<EnderecoForm>({
     apelido: '',
     cep: '',
     logradouro: '',
@@ -55,6 +144,35 @@ export function EnderecoSelector({
     longitude: '',
   });
 
+  // ========== ESTADOS DO MAPA ==========
+  const [posicaoMapa, setPosicaoMapa] = useState<PosicaoMapa | null>(null);
+  const [buscandoLocalizacao, setBuscandoLocalizacao] = useState(false);
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [fazendoReverseGeo, setFazendoReverseGeo] = useState(false);
+
+  // ========== ESTADOS DE SALVAMENTO ==========
+  const [salvando, setSalvando] = useState(false);
+
+  // ========== ESTADOS DE SNACKBAR ==========
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    open: false,
+    message: '',
+    severity: 'info',
+  });
+
+  const showSnackbar = (message: string, severity: 'success' | 'error' | 'warning' | 'info') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  // ========== CARREGAR ENDEREÇOS SALVOS ==========
   useEffect(() => {
     fetchEnderecos();
   }, []);
@@ -67,12 +185,18 @@ export function EnderecoSelector({
       setEnderecos(data);
     } catch (err) {
       console.error('Erro ao carregar endereços:', err);
-      setError('Erro ao carregar endereços salvos');
+      const error = err as { response?: { status?: number } };
+      if (error?.response?.status === 401) {
+        setError('Sessão expirada. Por favor, faça login novamente.');
+      } else {
+        setError('Erro ao carregar endereços salvos');
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // ========== HANDLERS DE MODO ==========
   const handleModoChange = (newModo: 'salvos' | 'novo') => {
     setModo(newModo);
     if (newModo === 'novo') {
@@ -86,9 +210,21 @@ export function EnderecoSelector({
     onEnderecoIdSelect(addressId);
   };
 
+  // ========== HANDLERS DO DIÁLOGO ==========
   const handleOpenDialog = () => {
+    resetForm();
     setDialogOpen(true);
-    setNovoEndereco({
+  };
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+    resetForm();
+  };
+
+  const resetForm = () => {
+    setFluxoEscolhido(null);
+    setEtapaAtual(0);
+    setForm({
       apelido: '',
       cep: '',
       logradouro: '',
@@ -97,64 +233,242 @@ export function EnderecoSelector({
       latitude: '',
       longitude: '',
     });
+    setPosicaoMapa(null);
   };
 
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
+  // ========== FLUXO A: TEXTO PRIMEIRO ==========
+  const handleEscolherTexto = () => {
+    setFluxoEscolhido('texto-primeiro');
+    setEtapaAtual(1);
   };
 
-  const handleLocationSelect = (lat: number, lng: number, address?: string) => {
-    setNovoEndereco((prev) => ({
+  const handleBuscarPorCep = async () => {
+    if (!form.cep || !form.numero) {
+      showSnackbar('Preencha CEP e Número para continuar', 'warning');
+      return;
+    }
+
+    const cepDigits = form.cep.replace(/\D/g, '');
+    if (cepDigits.length !== 8) {
+      showSnackbar('CEP deve ter 8 dígitos', 'warning');
+      return;
+    }
+
+    setBuscandoCep(true);
+    try {
+      // 1. Buscar dados do CEP no ViaCEP
+      const viaCepData = await cepService.lookup(cepDigits);
+      if (!viaCepData) {
+        showSnackbar('CEP não encontrado. Verifique o CEP digitado.', 'error');
+        setBuscandoCep(false);
+        return;
+      }
+
+      // 2. Atualizar logradouro se não preenchido
+      const logradouroFinal = form.logradouro.trim() || viaCepData.logradouro;
+      setForm((prev) => ({
+        ...prev,
+        logradouro: logradouroFinal,
+        cep: cepService.format(cepDigits),
+      }));
+
+      // 3. Montar query de geocoding: "Logradouro, Número, Cidade-UF, Brasil"
+      const query = `${logradouroFinal}, ${form.numero}, ${viaCepData.localidade} - ${viaCepData.uf}, Brasil`;
+
+      // 4. Geocoding
+      const resultados = await geoService.search(query);
+      if (!resultados || resultados.length === 0) {
+        // Fallback: tentar apenas CEP
+        const resultadosCep = await geoService.search(cepDigits);
+        if (!resultadosCep || resultadosCep.length === 0) {
+          showSnackbar('Não foi possível localizar o endereço no mapa. Ajuste manualmente.', 'warning');
+          // Posição padrão: Teresina, PI
+          setPosicaoMapa({ lat: -5.0892, lng: -42.8034 });
+          setEtapaAtual(2);
+          setBuscandoCep(false);
+          return;
+        }
+        const primeiro = resultadosCep[0];
+        setPosicaoMapa({
+          lat: parseFloat(primeiro.lat),
+          lng: parseFloat(primeiro.lon),
+        });
+      } else {
+        const primeiro = resultados[0];
+        setPosicaoMapa({
+          lat: parseFloat(primeiro.lat),
+          lng: parseFloat(primeiro.lon),
+        });
+      }
+
+      // 5. Avançar para etapa do mapa
+      setEtapaAtual(2);
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      showSnackbar('Erro ao buscar endereço. Verifique sua conexão.', 'error');
+    } finally {
+      setBuscandoCep(false);
+    }
+  };
+
+  const handleCepChange = async (cep: string) => {
+    setForm((prev) => ({ ...prev, cep }));
+
+    const digits = cep.replace(/\D/g, '');
+    if (digits.length === 8) {
+      try {
+        const via = await cepService.lookup(digits);
+        if (via?.logradouro) {
+          setForm((prev) => ({
+            ...prev,
+            logradouro: via.logradouro,
+            cep: cepService.format(digits),
+          }));
+        }
+      } catch (err) {
+        console.warn('Auto-preenchimento CEP falhou:', err);
+      }
+    }
+  };
+
+  // ========== FLUXO B: LOCALIZAÇÃO PRIMEIRO ==========
+  const handleEscolherLocalizacao = () => {
+    setFluxoEscolhido('localizacao-primeiro');
+    obterLocalizacaoAtual();
+  };
+
+  const obterLocalizacaoAtual = () => {
+    if (!navigator.geolocation) {
+      showSnackbar('Geolocalização não suportada pelo navegador', 'error');
+      setFluxoEscolhido(null);
+      return;
+    }
+
+    setBuscandoLocalizacao(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const pos = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setPosicaoMapa(pos);
+        setEtapaAtual(1);
+        setBuscandoLocalizacao(false);
+      },
+      (error) => {
+        console.error('Erro ao obter localização:', error);
+        showSnackbar('Não foi possível obter sua localização. Verifique as permissões do navegador.', 'error');
+        setBuscandoLocalizacao(false);
+        setFluxoEscolhido(null);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  };
+
+  // ========== HANDLERS DO MAPA ==========
+  const handleMapClick = (pos: PosicaoMapa) => {
+    setPosicaoMapa(pos);
+    setForm((prev) => ({
       ...prev,
-      latitude: String(lat),
-      longitude: String(lng),
-      ...(address ? parseAddress(address) : {}),
+      latitude: String(pos.lat),
+      longitude: String(pos.lng),
     }));
   };
 
-  const parseAddress = (address: string) => {
-    const parts = address.split(' - ');
-    const ruaNumero = parts[0]?.split(', ') || [];
-    return {
-      logradouro: ruaNumero[0] || '',
-      numero: ruaNumero[1] || '',
-    };
+  const handleConfirmarPosicao = async () => {
+    if (!posicaoMapa) {
+      showSnackbar('Selecione uma posição no mapa', 'warning');
+      return;
+    }
+
+    // Salvar coordenadas
+    setForm((prev) => ({
+      ...prev,
+      latitude: String(posicaoMapa.lat),
+      longitude: String(posicaoMapa.lng),
+    }));
+
+    // Se fluxo B, fazer reverse geocoding
+    if (fluxoEscolhido === 'localizacao-primeiro') {
+      setFazendoReverseGeo(true);
+      try {
+        const data: ReverseResult = await geoService.reverse(posicaoMapa.lat, posicaoMapa.lng);
+        const addr = data.address ?? {};
+
+        setForm((prev) => ({
+          ...prev,
+          logradouro: addr.road || addr.pedestrian || addr.footway || prev.logradouro,
+          numero: addr.house_number || prev.numero,
+          cep: addr.postcode || prev.cep,
+          latitude: String(posicaoMapa.lat),
+          longitude: String(posicaoMapa.lng),
+        }));
+      } catch (err) {
+        console.warn('Reverse geocoding falhou:', err);
+      } finally {
+        setFazendoReverseGeo(false);
+      }
+    }
+
+    // Avançar para formulário final
+    setEtapaAtual(fluxoEscolhido === 'texto-primeiro' ? 3 : 2);
   };
 
-  const handleSaveNovoEndereco = async () => {
-    if (!novoEndereco.cep.trim()) {
-      alert('CEP é obrigatório');
-      return;
-    }
-    if (!novoEndereco.logradouro.trim()) {
-      alert('Logradouro é obrigatório');
-      return;
-    }
-    if (!novoEndereco.numero.trim()) {
-      alert('Número é obrigatório');
-      return;
-    }
-    if (!novoEndereco.latitude || !novoEndereco.longitude) {
-      alert('Selecione a localização no mapa');
+  const handleVoltarAoMapa = () => {
+    setEtapaAtual(fluxoEscolhido === 'texto-primeiro' ? 2 : 1);
+  };
+
+  // ========== VALIDAÇÃO E SALVAMENTO ==========
+  const validarFormulario = (): string | null => {
+    if (!form.cep.trim()) return 'CEP é obrigatório';
+    if (!form.logradouro.trim()) return 'Logradouro é obrigatório';
+    if (!form.numero.trim()) return 'Número é obrigatório';
+    if (!form.latitude || !form.longitude) return 'Coordenadas são obrigatórias. Confirme a posição no mapa.';
+
+    const cepDigits = form.cep.replace(/\D/g, '');
+    if (cepDigits.length !== 8) return 'CEP inválido';
+
+    return null;
+  };
+
+  const handleSalvar = async () => {
+    const erroValidacao = validarFormulario();
+    if (erroValidacao) {
+      showSnackbar(erroValidacao, 'warning');
       return;
     }
 
-    setSalvandoEndereco(true);
+    setSalvando(true);
     try {
-      const result = await userService.addAddress(novoEndereco);
+      const result = await userService.addAddress(form);
       await fetchEnderecos();
       handleEnderecoSelect(result.id);
       setModo('salvos');
       handleCloseDialog();
-      alert('Endereço cadastrado com sucesso!');
+      showSnackbar('Endereço cadastrado com sucesso!', 'success');
     } catch (err) {
       console.error('Erro ao salvar endereço:', err);
-      alert('Erro ao salvar endereço. Tente novamente.');
+      
+      // Tratamento específico para erro de autenticação
+      const error = err as { response?: { status?: number; data?: { detail?: string } } };
+      if (error?.response?.status === 401) {
+        showSnackbar('Sessão expirada. Por favor, faça login novamente.', 'error');
+        // Opcional: redirecionar para login
+        // window.location.href = '/login';
+      } else {
+        const mensagem = error?.response?.data?.detail || 'Erro ao salvar endereço. Tente novamente.';
+        showSnackbar(mensagem, 'error');
+      }
     } finally {
-      setSalvandoEndereco(false);
+      setSalvando(false);
     }
   };
 
+  // ========== RENDERIZAÇÃO: SELETOR DE ENDEREÇOS SALVOS ==========
   const enderecoSelecionadoObj = enderecos.find((e) => e.id === enderecoSelecionado);
 
   return (
@@ -232,8 +546,7 @@ export function EnderecoSelector({
                     />
                   )}
                   <Typography variant="body2" color="success.dark">
-                    <strong>Logradouro:</strong> {enderecoSelecionadoObj.logradouro},{' '}
-                    {enderecoSelecionadoObj.numero}
+                    <strong>Endereço:</strong> {enderecoSelecionadoObj.logradouro}, {enderecoSelecionadoObj.numero}
                   </Typography>
                   {enderecoSelecionadoObj.complemento && (
                     <Typography variant="body2" color="success.dark">
@@ -242,9 +555,6 @@ export function EnderecoSelector({
                   )}
                   <Typography variant="body2" color="success.dark">
                     <strong>CEP:</strong> {enderecoSelecionadoObj.cep}
-                  </Typography>
-                  <Typography variant="caption" color="success.dark" display="block" sx={{ mt: 1 }}>
-                    📍 {enderecoSelecionadoObj.latitude}, {enderecoSelecionadoObj.longitude}
                   </Typography>
                 </Paper>
               )}
@@ -266,134 +576,376 @@ export function EnderecoSelector({
         </Box>
       )}
 
+      {/* ========== DIÁLOGO PRINCIPAL ========== */}
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>Cadastrar Novo Endereço</DialogTitle>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AddLocationIcon color="primary" />
+            Cadastrar Novo Endereço
+          </Box>
+        </DialogTitle>
+
         <DialogContent>
           <Box sx={{ pt: 1 }}>
-            <Alert severity="info" sx={{ mb: 3 }}>
-              <strong>Passo 1:</strong> Clique no mapa para selecionar a localização
-              <br />
-              <strong>Passo 2:</strong> Complete os dados do endereço
-            </Alert>
+            {/* ===== ETAPA 0: ESCOLHA DO FLUXO ===== */}
+            {etapaAtual === 0 && (
+              <Box>
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  <strong>Escolha como deseja cadastrar seu endereço:</strong>
+                  <br />
+                  Você pode começar digitando o CEP ou usar sua localização atual.
+                </Alert>
 
-            <MapSelector
-              onLocationSelect={handleLocationSelect}
-              initialPosition={
-                novoEndereco.latitude && novoEndereco.longitude
-                  ? {
-                      lat: parseFloat(novoEndereco.latitude),
-                      lng: parseFloat(novoEndereco.longitude),
-                    }
-                  : undefined
-              }
-            />
-
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                Dados do Endereço
-              </Typography>
-              <Stack spacing={2} sx={{ mt: 2 }}>
-                <TextField
-                  label="Apelido (Opcional)"
-                  placeholder="Ex: Casa, Trabalho, Matriz"
-                  value={novoEndereco.apelido}
-                  onChange={(e) =>
-                    setNovoEndereco({ ...novoEndereco, apelido: e.target.value })
-                  }
-                  fullWidth
-                  size="small"
-                  helperText="Um nome para identificar este endereço"
-                />
-
-                <TextField
-                  label="CEP *"
-                  placeholder="00000-000"
-                  value={novoEndereco.cep}
-                  onChange={(e) => setNovoEndereco({ ...novoEndereco, cep: e.target.value })}
-                  fullWidth
-                  size="small"
-                  required
-                  inputProps={{ maxLength: 9 }}
-                />
-
-                <TextField
-                  label="Logradouro *"
-                  placeholder="Ex: Rua das Flores"
-                  value={novoEndereco.logradouro}
-                  onChange={(e) =>
-                    setNovoEndereco({ ...novoEndereco, logradouro: e.target.value })
-                  }
-                  fullWidth
-                  size="small"
-                  required
-                  helperText="Nome da rua/avenida obtido do mapa"
-                />
-
-                <TextField
-                  label="Número *"
-                  placeholder="123"
-                  value={novoEndereco.numero}
-                  onChange={(e) => setNovoEndereco({ ...novoEndereco, numero: e.target.value })}
-                  fullWidth
-                  size="small"
-                  required
-                />
-
-                <TextField
-                  label="Complemento"
-                  placeholder="Ex: Apto 101, Bloco B, Portão Verde"
-                  value={novoEndereco.complemento}
-                  onChange={(e) =>
-                    setNovoEndereco({ ...novoEndereco, complemento: e.target.value })
-                  }
-                  fullWidth
-                  size="small"
-                  multiline
-                  rows={2}
-                />
-
-                {novoEndereco.latitude && novoEndereco.longitude && (
+                <Stack spacing={2}>
                   <Paper
-                    elevation={0}
+                    elevation={2}
                     sx={{
-                      p: 1.5,
-                      bgcolor: 'info.light',
-                      border: '1px solid',
-                      borderColor: 'info.main',
+                      p: 3,
+                      cursor: 'pointer',
+                      border: '2px solid transparent',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        bgcolor: 'action.hover',
+                      },
                     }}
+                    onClick={handleEscolherTexto}
                   >
-                    <Typography variant="caption" color="info.dark" fontWeight={600}>
-                      📍 Coordenadas selecionadas:
-                    </Typography>
-                    <Typography variant="caption" color="info.dark" display="block">
-                      Latitude: {novoEndereco.latitude}, Longitude: {novoEndereco.longitude}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <EditLocationIcon color="primary" sx={{ fontSize: 40 }} />
+                      <Box>
+                        <Typography variant="h6" gutterBottom>
+                          📝 Digitar CEP e Endereço
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Digite CEP e número → Sistema localiza no mapa → Você ajusta se necessário
+                        </Typography>
+                      </Box>
+                    </Box>
                   </Paper>
+
+                  <Paper
+                    elevation={2}
+                    sx={{
+                      p: 3,
+                      cursor: 'pointer',
+                      border: '2px solid transparent',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        borderColor: 'secondary.main',
+                        bgcolor: 'action.hover',
+                      },
+                    }}
+                    onClick={handleEscolherLocalizacao}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      {buscandoLocalizacao ? (
+                        <CircularProgress size={40} />
+                      ) : (
+                        <MyLocationIcon color="secondary" sx={{ fontSize: 40 }} />
+                      )}
+                      <Box>
+                        <Typography variant="h6" gutterBottom>
+                          📍 Usar Minha Localização
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {buscandoLocalizacao
+                            ? 'Obtendo sua localização...'
+                            : 'GPS localiza você → Ajusta no mapa → Preenche os dados'}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Paper>
+                </Stack>
+              </Box>
+            )}
+
+            {/* ===== FLUXO A - ETAPA 1: DIGITAÇÃO CEP/NÚMERO ===== */}
+            {fluxoEscolhido === 'texto-primeiro' && etapaAtual === 1 && (
+              <Box>
+                <Alert severity="success" icon={<EditLocationIcon />} sx={{ mb: 3 }}>
+                  <strong>Passo 1:</strong> Digite o CEP e o número da residência
+                </Alert>
+
+                <Stepper activeStep={0} sx={{ mb: 3 }}>
+                  <Step>
+                    <StepLabel>Digitar CEP</StepLabel>
+                  </Step>
+                  <Step>
+                    <StepLabel>Ajustar no Mapa</StepLabel>
+                  </Step>
+                  <Step>
+                    <StepLabel>Confirmar Dados</StepLabel>
+                  </Step>
+                </Stepper>
+
+                <Stack spacing={2}>
+                  <TextField
+                    label="CEP"
+                    placeholder="00000-000"
+                    value={form.cep}
+                    onChange={(e) => handleCepChange(e.target.value)}
+                    fullWidth
+                    required
+                    inputProps={{ maxLength: 9 }}
+                    helperText="Auto-preenche o logradouro"
+                  />
+
+                  <TextField
+                    label="Logradouro"
+                    placeholder="Ex: Rua das Flores"
+                    value={form.logradouro}
+                    onChange={(e) => setForm({ ...form, logradouro: e.target.value })}
+                    fullWidth
+                    required
+                  />
+
+                  <TextField
+                    label="Número"
+                    placeholder="123"
+                    value={form.numero}
+                    onChange={(e) => setForm({ ...form, numero: e.target.value })}
+                    fullWidth
+                    required
+                  />
+
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={handleBuscarPorCep}
+                    disabled={buscandoCep || !form.cep || !form.numero}
+                    startIcon={buscandoCep ? <CircularProgress size={20} /> : <LocationOnIcon />}
+                    fullWidth
+                  >
+                    {buscandoCep ? 'Localizando...' : 'Localizar no Mapa'}
+                  </Button>
+                </Stack>
+              </Box>
+            )}
+
+            {/* ===== FLUXO A - ETAPA 2: MAPA (AJUSTE) ===== */}
+            {fluxoEscolhido === 'texto-primeiro' && etapaAtual === 2 && posicaoMapa && (
+              <Box>
+                <Alert severity="info" icon={<LocationOnIcon />} sx={{ mb: 2 }}>
+                  <strong>Passo 2:</strong> Ajuste o marcador clicando no local exato da coleta
+                </Alert>
+
+                <Stepper activeStep={1} sx={{ mb: 3 }}>
+                  <Step completed>
+                    <StepLabel>Digitar CEP</StepLabel>
+                  </Step>
+                  <Step>
+                    <StepLabel>Ajustar no Mapa</StepLabel>
+                  </Step>
+                  <Step>
+                    <StepLabel>Confirmar Dados</StepLabel>
+                  </Step>
+                </Stepper>
+
+                <Paper elevation={3} sx={{ height: 400, overflow: 'hidden', borderRadius: 2, mb: 2 }}>
+                  <MapContainer
+                    center={[posicaoMapa.lat, posicaoMapa.lng]}
+                    zoom={16}
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <Marker position={[posicaoMapa.lat, posicaoMapa.lng]} />
+                    <MapClickHandler onPositionChange={handleMapClick} />
+                    <MapRecenter center={posicaoMapa} />
+                  </MapContainer>
+                </Paper>
+
+                <Stack direction="row" spacing={2}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ArrowBackIcon />}
+                    onClick={() => setEtapaAtual(1)}
+                  >
+                    Voltar
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<CheckCircleIcon />}
+                    onClick={handleConfirmarPosicao}
+                    fullWidth
+                  >
+                    Confirmar Posição
+                  </Button>
+                </Stack>
+              </Box>
+            )}
+
+            {/* ===== FLUXO B - ETAPA 1: MAPA (AJUSTE) ===== */}
+            {fluxoEscolhido === 'localizacao-primeiro' && etapaAtual === 1 && posicaoMapa && (
+              <Box>
+                <Alert severity="info" icon={<MyLocationIcon />} sx={{ mb: 2 }}>
+                  <strong>Passo 1:</strong> Sua localização foi detectada. Ajuste o marcador se necessário.
+                </Alert>
+
+                <Stepper activeStep={0} sx={{ mb: 3 }}>
+                  <Step>
+                    <StepLabel>Ajustar no Mapa</StepLabel>
+                  </Step>
+                  <Step>
+                    <StepLabel>Preencher Dados</StepLabel>
+                  </Step>
+                </Stepper>
+
+                <Paper elevation={3} sx={{ height: 400, overflow: 'hidden', borderRadius: 2, mb: 2 }}>
+                  <MapContainer
+                    center={[posicaoMapa.lat, posicaoMapa.lng]}
+                    zoom={16}
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <Marker position={[posicaoMapa.lat, posicaoMapa.lng]} />
+                    <MapClickHandler onPositionChange={handleMapClick} />
+                    <MapRecenter center={posicaoMapa} />
+                  </MapContainer>
+                </Paper>
+
+                <Button
+                  variant="contained"
+                  size="large"
+                  startIcon={fazendoReverseGeo ? <CircularProgress size={20} /> : <CheckCircleIcon />}
+                  onClick={handleConfirmarPosicao}
+                  disabled={fazendoReverseGeo}
+                  fullWidth
+                >
+                  {fazendoReverseGeo ? 'Buscando endereço...' : 'Confirmar e Preencher Dados'}
+                </Button>
+              </Box>
+            )}
+
+            {/* ===== FORMULÁRIO FINAL (AMBOS OS FLUXOS) ===== */}
+            {((fluxoEscolhido === 'texto-primeiro' && etapaAtual === 3) ||
+              (fluxoEscolhido === 'localizacao-primeiro' && etapaAtual === 2)) && (
+              <Box>
+                <Alert severity="success" icon={<CheckCircleIcon />} sx={{ mb: 3 }}>
+                  <strong>Última etapa:</strong> Revise e complete os dados do endereço
+                </Alert>
+
+                {fluxoEscolhido === 'texto-primeiro' ? (
+                  <Stepper activeStep={2} sx={{ mb: 3 }}>
+                    <Step completed>
+                      <StepLabel>Digitar CEP</StepLabel>
+                    </Step>
+                    <Step completed>
+                      <StepLabel>Ajustar no Mapa</StepLabel>
+                    </Step>
+                    <Step>
+                      <StepLabel>Confirmar Dados</StepLabel>
+                    </Step>
+                  </Stepper>
+                ) : (
+                  <Stepper activeStep={1} sx={{ mb: 3 }}>
+                    <Step completed>
+                      <StepLabel>Ajustar no Mapa</StepLabel>
+                    </Step>
+                    <Step>
+                      <StepLabel>Preencher Dados</StepLabel>
+                    </Step>
+                  </Stepper>
                 )}
-              </Stack>
-            </Box>
+
+                <Stack spacing={2}>
+                  <TextField
+                    label="Apelido (opcional)"
+                    placeholder="Ex: Casa, Trabalho, Escritório"
+                    value={form.apelido}
+                    onChange={(e) => setForm({ ...form, apelido: e.target.value })}
+                    fullWidth
+                  />
+
+                  <Divider />
+
+                  <TextField
+                    label="CEP"
+                    placeholder="00000-000"
+                    value={form.cep}
+                    onChange={(e) => setForm({ ...form, cep: e.target.value })}
+                    fullWidth
+                    required
+                    inputProps={{ maxLength: 9 }}
+                  />
+
+                  <TextField
+                    label="Logradouro"
+                    placeholder="Ex: Rua das Flores"
+                    value={form.logradouro}
+                    onChange={(e) => setForm({ ...form, logradouro: e.target.value })}
+                    fullWidth
+                    required
+                  />
+
+                  <TextField
+                    label="Número"
+                    placeholder="123"
+                    value={form.numero}
+                    onChange={(e) => setForm({ ...form, numero: e.target.value })}
+                    fullWidth
+                    required
+                  />
+
+                  <TextField
+                    label="Complemento"
+                    placeholder="Ex: Apto 101, Bloco B"
+                    value={form.complemento}
+                    onChange={(e) => setForm({ ...form, complemento: e.target.value })}
+                    fullWidth
+                    multiline
+                    rows={2}
+                  />
+
+                  <Button
+                    variant="outlined"
+                    startIcon={<ArrowBackIcon />}
+                    onClick={handleVoltarAoMapa}
+                    fullWidth
+                  >
+                    Ajustar Posição no Mapa
+                  </Button>
+                </Stack>
+              </Box>
+            )}
           </Box>
         </DialogContent>
+
         <DialogActions>
-          <Button onClick={handleCloseDialog} disabled={salvandoEndereco}>
+          <Button onClick={handleCloseDialog} disabled={salvando}>
             Cancelar
           </Button>
-          <Button
-            onClick={handleSaveNovoEndereco}
-            variant="contained"
-            disabled={
-              salvandoEndereco ||
-              !novoEndereco.cep ||
-              !novoEndereco.logradouro ||
-              !novoEndereco.numero ||
-              !novoEndereco.latitude ||
-              !novoEndereco.longitude
-            }
-          >
-            {salvandoEndereco ? 'Salvando...' : 'Salvar Endereço'}
-          </Button>
+          {((fluxoEscolhido === 'texto-primeiro' && etapaAtual === 3) ||
+            (fluxoEscolhido === 'localizacao-primeiro' && etapaAtual === 2)) && (
+            <Button
+              onClick={handleSalvar}
+              variant="contained"
+              disabled={salvando}
+              startIcon={salvando ? <CircularProgress size={20} /> : <CheckCircleIcon />}
+            >
+              {salvando ? 'Salvando...' : 'Salvar Endereço'}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
+
+      {/* ========== SNACKBAR PARA NOTIFICAÇÕES ========== */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
