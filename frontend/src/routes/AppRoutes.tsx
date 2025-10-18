@@ -6,6 +6,7 @@ import Cadastro from '../pages/Cadastro';
 import Home from '../pages/Home';
 import Perfil from '../pages/Perfil';
 import Residuo from '../pages/Residuo';
+import { Agendamento } from '../pages/Agendamento';
 
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
@@ -31,10 +32,18 @@ export function AppRoutes() {
           <Home />
         </ProtectedRoute>
       } />
+
       <Route path="/residuos" element={
         <ProtectedRoute>
           <RoleBasedRoute allowedRoles={['produtor']}>
             <Residuo />
+          </RoleBasedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/agendamentos" element={
+        <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={['produtor']}>
+            <Agendamento />
           </RoleBasedRoute>
         </ProtectedRoute>
       } />

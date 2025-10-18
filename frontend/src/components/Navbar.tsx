@@ -16,7 +16,6 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import HomeIcon from '@mui/icons-material/Home';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import RedeemIcon from '@mui/icons-material/Redeem';
@@ -26,7 +25,6 @@ import RecyclingIcon from '@mui/icons-material/Recycling';
 
 // Definição de todos os links possíveis com seus roles
 const allNavLinks = [
-  { label: 'Página Inicial', icon: <HomeIcon fontSize="small" />, to: '/', roles: ['produtor', 'coletor', 'receptor'] },
   { label: 'Resíduos', icon: <RecyclingIcon fontSize="small" />, to: '/residuos', roles: ['produtor'] },
   { label: 'Agendamentos', icon: <CalendarMonthIcon fontSize="small" />, to: '/agendamentos', roles: ['produtor'] },
   { label: 'Coletas', icon: <LocalShippingIcon fontSize="small" />, to: '/coletas', roles: ['coletor'] },
@@ -40,6 +38,8 @@ export function Navbar() {
   const { hasRole } = useRoleCheck();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  // Breakpoint adicional: quando há muitos itens, mostrar dropdown mais cedo
+  const isCompact = useMediaQuery(theme.breakpoints.down('lg'));
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -48,7 +48,18 @@ export function Navbar() {
     return allNavLinks.filter(link => hasRole(link.roles));
   }, [hasRole]);
 
+  // Determina quantos links mostrar diretamente baseado no espaço disponível
+  const maxVisibleLinks = useMemo(() => {
+    if (isMobile) return 0; // Mobile: todos no menu hambúrguer
+    if (isCompact && navLinks.length > 4) return 3; // Tela média com muitos links: mostrar 3 + dropdown
+    return navLinks.length; // Tela grande: mostrar todos
+  }, [isMobile, isCompact, navLinks.length]);
+
+  const visibleLinks = navLinks.slice(0, maxVisibleLinks);
+  const dropdownLinks = navLinks.slice(maxVisibleLinks);
+
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [dropdownAnchor, setDropdownAnchor] = useState<null | HTMLElement>(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
 
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -57,6 +68,14 @@ export function Navbar() {
 
   const handleCloseMenu = () => {
     setMenuAnchor(null);
+  };
+
+  const handleOpenDropdown = (event: React.MouseEvent<HTMLElement>) => {
+    setDropdownAnchor(event.currentTarget);
+  };
+
+  const handleCloseDropdown = () => {
+    setDropdownAnchor(null);
   };
 
   const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -108,7 +127,7 @@ export function Navbar() {
         {/* Desktop Navigation */}
         {!isMobile && (
           <Box sx={{ display: 'flex', gap: '0.5rem', flex: 1, ml: '2rem' }}>
-            {navLinks.map((link) => (
+            {visibleLinks.map((link) => (
               <Button
                 key={link.to}
                 component={RouterLink}
@@ -129,6 +148,49 @@ export function Navbar() {
                 {link.label}
               </Button>
             ))}
+            {dropdownLinks.length > 0 && (
+              <>
+                <Button
+                  onClick={handleOpenDropdown}
+                  startIcon={<MenuIcon fontSize="small" />}
+                  sx={{
+                    color: 'text.primary',
+                    fontWeight: 500,
+                    textTransform: 'none',
+                    borderRadius: '0.5rem',
+                    px: '1rem',
+                    '&:hover': {
+                      bgcolor: 'action.hover',
+                    },
+                  }}
+                >
+                  Mais
+                </Button>
+                <Menu
+                  anchorEl={dropdownAnchor}
+                  open={Boolean(dropdownAnchor)}
+                  onClose={handleCloseDropdown}
+                  sx={{ mt: '0.5rem' }}
+                >
+                  {dropdownLinks.map((link) => (
+                    <MenuItem
+                      key={link.to}
+                      component={RouterLink}
+                      to={link.to}
+                      onClick={handleCloseDropdown}
+                      sx={{
+                        color: isActiveRoute(link.to) ? 'primary.main' : 'text.primary',
+                        fontWeight: isActiveRoute(link.to) ? 600 : 400,
+                        gap: '0.75rem',
+                      }}
+                    >
+                      {link.icon}
+                      {link.label}
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </>
+            )}
           </Box>
         )}
 

@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 
-from src.infra.database.repositories import scheduling_repo, user_repo
+from src.infra.database.repositories import scheduling_repo, user_repo, residue_repo
 from src.infra.database.models.scheduling import Scheduling
 from src.schemas.scheduling_schema import (
     SchedulingCreate,
@@ -97,6 +97,26 @@ class SchedulingService:
         doc.pop("_id", None)
 
         new_id = await scheduling_repo.create_scheduling(doc)
+        
+        # 🔔 PADRÃO OBSERVER: Atualizar status dos resíduos para AGENDADO
+        # Quando um agendamento é criado, os resíduos associados mudam de estado
+        for residuo_id in dados.residuosId:
+            try:
+                await residue_repo.atualizar_status(
+                    residuo_id=residuo_id,
+                    novo_status="AGENDADO",
+                    usuario_id=produtor_id,
+                    detalhes={
+                        "agendamento_id": new_id,
+                        "acao": "agendamento_criado",
+                        "produtor_id": produtor_id
+                    }
+                )
+            except Exception as e:
+                # Log do erro mas não falha a criação do agendamento
+                # Em produção, usar logger adequado
+                print(f"Erro ao atualizar status do resíduo {residuo_id}: {str(e)}")
+        
         criado = await scheduling_repo.find_by_id(new_id)
         if not criado:
             raise HTTPException(500, "Erro ao recuperar agendamento criado")
@@ -250,6 +270,25 @@ class SchedulingService:
         ok = await scheduling_repo.update_status(scheduling_id, novo_status)
         if not ok:
             raise HTTPException(500, "Erro ao atualizar status do agendamento")
+
+        # 🔔 PADRÃO OBSERVER: Atualizar status dos resíduos quando agendamento é cancelado
+        # Se o agendamento foi CANCELADO, os resíduos voltam para DISPONIVEL
+        if novo_status.upper() == "CANCELADO":
+            residuos_ids = atual.get("residuosId", [])
+            for residuo_id in residuos_ids:
+                try:
+                    await residue_repo.atualizar_status(
+                        residuo_id=residuo_id,
+                        novo_status="DISPONIVEL",
+                        usuario_id=str(user_id) if user_id else "sistema",
+                        detalhes={
+                            "agendamento_id": scheduling_id,
+                            "acao": "agendamento_cancelado",
+                            "usuario_id": str(user_id) if user_id else "sistema"
+                        }
+                    )
+                except Exception as e:
+                    print(f"Erro ao atualizar status do resíduo {residuo_id}: {str(e)}")
 
         atualizado = await scheduling_repo.find_by_id(scheduling_id)
         if not atualizado:

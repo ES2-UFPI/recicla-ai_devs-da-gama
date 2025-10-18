@@ -3,5 +3,5 @@ import type { ResiduoStatus } from '../../../types/residuo';
 import { statusColor } from '../constants';
 
 export const StatusChip = ({ s }: { s: ResiduoStatus }) => (
-  <Chip size="small" label={s} color={statusColor[s]} variant={s === 'CRIADO' ? 'outlined' : 'filled'} />
+  <Chip size="small" label={s} color={statusColor[s]} variant={s === 'DISPONIVEL' ? 'outlined' : 'filled'} />
 );
