@@ -5,6 +5,8 @@ from src.schemas.scheduling_schema import (
     SchedulingCreate,
     SchedulingUpdate,
     SchedulingInDB,
+    BuscarAgendamentosRequest,
+    AgendamentoComDistancia,
 )
 from src.service.scheduling_service import SchedulingService
 from src.infra.security.dependencies import get_current_user
@@ -70,6 +72,121 @@ async def obter_agendamento(
     - Cooperativa/Reciclador: pode ver qualquer agendamento (para aceitar coletas)
     """
     return await scheduling_service.obter_agendamento(scheduling_id, current_user)
+
+
+@router.post(
+    "/disponiveis",
+    response_model=List[AgendamentoComDistancia],
+    summary="Buscar agendamentos disponíveis por localização",
+    description="""
+    Busca agendamentos PENDENTE disponíveis para coleta baseado em:
+    - **Localização**: Latitude, longitude e raio de busca
+    - **Horário**: Data e hora atual para verificar disponibilidade
+    - **Categorias** (opcional): Filtro por tipos de resíduos
+    
+    ## Funcionalidade
+    
+    Este endpoint é usado pelo **coletor** para encontrar agendamentos próximos
+    que estejam disponíveis no momento atual.
+    
+    ## Filtros Aplicados
+    
+    1. ✅ Status PENDENTE
+    2. ✅ Distância ≤ raio especificado
+    3. ✅ Horário dentro do slot de disponibilidade
+    4. ✅ Categorias de resíduos (opcional)
+    
+    ## Algoritmo Otimizado
+    
+    - Query geoespacial no MongoDB (cálculo de distância no banco)
+    - Retorna apenas agendamentos no raio especificado
+    - Ordenado por distância (mais próximo primeiro)
+    - Inclui dados completos dos resíduos
+    
+    ## Autorização
+    
+    - Apenas usuários com role **"coletor"** podem usar este endpoint
+    
+    ## Exemplo de Uso
+    
+    ```json
+    {
+      "latitude": -5.0892,
+      "longitude": -42.8019,
+      "raio": 5.0,
+      "data_busca": "22/10/2025",
+      "hora_busca": "15:00",
+      "categorias_ids": ["plastico_id", "metal_id"]
+    }
+    ```
+    
+    ## Resposta
+    
+    Lista de agendamentos ordenados por distância, cada um contendo:
+    - Dados do agendamento (local, disponibilidade, etc.)
+    - **distancia_km**: Distância calculada em quilômetros
+    - **residuos**: Lista completa de resíduos com suas informações
+    """,
+    responses={
+        200: {
+            "description": "Lista de agendamentos disponíveis",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "id": "674a1b2c3d4e5f6g7h8i9j0k",
+                            "produtorId": "produtor_123",
+                            "distancia_km": 0.87,
+                            "local": {
+                                "latitude": "-5.0900",
+                                "longitude": "-42.8025",
+                                "logradouro": "Rua das Flores",
+                                "numero": "123"
+                            },
+                            "disponibilidade": [
+                                {
+                                    "data": "22/10/2025",
+                                    "hora_inicio": "10:30",
+                                    "hora_fim": "18:00"
+                                }
+                            ],
+                            "residuos": [
+                                {
+                                    "id": "residuo_1",
+                                    "categoriaId": "plastico_id",
+                                    "quantidade": 5.0,
+                                    "tipo_medida": "kg"
+                                }
+                            ],
+                            "status": "PENDENTE"
+                        }
+                    ]
+                }
+            }
+        },
+        403: {"description": "Apenas coletores podem buscar agendamentos disponíveis"},
+        422: {"description": "Erro de validação nos parâmetros de busca"}
+    }
+)
+async def buscar_agendamentos_disponiveis(
+    filtros: BuscarAgendamentosRequest,
+    current_user: dict = Depends(get_current_user),
+) -> List[AgendamentoComDistancia]:
+    """
+    Busca agendamentos disponíveis próximos ao coletor.
+    
+    Este endpoint implementa a lógica de busca geoespacial otimizada,
+    permitindo que coletores encontrem agendamentos:
+    - Dentro de um raio específico
+    - Disponíveis no horário atual
+    - Opcionalmente filtrados por categoria de resíduo
+    
+    O resultado é ordenado por distância (mais próximo primeiro).
+    """
+    return await scheduling_service.buscar_agendamentos_disponiveis(
+        filtros=filtros,
+        current_user=current_user
+    )
 
 
 @router.get(

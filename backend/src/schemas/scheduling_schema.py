@@ -194,3 +194,91 @@ class SchedulingInDB(BaseModel):
     local: dict[str, Any]  # Armazena objeto completo do endereço
     status: str
     observacoes: Optional[str] = None
+
+
+class BuscarAgendamentosRequest(BaseModel):
+    """
+    Schema para buscar agendamentos disponíveis por localização.
+    Usado pelo coletor para encontrar agendamentos próximos.
+    """
+    latitude: float = Field(
+        ..., 
+        description="Latitude do centro de busca (posição do coletor)",
+        ge=-90.0,
+        le=90.0,
+        example=-5.0892
+    )
+    longitude: float = Field(
+        ..., 
+        description="Longitude do centro de busca (posição do coletor)",
+        ge=-180.0,
+        le=180.0,
+        example=-42.8019
+    )
+    raio: float = Field(
+        ..., 
+        description="Raio de busca em quilômetros",
+        gt=0,
+        le=100,  # Limite máximo de 100km para evitar buscas muito amplas
+        example=5.0
+    )
+    data_busca: str = Field(
+        ...,
+        description="Data atual para verificar disponibilidade (formato dd/mm/aaaa)",
+        example="22/10/2025"
+    )
+    hora_busca: str = Field(
+        ...,
+        description="Hora atual para verificar disponibilidade (formato hh:mm)",
+        example="15:00"
+    )
+    categorias_ids: Optional[list[str]] = Field(
+        None,
+        description="IDs de categorias para filtrar. Se fornecido, retorna apenas agendamentos que contenham resíduos dessas categorias",
+        example=["categoria_id1", "categoria_id2"]
+    )
+    
+    @field_validator('raio')
+    @classmethod
+    def validar_raio(cls, v: float) -> float:
+        """Valida se o raio está em um intervalo razoável"""
+        if v <= 0:
+            raise ValueError("Raio deve ser maior que zero")
+        if v > 100:
+            raise ValueError("Raio máximo permitido é 100km")
+        return v
+    
+    @field_validator('data_busca')
+    @classmethod
+    def validar_data_busca(cls, v: str) -> str:
+        """Valida formato da data (dd/mm/aaaa)"""
+        try:
+            datetime.strptime(v, "%d/%m/%Y")
+            return v
+        except ValueError:
+            raise ValueError("Data deve estar no formato dd/mm/aaaa (ex: 22/10/2025)")
+    
+    @field_validator('hora_busca')
+    @classmethod
+    def validar_hora_busca(cls, v: str) -> str:
+        """Valida formato do horário (hh:mm)"""
+        try:
+            datetime.strptime(v, "%H:%M")
+            return v
+        except ValueError:
+            raise ValueError("Horário deve estar no formato hh:mm (ex: 15:00)")
+
+
+class AgendamentoComDistancia(SchedulingInDB):
+    """
+    Schema de retorno de agendamento com informação de distância.
+    Usado na resposta da busca por localização.
+    """
+    distancia_km: float = Field(
+        ..., 
+        description="Distância em quilômetros entre o coletor e o local de coleta"
+    )
+    residuos: list[dict[str, Any]] = Field(
+        ...,
+        description="Lista completa de resíduos do agendamento com suas informações"
+    )

@@ -80,8 +80,6 @@ class UserUpdate(BaseModel):
     email: Optional[str] = Field(None, example="novo.email@example.com")
     phone: Optional[str] = Field(None, example="(88) 88888-8888")
     password: Optional[str] = Field(None, example="novaSenha123")
-    role_id: Optional[str] = Field(None, example="new_role_id")
-    role_id: str = Field(..., example="role_id")
     addresses: Optional[list[Endereco]] = Field(None, example=[{
         "apelido": "Casa",
         "cep": "12345-678",

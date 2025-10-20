@@ -110,3 +110,137 @@ async def delete_scheduling(scheduling_id: str) -> bool:
 	result = await _collection().delete_one({"_id": _id})
 	return result.deleted_count > 0
 
+
+async def find_pendentes(*, limit: int = 500, skip: int = 0) -> List[Dict[str, Any]]:
+	"""
+	Busca todos os agendamentos com status PENDENTE.
+	Usado para filtrar agendamentos disponíveis para coleta.
+	
+	Args:
+		limit: Número máximo de documentos a retornar (padrão: 500)
+		skip: Número de documentos a pular (paginação)
+	
+	Returns:
+		Lista de agendamentos pendentes
+	"""
+	cursor = _collection().find({"status": "PENDENTE"}).skip(skip).limit(limit)
+	docs = await cursor.to_list(length=limit)
+	return _to_response_many(docs)
+
+
+async def find_pendentes_por_proximidade(
+	latitude: float,
+	longitude: float,
+	raio_km: float,
+	*,
+	limit: int = 100,
+	skip: int = 0
+) -> List[Dict[str, Any]]:
+	"""
+	Busca agendamentos PENDENTE próximos a uma localização usando query geoespacial.
+	
+	IMPORTANTE: Esta função assume que as coordenadas estão armazenadas como strings
+	no formato "local.latitude" e "local.longitude". Futuramente, pensar em
+	migrar para GeoJSON Point no futuro.
+	
+	Por enquanto, usa aggregation pipeline para:
+	1. Filtrar por status PENDENTE
+	2. Converter strings para números
+	3. Calcular distância
+	4. Filtrar por raio
+	5. Ordenar por distância
+	
+	Args:
+		latitude: Latitude central da busca
+		longitude: Longitude central da busca
+		raio_km: Raio de busca em quilômetros
+		limit: Número máximo de resultados
+		skip: Offset para paginação
+	
+	Returns:
+		Lista de agendamentos com campo adicional 'distancia_km'
+	"""
+	# Converter raio para radianos (necessário para cálculo esférico)
+	# Raio da Terra = 6371 km
+	raio_radianos = raio_km / 6371.0
+	
+	pipeline = [
+		# 1. Filtrar apenas PENDENTES
+		{"$match": {"status": "PENDENTE"}},
+		
+		# 2. Adicionar campos calculados
+		{"$addFields": {
+			"lat_num": {"$toDouble": "$local.latitude"},
+			"lon_num": {"$toDouble": "$local.longitude"}
+		}},
+		
+		# 3. Filtrar documentos com coordenadas válidas
+		{"$match": {
+			"lat_num": {"$exists": True, "$ne": None},
+			"lon_num": {"$exists": True, "$ne": None}
+		}},
+		
+		# 4. Calcular distância usando fórmula Haversine (aproximação esférica)
+		{"$addFields": {
+			"distancia_radianos": {
+				"$let": {
+					"vars": {
+						"dlat": {"$subtract": [{"$degreesToRadians": "$lat_num"}, {"$degreesToRadians": latitude}]},
+						"dlon": {"$subtract": [{"$degreesToRadians": "$lon_num"}, {"$degreesToRadians": longitude}]},
+						"lat1": {"$degreesToRadians": latitude},
+						"lat2": {"$degreesToRadians": "$lat_num"}
+					},
+					"in": {
+						"$let": {
+							"vars": {
+								"a": {
+									"$add": [
+										{"$pow": [{"$sin": {"$divide": ["$$dlat", 2]}}, 2]},
+										{"$multiply": [
+											{"$cos": "$$lat1"},
+											{"$cos": "$$lat2"},
+											{"$pow": [{"$sin": {"$divide": ["$$dlon", 2]}}, 2]}
+										]}
+									]
+								}
+							},
+							"in": {
+								"$multiply": [
+									2,
+									{"$atan2": [{"$sqrt": "$$a"}, {"$sqrt": {"$subtract": [1, "$$a"]}}]}
+								]
+							}
+						}
+					}
+				}
+			}
+		}},
+		
+		# 5. Converter distância para km
+		{"$addFields": {
+			"distancia_km": {"$multiply": ["$distancia_radianos", 6371.0]}
+		}},
+		
+		# 6. Filtrar por raio
+		{"$match": {"distancia_km": {"$lte": raio_km}}},
+		
+		# 7. Ordenar por distância (mais próximo primeiro)
+		{"$sort": {"distancia_km": 1}},
+		
+		# 8. Paginação
+		{"$skip": skip},
+		{"$limit": limit},
+		
+		# 9. Limpar campos temporários
+		{"$project": {
+			"lat_num": 0,
+			"lon_num": 0,
+			"distancia_radianos": 0
+		}}
+	]
+	
+	cursor = _collection().aggregate(pipeline)
+	docs = await cursor.to_list(length=limit)
+	return _to_response_many(docs)
+
+
