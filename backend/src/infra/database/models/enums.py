@@ -25,5 +25,5 @@ class AcaoHistorico(str, Enum):
 class StatusAgendamento(str, Enum):
     """Estados possíveis de um agendamento"""
     PENDENTE = "PENDENTE"
-    ACEITO = "ACEITO"
+    CONCLUIDO = "CONCLUIDO"
     CANCELADO = "CANCELADO"

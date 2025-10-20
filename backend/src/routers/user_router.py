@@ -54,13 +54,13 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
 	)
 
 
-@router.put("/me", response_model=UserPublic)
+@router.patch("/me", response_model=UserPublic)
 async def update_user(
 	payload: UserUpdate,
 	current_user: dict = Depends(get_current_user)
 ):
 	"""
-	Atualiza dados do usuário.
+	Atualiza parcialmente dados do usuário.
 	
 	Requer autenticação. Apenas o próprio usuário pode se atualizar.
 	Permite atualizar: name, email, phone, password, addresses, cidade_id, estado_id.
