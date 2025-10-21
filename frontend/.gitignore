@@ -26,8 +26,8 @@ dist-ssr
 
 # React/Vite/CRA/Next.js
 build/
-.env*
-.env.*
+.env.development
+.env.production
 coverage/
 .parcel-cache/
 .turbo/
