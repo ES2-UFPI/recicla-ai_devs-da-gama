@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
+from math import radians, sin, cos, sqrt, atan2
 
 from src.infra.database.repositories import scheduling_repo, user_repo, residue_repo
 from src.infra.database.models.scheduling import Scheduling
@@ -8,6 +9,8 @@ from src.schemas.scheduling_schema import (
     SchedulingUpdate,
     SchedulingInDB,
     LocalEndereco,
+    BuscarAgendamentosRequest,
+    AgendamentoComDistancia,
 )
 
 
@@ -307,6 +310,9 @@ class SchedulingService:
         - Produtor: pode deletar apenas seus próprios agendamentos
         - Cooperativa/Reciclador: NÃO pode deletar agendamentos
         - Admin: pode deletar qualquer agendamento
+        
+        Efeitos colaterais:
+        - Os resíduos associados voltam ao status DISPONIVEL
         """
         atual = await scheduling_repo.find_by_id(scheduling_id)
         if not atual:
@@ -323,7 +329,252 @@ class SchedulingService:
         if user_role == "produtor" and atual.get("produtorId") != user_id:
             raise HTTPException(403, "Você só pode deletar seus próprios agendamentos")
 
+        # 🔔 PADRÃO OBSERVER: Reverter status dos resíduos para DISPONIVEL
+        # Quando um agendamento é deletado, os resíduos associados voltam a estar disponíveis
+        residuos_ids = atual.get("residuosId", [])
+        for residuo_id in residuos_ids:
+            try:
+                await residue_repo.atualizar_status(
+                    residuo_id=residuo_id,
+                    novo_status="DISPONIVEL",
+                    usuario_id=user_id
+                )
+            except Exception as e:
+                # Log do erro mas não falha a deleção do agendamento
+                # Em produção, usar logger adequado
+                print(f"⚠️ Erro ao reverter status do resíduo {residuo_id}: {str(e)}")
+
         ok = await scheduling_repo.delete_scheduling(scheduling_id)
         if not ok:
             raise HTTPException(500, "Erro ao deletar agendamento")
         return True
+
+    @staticmethod
+    def _calcular_distancia_haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        '''
+        Calcula a distância em quilômetros entre duas coordenadas geográficas.
+        Utiliza a fórmula de Haversine para calcular a distância great-circle.
+
+        Args:
+            lat1: Latitude do ponto 1 (graus)
+            lon1: Longitude do ponto 1 (graus)
+            lat2: Latitude do ponto 2 (graus)
+            lon2: Longitude do ponto 2 (graus)
+        
+        Returns:
+            float: Distância em quilômetros
+
+        Referência: https://en.wikipedia.org/wiki/Haversine_formula
+        '''
+        # Raio da Terra em quilômetros
+        R = 6371.0
+        
+        # Converter de graus para radianos
+        lat1_rad = radians(lat1)
+        lon1_rad = radians(lon1)
+        lat2_rad = radians(lat2)
+        lon2_rad = radians(lon2)
+        
+        # Diferenças
+        dlat = lat2_rad - lat1_rad
+        dlon = lon2_rad - lon1_rad
+        
+        # Fórmula de Haversine
+        a = sin(dlat / 2)**2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlon / 2)**2
+        c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        
+        distancia = R * c
+        return distancia
+
+    @staticmethod
+    def _agendamento_disponivel_no_horario(
+        disponibilidade: list[dict[str, Any]], 
+        data_busca: str, 
+        hora_busca: str
+    ) -> bool:
+        """
+        Verifica se o agendamento está disponível na data/hora especificada.
+        
+        Um agendamento é considerado disponível se:
+        - Existe um slot com a data exata da busca
+        - A hora da busca está entre hora_inicio e hora_fim desse slot
+        
+        Args:
+            disponibilidade: Lista de slots de disponibilidade do agendamento
+                Exemplo: [{"data": "22/10/2025", "hora_inicio": "10:30", "hora_fim": "18:00"}]
+            data_busca: Data atual (formato dd/mm/aaaa)
+            hora_busca: Hora atual (formato hh:mm)
+        
+        Returns:
+            bool: True se agendamento está disponível naquele momento, False caso contrário
+        
+        Exemplo:
+            >>> slots = [{"data": "22/10/2025", "hora_inicio": "10:30", "hora_fim": "18:00"}]
+            >>> _agendamento_disponivel_no_horario(slots, "22/10/2025", "15:00")
+            True
+            >>> _agendamento_disponivel_no_horario(slots, "22/10/2025", "09:00")
+            False
+            >>> _agendamento_disponivel_no_horario(slots, "23/10/2025", "15:00")
+            False
+        """
+        from datetime import datetime
+        
+        try:
+            # Converter data e hora de busca para datetime
+            data_busca_dt = datetime.strptime(data_busca, "%d/%m/%Y")
+            hora_busca_dt = datetime.strptime(hora_busca, "%H:%M").time()
+            
+            # Verificar cada slot de disponibilidade
+            for slot in disponibilidade:
+                slot_data = slot.get("data")
+                slot_hora_inicio = slot.get("hora_inicio")
+                slot_hora_fim = slot.get("hora_fim")
+                
+                # Validar se slot tem os campos necessários
+                if not all([slot_data, slot_hora_inicio, slot_hora_fim]):
+                    continue
+                
+                try:
+                    # Converter data do slot
+                    slot_data_dt = datetime.strptime(slot_data, "%d/%m/%Y")
+                    
+                    # Verificar se é o mesmo dia
+                    if slot_data_dt.date() != data_busca_dt.date():
+                        continue  # Não é o mesmo dia, próximo slot
+                    
+                    # Converter horários do slot
+                    slot_inicio_dt = datetime.strptime(slot_hora_inicio, "%H:%M").time()
+                    slot_fim_dt = datetime.strptime(slot_hora_fim, "%H:%M").time()
+                    
+                    # Verificar se hora de busca está dentro do intervalo
+                    # hora_inicio <= hora_busca < hora_fim
+                    if slot_inicio_dt <= hora_busca_dt < slot_fim_dt:
+                        return True  # Encontrou slot disponível!
+                
+                except (ValueError, TypeError):
+                    # Slot com formato inválido, ignorar e tentar próximo
+                    continue
+            
+            # Nenhum slot disponível encontrado
+            return False
+        
+        except (ValueError, TypeError):
+            # Data/hora de busca inválida
+            return False
+
+    async def buscar_agendamentos_disponiveis(
+        self, 
+        filtros: BuscarAgendamentosRequest,
+        current_user: Dict[str, Any]
+    ) -> List[AgendamentoComDistancia]:
+        """
+        Busca agendamentos disponíveis (PENDENTE) dentro de um raio de localização
+        e que estejam disponíveis no momento da busca.
+        
+        VERSÃO OTIMIZADA: Usa query geoespacial no MongoDB para filtrar por distância
+        diretamente no banco de dados, evitando buscar e processar documentos desnecessários.
+        
+        Algoritmo:
+        1. Valida que usuário é coletor
+        2. Usa aggregation pipeline do MongoDB para:
+           - Filtrar status PENDENTE
+           - Calcular distância (Haversine) no banco
+           - Filtrar por raio
+           - Ordenar por distância
+        3. Filtra agendamentos disponíveis no horário especificado (data_busca/hora_busca)
+        4. Se categorias_ids fornecido: filtra agendamentos com resíduos dessas categorias
+        5. Busca informações completas dos resíduos
+        6. Retorna lista ordenada
+
+        Args:
+            filtros: Parâmetros de busca (lat, lon, raio, data, hora, categorias)
+            current_user: Usuário autenticado (deve ser role "coletor")
+        
+        Returns:
+            Lista de agendamentos com distância e dados completos dos resíduos,
+            filtrados por: status PENDENTE, distância, horário disponível e categorias
+            
+        Raises:
+            HTTPException: 
+                - 403 se usuário não for coletor
+        """
+        # Verificar se usuário é coletor
+        user_role = current_user.get("role_id")
+        if user_role != "coletor":
+            raise HTTPException(
+                403, 
+                "Apenas coletores podem buscar agendamentos disponíveis"
+            )
+        
+        # 1. Buscar agendamentos PENDENTES próximos usando query geoespacial
+        # Filtro por distância é feito NO BANCO DE DADOS
+        agendamentos_proximos = await scheduling_repo.find_pendentes_por_proximidade(
+            latitude=filtros.latitude,
+            longitude=filtros.longitude,
+            raio_km=filtros.raio,
+            limit=100  # Limitar resultados para não sobrecarregar
+        )
+        
+        if not agendamentos_proximos:
+            return []
+        
+        # 2. Filtrar por disponibilidade temporal, categorias e buscar resíduos
+        agendamentos_com_residuos = []
+        
+        for agendamento in agendamentos_proximos:
+            # FILTRO TEMPORAL: Verificar se agendamento está disponível no horário
+            disponibilidade = agendamento.get("disponibilidade", [])
+            
+            if not self._agendamento_disponivel_no_horario(
+                disponibilidade, 
+                filtros.data_busca, 
+                filtros.hora_busca
+            ):
+                # Agendamento não está disponível neste horário, pular
+                continue
+            
+            residuos_ids = agendamento.get("residuosId", [])
+            
+            # Buscar resíduos do agendamento
+            residuos = []
+            for residuo_id in residuos_ids:
+                residuo = await residue_repo.find_by_id(residuo_id)
+                if residuo:
+                    residuos.append(residuo)
+            
+            # Se filtro de categorias foi fornecido
+            if filtros.categorias_ids:
+                # Verificar se algum resíduo pertence às categorias desejadas
+                tem_categoria_desejada = any(
+                    residuo.get("categoriaId") in filtros.categorias_ids
+                    for residuo in residuos
+                )
+                
+                # Só inclui se tiver resíduo da categoria desejada
+                if tem_categoria_desejada:
+                    agendamentos_com_residuos.append({
+                        "agendamento": agendamento,
+                        "residuos": residuos
+                    })
+            else:
+                # Sem filtro de categoria, inclui todos
+                agendamentos_com_residuos.append({
+                    "agendamento": agendamento,
+                    "residuos": residuos
+                })
+        
+        # 3. Montar resposta
+        # Nota: agendamentos já vêm ordenados por distância do repository
+        resultado = []
+        for item in agendamentos_com_residuos:
+            agendamento = item["agendamento"]
+            # distancia_km já vem calculada do aggregation pipeline
+            distancia = agendamento.pop("distancia_km", 0.0)
+            
+            resultado.append(AgendamentoComDistancia(
+                **agendamento,
+                distancia_km=round(distancia, 2),
+                residuos=item["residuos"]
+            ))
+        
+        return resultado
