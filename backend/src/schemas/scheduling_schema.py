@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Any
 from datetime import datetime, timedelta
+import pytz
 
 
 class LocalEndereco(BaseModel):
@@ -70,10 +71,15 @@ class DisponibilidadeSlot(BaseModel):
         Valida o slot de disponibilidade:
         1. Hora de início deve ser menor que hora de fim
         2. Hora de início não pode ser no passado (tolerância de 30min)
+        
+        Nota: Usa timezone de Brasília (America/Sao_Paulo) para comparação.
         """
         dt_inicio = self.to_datetime_inicio()
         dt_fim = self.to_datetime_fim()
-        agora = datetime.now()
+        
+        # Usar timezone de Brasília para comparação
+        tz_brasilia = pytz.timezone('America/Sao_Paulo')
+        agora = datetime.now(tz_brasilia).replace(tzinfo=None)  # Remove timezone para comparação
         tolerancia = timedelta(minutes=30)
         
         # Validação 1: Início deve ser antes do fim
@@ -86,7 +92,8 @@ class DisponibilidadeSlot(BaseModel):
         if dt_inicio < (agora - tolerancia):
             raise ValueError(
                 f"Horário de início não pode estar no passado. "
-                f"Data/hora: {self.data} {self.hora_inicio} (tolerância: 30 minutos)"
+                f"Data/hora: {self.data} {self.hora_inicio} (tolerância: 30 minutos). "
+                f"Horário do servidor: {agora.strftime('%d/%m/%Y %H:%M')} (Brasília)"
             )
     
     def to_string(self) -> str:
