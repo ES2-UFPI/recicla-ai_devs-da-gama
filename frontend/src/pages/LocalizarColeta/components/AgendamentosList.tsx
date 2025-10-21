@@ -147,6 +147,10 @@ export function AgendamentosList({
                   {agendamento.residuos.map((residuo) => {
                     const categoria = getCategoriaById(residuo.categoriaId);
                     const isExpanded = expandedResiduos.has(residuo.id);
+                    const valorEstimado = categoria 
+                      ? (residuo.quantidade * categoria.preco_por_kg).toFixed(2)
+                      : null;
+                    const temDescricao = categoria?.descricao && categoria.descricao.trim().length > 0;
 
                     return (
                       <Box key={residuo.id}>
@@ -155,7 +159,7 @@ export function AgendamentosList({
                             display: 'flex',
                             alignItems: 'center',
                             gap: 1,
-                            p: 1,
+                            p: 1.5,
                             bgcolor: 'background.default',
                             borderRadius: 1,
                             border: '1px solid',
@@ -167,39 +171,46 @@ export function AgendamentosList({
                             <Typography variant="body2" fontWeight={600}>
                               {categoria?.tipo || 'Categoria desconhecida'}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" display="block">
                               {residuo.quantidade} {residuo.tipo_medida}
                             </Typography>
-                          </Box>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => toggleResiduoExpand(residuo.id, e)}
-                            sx={{
-                              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                              transition: 'transform 0.3s',
-                            }}
-                          >
-                            <ExpandMoreIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-
-                        <Collapse in={isExpanded}>
-                          <Box sx={{ p: 1.5, bgcolor: 'background.paper', borderRadius: 1, mt: 0.5 }}>
-                            {categoria && (
-                              <>
-                                <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
-                                  Descrição:
-                                </Typography>
-                                <Typography variant="body2" mb={1}>
-                                  {categoria.descricao}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  Valor estimado: R$ {(residuo.quantidade * categoria.preco_por_kg).toFixed(2)}
-                                </Typography>
-                              </>
+                            {valorEstimado && (
+                              <Typography 
+                                variant="caption" 
+                                color="success.main" 
+                                fontWeight={600}
+                                sx={{ mt: 0.5, display: 'block' }}
+                              >
+                                💰 Valor estimado: R$ {valorEstimado}
+                              </Typography>
                             )}
                           </Box>
-                        </Collapse>
+                          {temDescricao && (
+                            <IconButton
+                              size="small"
+                              onClick={(e) => toggleResiduoExpand(residuo.id, e)}
+                              sx={{
+                                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.3s',
+                              }}
+                            >
+                              <ExpandMoreIcon fontSize="small" />
+                            </IconButton>
+                          )}
+                        </Box>
+
+                        {temDescricao && (
+                          <Collapse in={isExpanded}>
+                            <Box sx={{ p: 1.5, bgcolor: 'background.paper', borderRadius: 1, mt: 0.5 }}>
+                              <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                                Descrição:
+                              </Typography>
+                              <Typography variant="body2">
+                                {categoria.descricao}
+                              </Typography>
+                            </Box>
+                          </Collapse>
+                        )}
                       </Box>
                     );
                   })}
