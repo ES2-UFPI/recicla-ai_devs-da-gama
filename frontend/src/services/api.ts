@@ -21,17 +21,14 @@ api.interceptors.response.use(
     // 1. Não é erro 401
     // 2. Já tentou fazer refresh
     // 3. A requisição original já é para endpoints de auth (login/register/refresh/logout)
-    // 4. É POST /users (cadastro público de usuário)
     // Nota: /auth/me DEVE tentar refresh quando falhar com 401
   const isAuthEndpoint = url.includes('/auth/login') || 
               url.includes('/auth/register') || 
               url.includes('/auth/refresh') || 
-              url.includes('/auth/logout');
-  
-  // POST /users (sem /me) é cadastro público, não precisa refresh
-  const isPublicUserRegistration = url === '/users' && originalRequest.method?.toLowerCase() === 'post';
+              url.includes('/auth/logout') ||
+              url.includes('/users'); // Cadastro de usuário
 
-    if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint && !isPublicUserRegistration) {
+    if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
       try {
         // Tenta renovar o access token usando o refresh_token do cookie
