@@ -27,3 +27,10 @@ class StatusAgendamento(str, Enum):
     PENDENTE = "PENDENTE"
     CONCLUIDO = "CONCLUIDO"
     CANCELADO = "CANCELADO"
+
+class EstadoColeta(str, Enum):
+    """Estados possíveis de uma coleta"""
+    PENDENTE = "PENDENTE"
+    EM_ANDAMENTO = "EM_ANDAMENTO"
+    CONCLUIDA = "CONCLUIDA"
+    CANCELADA = "CANCELADA"
