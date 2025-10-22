@@ -1,5 +1,3 @@
-
-
 import { Routes, Route } from 'react-router-dom';
 import Login from '../pages/Login';
 import Cadastro from '../pages/Cadastro';
@@ -7,6 +5,8 @@ import Home from '../pages/Home';
 import Perfil from '../pages/Perfil';
 import Residuo from '../pages/Residuo';
 import { Agendamento } from '../pages/Agendamento';
+import LocalizarColeta from '../pages/LocalizarColeta';
+import Coleta from '../pages/Coleta';
 
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
@@ -51,6 +51,21 @@ export function AppRoutes() {
       <Route path="/perfil" element={
         <ProtectedRoute>
           <Perfil />
+        </ProtectedRoute>
+      } />
+      {/* Rota Localizar Coleta */}
+      <Route path="/localizar-coleta" element={
+        <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={['coletor']}>
+            <LocalizarColeta />
+          </RoleBasedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/coletas" element={
+        <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={['coletor']}>
+            <Coleta />
+          </RoleBasedRoute>
         </ProtectedRoute>
       } />
       {/* Exemplo de rota protegida futura:
