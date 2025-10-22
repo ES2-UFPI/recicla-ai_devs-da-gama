@@ -1,11 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Icon, type LatLngExpression } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Box, Typography, Chip, Link as MuiLink } from '@mui/material';
+import { Box, Typography, Chip, Link as MuiLink, Button } from '@mui/material';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import type { Agendamento } from '../hooks/useAgendamentos';
 import { useCategorias } from '../hooks/useCategorias';
+import { ResiduosSelectionModal } from './ResiduosSelectionModal';
 
 // Fix para ícones do Leaflet no Vite
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -62,11 +64,24 @@ export function InteractiveMap({
   onMarkerClick,
 }: InteractiveMapProps) {
   const { getCategoriaById } = useCategorias();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedAgendamento, setSelectedAgendamento] = useState<Agendamento | null>(null);
   const center: LatLngExpression = userLocation || [-5.0892, -42.8019]; // Teresina como padrão
   const zoom = userLocation ? 13 : 12;
 
   const getGoogleMapsLink = (lat: string, lng: string) => {
     return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  };
+
+  const handleOpenModal = (agendamento: Agendamento, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedAgendamento(agendamento);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedAgendamento(null);
   };
 
   return (
@@ -142,7 +157,7 @@ export function InteractiveMap({
                   <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
                     Resíduos disponíveis:
                   </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
                     {agendamento.residuos.map((residuo, idx) => {
                       const categoria = getCategoriaById(residuo.categoriaId);
                       return (
@@ -156,6 +171,18 @@ export function InteractiveMap({
                       );
                     })}
                   </Box>
+
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="small"
+                    fullWidth
+                    onClick={(e) => handleOpenModal(agendamento, e)}
+                    startIcon={<LocalShippingIcon />}
+                    sx={{ mb: 1, fontWeight: 600 }}
+                  >
+                    Selecionar Resíduos
+                  </Button>
 
                   <MuiLink
                     href={getGoogleMapsLink(agendamento.local.latitude!, agendamento.local.longitude!)}
@@ -172,6 +199,15 @@ export function InteractiveMap({
           );
         })}
       </MapContainer>
+
+      {/* Modal de Seleção de Resíduos */}
+      {selectedAgendamento && (
+        <ResiduosSelectionModal
+          open={modalOpen}
+          onClose={handleCloseModal}
+          agendamento={selectedAgendamento}
+        />
+      )}
 
       <style>{`
         .highlighted-marker {

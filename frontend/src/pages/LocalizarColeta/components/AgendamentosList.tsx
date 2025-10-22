@@ -8,14 +8,17 @@ import {
   Stack,
   Collapse,
   IconButton,
+  Button,
 } from '@mui/material';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import RecyclingIcon from '@mui/icons-material/Recycling';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import type { Agendamento } from '../hooks/useAgendamentos';
 import { useCategorias } from '../hooks/useCategorias';
+import { ResiduosSelectionModal } from './ResiduosSelectionModal';
 import { useState } from 'react';
 
 interface AgendamentosListProps {
@@ -31,6 +34,8 @@ export function AgendamentosList({
 }: AgendamentosListProps) {
   const { getCategoriaById } = useCategorias();
   const [expandedResiduos, setExpandedResiduos] = useState<Set<string>>(new Set());
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedAgendamento, setSelectedAgendamento] = useState<Agendamento | null>(null);
 
   const toggleResiduoExpand = (residuoId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -44,6 +49,18 @@ export function AgendamentosList({
       return newSet;
     });
   };
+
+  const handleOpenModal = (agendamento: Agendamento, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedAgendamento(agendamento);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedAgendamento(null);
+  };
+
   const getGoogleMapsLink = (lat: string, lng: string) => {
     return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
   };
@@ -224,6 +241,26 @@ export function AgendamentosList({
                 </Typography>
               )}
 
+              {/* Botão de Seleção de Resíduos */}
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                onClick={(e) => handleOpenModal(agendamento, e)}
+                startIcon={<LocalShippingIcon />}
+                sx={{
+                  mb: 1.5,
+                  py: 1.2,
+                  fontWeight: 600,
+                  boxShadow: 2,
+                  '&:hover': {
+                    boxShadow: 4,
+                  },
+                }}
+              >
+                Selecionar Resíduos para Coletar
+              </Button>
+
               {/* Link Google Maps */}
               <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <MuiLink
@@ -241,6 +278,15 @@ export function AgendamentosList({
           </Card>
         );
       })}
+
+      {/* Modal de Seleção de Resíduos */}
+      {selectedAgendamento && (
+        <ResiduosSelectionModal
+          open={modalOpen}
+          onClose={handleCloseModal}
+          agendamento={selectedAgendamento}
+        />
+      )}
     </Stack>
   );
 }
