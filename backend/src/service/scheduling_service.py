@@ -13,6 +13,7 @@ from src.schemas.scheduling_schema import (
     AgendamentoComDistancia,
 )
 
+from src.infra.database.models.enums import StatusResiduo, StatusAgendamento
 
 class SchedulingService:
     """
@@ -107,7 +108,7 @@ class SchedulingService:
             try:
                 await residue_repo.atualizar_status(
                     residuo_id=residuo_id,
-                    novo_status="AGENDADO",
+                    novo_status=StatusResiduo.AGENDADO,
                     usuario_id=produtor_id,
                     detalhes={
                         "agendamento_id": new_id,
@@ -190,6 +191,7 @@ class SchedulingService:
         docs = await scheduling_repo.list_schedules(filters=filters or None, limit=limit, skip=skip)
         return [SchedulingInDB(**d) for d in docs]
 
+    # Verificar futuramente se os status dos resíduos são modificados também
     async def atualizar_agendamento(
         self, 
         scheduling_id: str, 
@@ -336,7 +338,7 @@ class SchedulingService:
             try:
                 await residue_repo.atualizar_status(
                     residuo_id=residuo_id,
-                    novo_status="DISPONIVEL",
+                    novo_status=StatusResiduo.DISPONIVEL,
                     usuario_id=user_id
                 )
             except Exception as e:
@@ -534,33 +536,43 @@ class SchedulingService:
                 continue
             
             residuos_ids = agendamento.get("residuosId", [])
-            
+
             # Buscar resíduos do agendamento
-            residuos = []
+            residuos: List[Dict[str, Any]] = []
             for residuo_id in residuos_ids:
                 residuo = await residue_repo.find_by_id(residuo_id)
                 if residuo:
                     residuos.append(residuo)
+
+            # ÚLTIMO FILTRO: manter apenas resíduos com status AGENDADO
+            residuos_agendados = [
+                r for r in residuos
+                if r.get("status") == StatusResiduo.AGENDADO
+            ]
+
+            # Se não houver resíduos AGENDADO, não exibir este agendamento
+            if not residuos_agendados:
+                continue
             
             # Se filtro de categorias foi fornecido
             if filtros.categorias_ids:
                 # Verificar se algum resíduo pertence às categorias desejadas
                 tem_categoria_desejada = any(
                     residuo.get("categoriaId") in filtros.categorias_ids
-                    for residuo in residuos
+                    for residuo in residuos_agendados
                 )
                 
                 # Só inclui se tiver resíduo da categoria desejada
                 if tem_categoria_desejada:
                     agendamentos_com_residuos.append({
                         "agendamento": agendamento,
-                        "residuos": residuos
+                        "residuos": residuos_agendados
                     })
             else:
                 # Sem filtro de categoria, inclui todos
                 agendamentos_com_residuos.append({
                     "agendamento": agendamento,
-                    "residuos": residuos
+                    "residuos": residuos_agendados
                 })
         
         # 3. Montar resposta

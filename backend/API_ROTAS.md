@@ -14,6 +14,7 @@ Esta documentação lista todas as rotas disponíveis no backend da aplicação 
 - [Resíduos](#resíduos)
 - [Categorias](#categorias)
 - [Agendamentos](#agendamentos)
+- [Coletas](#coletas)
 - [Desenvolvimento](#desenvolvimento)
 
 ---
@@ -1555,7 +1556,509 @@ No Content
 
 ---
 
-## 🔧 Desenvolvimento
+## � Coletas
+
+Gerenciamento do fluxo completo de coleta de resíduos pelos coletores.
+
+### Aceitar Coleta
+**POST** `http://localhost:8000/coletas/aceitar`
+
+Coletor aceita um agendamento e reserva os resíduos selecionados.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Regras:**
+- Agendamento deve estar com status PENDENTE
+- Todos os resíduos devem existir e estar AGENDADO
+- Todos os resíduos devem pertencer ao agendamento
+- Cria uma nova coleta em estado PENDENTE
+- Atualiza resíduos para RESERVADO
+
+**Corpo da Requisição:**
+```json
+{
+  "agendamento_id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "residuos_ids": [
+    "60c72b2f9b1d4c3a4c8e4d3f",
+    "60c72b2f9b1d4c3a4c8e4d40"
+  ]
+}
+```
+
+**Resposta de Sucesso (201):**
+```json
+{
+  "id": "674a1b2c3d4e5f6g7h8i9j0k",
+  "agendamento_id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "produtor_id": "60c72b2f9b1d4c3a4c8e4d3a",
+  "coletor_id": "60c72b2f9b1d4c3a4c8e4d3b",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3f",
+    "60c72b2f9b1d4c3a4c8e4d40"
+  ],
+  "data_hora": "2025-10-22T14:30:00Z",
+  "local": {
+    "address_id": 1,
+    "apelido": "Casa",
+    "cep": "64000-000",
+    "logradouro": "Rua das Flores",
+    "numero": "123",
+    "complemento": "Apto 101",
+    "latitude": "-5.0892",
+    "longitude": "-42.8019"
+  },
+  "observacoes": null,
+  "estado": "PENDENTE"
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é coletor:
+```json
+{
+  "detail": "Apenas coletores podem aceitar coletas"
+}
+```
+
+**404 Not Found** - Agendamento não encontrado:
+```json
+{
+  "detail": "Agendamento não encontrado"
+}
+```
+
+**400 Bad Request** - Agendamento não está PENDENTE:
+```json
+{
+  "detail": "Agendamento não está PENDENTE"
+}
+```
+
+**400 Bad Request** - Resíduo não pertence ao agendamento:
+```json
+{
+  "detail": "Resíduo 60c72b2f9b1d4c3a4c8e4d3f não pertence ao agendamento"
+}
+```
+
+---
+
+### Iniciar Coleta
+**PATCH** `http://localhost:8000/coletas/{coleta_id}/iniciar`
+
+Marca a coleta como EM_ANDAMENTO (coletor chegou no local).
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Regras:**
+- Coleta deve estar em estado PENDENTE
+- Atualiza data_hora para o momento atual
+- Muda estado para EM_ANDAMENTO
+
+**Exemplo:** `http://localhost:8000/coletas/674a1b2c3d4e5f6g7h8i9j0k/iniciar`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "674a1b2c3d4e5f6g7h8i9j0k",
+  "agendamento_id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "produtor_id": "60c72b2f9b1d4c3a4c8e4d3a",
+  "coletor_id": "60c72b2f9b1d4c3a4c8e4d3b",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3f",
+    "60c72b2f9b1d4c3a4c8e4d40"
+  ],
+  "data_hora": "2025-10-22T15:00:00Z",
+  "local": {
+    "address_id": 1,
+    "apelido": "Casa",
+    "cep": "64000-000",
+    "logradouro": "Rua das Flores",
+    "numero": "123",
+    "complemento": "Apto 101",
+    "latitude": "-5.0892",
+    "longitude": "-42.8019"
+  },
+  "observacoes": null,
+  "estado": "EM_ANDAMENTO"
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é o coletor da coleta:
+```json
+{
+  "detail": "Você não tem permissão para iniciar esta coleta"
+}
+```
+
+**400 Bad Request** - Coleta não está PENDENTE:
+```json
+{
+  "detail": "Coleta não está no estado PENDENTE"
+}
+```
+
+---
+
+### Coletar Resíduo
+**PATCH** `http://localhost:8000/coletas/{coleta_id}/coletar-residuo`
+
+Marca um ou mais resíduos como COLETADO (mantém na lista da coleta).
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Regras:**
+- Coleta deve estar EM_ANDAMENTO
+- Todos os resíduos devem estar RESERVADO
+- Todos os resíduos devem pertencer à coleta
+- Atualiza resíduos para COLETADO
+- Mantém resíduos na lista `residuos_id`
+- Verifica se todos resíduos foram finalizados (auto-conclusão do agendamento)
+
+**Exemplo:** `http://localhost:8000/coletas/674a1b2c3d4e5f6g7h8i9j0k/coletar-residuo`
+
+**Corpo da Requisição:**
+```json
+{
+  "residuos_ids": [
+    "60c72b2f9b1d4c3a4c8e4d3f",
+    "60c72b2f9b1d4c3a4c8e4d40"
+  ],
+  "observacao": "Resíduos coletados em bom estado"
+}
+```
+
+**Campos:**
+- `residuos_ids`: Lista de IDs dos resíduos (obrigatório, mínimo 1)
+- `observacao`: Observação sobre a coleta (opcional)
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "674a1b2c3d4e5f6g7h8i9j0k",
+  "agendamento_id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "produtor_id": "60c72b2f9b1d4c3a4c8e4d3a",
+  "coletor_id": "60c72b2f9b1d4c3a4c8e4d3b",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3f",
+    "60c72b2f9b1d4c3a4c8e4d40"
+  ],
+  "data_hora": "2025-10-22T15:00:00Z",
+  "local": {
+    "address_id": 1,
+    "apelido": "Casa",
+    "cep": "64000-000",
+    "logradouro": "Rua das Flores",
+    "numero": "123",
+    "complemento": "Apto 101",
+    "latitude": "-5.0892",
+    "longitude": "-42.8019"
+  },
+  "observacoes": "Resíduo coletado em bom estado",
+  "estado": "EM_ANDAMENTO"
+}
+```
+
+**Observações:**
+- Os resíduos permanecem na lista `residuos_id` da coleta
+- Sistema verifica automaticamente se todos os resíduos do agendamento foram finalizados
+- Se todos foram coletados/rejeitados, o agendamento muda para CONCLUIDO
+- É possível coletar múltiplos resíduos de uma só vez
+
+---
+
+### Rejeitar Resíduo
+**PATCH** `http://localhost:8000/coletas/{coleta_id}/rejeitar-residuo`
+
+Marca um ou mais resíduos como REJEITADO e remove da lista da coleta.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Regras:**
+- Coleta deve estar EM_ANDAMENTO
+- Todos os resíduos devem estar RESERVADO
+- Todos os resíduos devem pertencer à coleta
+- Atualiza resíduos para REJEITADO
+- Remove resíduos da lista `residuos_id`
+- Motivo é obrigatório
+- Verifica conclusão do agendamento
+
+**Exemplo:** `http://localhost:8000/coletas/674a1b2c3d4e5f6g7h8i9j0k/rejeitar-residuo`
+
+**Corpo da Requisição:**
+```json
+{
+  "residuos_ids": [
+    "60c72b2f9b1d4c3a4c8e4d40",
+    "60c72b2f9b1d4c3a4c8e4d41"
+  ],
+  "motivo": "Materiais contaminados com óleo"
+}
+```
+
+**Campos:**
+- `residuos_ids`: Lista de IDs dos resíduos (obrigatório, mínimo 1)
+- `motivo`: Motivo da rejeição, mínimo 3 caracteres (obrigatório)
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "674a1b2c3d4e5f6g7h8i9j0k",
+  "agendamento_id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "produtor_id": "60c72b2f9b1d4c3a4c8e4d3a",
+  "coletor_id": "60c72b2f9b1d4c3a4c8e4d3b",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3f"
+  ],
+  "data_hora": "2025-10-22T15:00:00Z",
+  "local": {
+    "address_id": 1,
+    "apelido": "Casa",
+    "cep": "64000-000",
+    "logradouro": "Rua das Flores",
+    "numero": "123",
+    "complemento": "Apto 101",
+    "latitude": "-5.0892",
+    "longitude": "-42.8019"
+  },
+  "observacoes": "REJEITADO 60c72b2f9b1d4c3a4c8e4d40: Materiais contaminados com óleo\nREJEITADO 60c72b2f9b1d4c3a4c8e4d41: Materiais contaminados com óleo",
+  "estado": "EM_ANDAMENTO"
+}
+```
+
+**Observações:**
+- Os resíduos são REMOVIDOS da lista `residuos_id` da coleta
+- Motivo é anexado às observações da coleta para cada resíduo rejeitado
+- Útil quando os resíduos não atendem aos critérios de qualidade
+- É possível rejeitar múltiplos resíduos de uma só vez com o mesmo motivo
+
+---
+
+### Cancelar Coleta Antes de Chegar ao Local
+**POST** `http://localhost:8000/coletas/{coleta_id}/cancelar-antes-local`
+
+Cancela uma coleta PENDENTE e libera os resíduos (RESERVADO → AGENDADO).
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Regras:**
+- Coleta deve estar PENDENTE
+- Muda estado para CANCELADA
+- Libera resíduos: RESERVADO → AGENDADO
+- Resíduos ficam disponíveis para outro coletor
+
+**Exemplo:** `http://localhost:8000/coletas/674a1b2c3d4e5f6g7h8i9j0k/cancelar-antes-local`
+
+**Corpo da Requisição:**
+```json
+{
+  "motivo": "Imprevisto no caminho, não consigo chegar a tempo"
+}
+```
+
+**Campo:**
+- `motivo`: Motivo do cancelamento (opcional)
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "674a1b2c3d4e5f6g7h8i9j0k",
+  "agendamento_id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "produtor_id": "60c72b2f9b1d4c3a4c8e4d3a",
+  "coletor_id": "60c72b2f9b1d4c3a4c8e4d3b",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3f",
+    "60c72b2f9b1d4c3a4c8e4d40"
+  ],
+  "data_hora": "2025-10-22T14:30:00Z",
+  "local": {
+    "address_id": 1,
+    "apelido": "Casa",
+    "cep": "64000-000",
+    "logradouro": "Rua das Flores",
+    "numero": "123",
+    "complemento": "Apto 101",
+    "latitude": "-5.0892",
+    "longitude": "-42.8019"
+  },
+  "observacoes": "Imprevisto no caminho, não consigo chegar a tempo",
+  "estado": "CANCELADA"
+}
+```
+
+**Observações:**
+- Resíduos voltam para AGENDADO e ficam disponíveis
+- Agendamento volta para PENDENTE
+- Outro coletor pode aceitar a coleta
+
+---
+
+### Cancelar Coleta Após Chegar ao Local
+**POST** `http://localhost:8000/coletas/{coleta_id}/cancelar`
+
+Cancela uma coleta EM_ANDAMENTO e marca resíduos RESERVADO como CANCELADO.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Regras:**
+- Coleta deve estar EM_ANDAMENTO
+- Muda estado para CANCELADA
+- Resíduos ainda RESERVADO → CANCELADO
+- Resíduos já COLETADOS ou REJEITADOS não são alterados
+
+**Exemplo:** `http://localhost:8000/coletas/674a1b2c3d4e5f6g7h8i9j0k/cancelar`
+
+**Corpo da Requisição:**
+```json
+{
+  "motivo": "Produtor não estava no local"
+}
+```
+
+**Campo:**
+- `motivo`: Motivo do cancelamento (opcional)
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "674a1b2c3d4e5f6g7h8i9j0k",
+  "agendamento_id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "produtor_id": "60c72b2f9b1d4c3a4c8e4d3a",
+  "coletor_id": "60c72b2f9b1d4c3a4c8e4d3b",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3f",
+    "60c72b2f9b1d4c3a4c8e4d40"
+  ],
+  "data_hora": "2025-10-22T15:00:00Z",
+  "local": {
+    "address_id": 1,
+    "apelido": "Casa",
+    "cep": "64000-000",
+    "logradouro": "Rua das Flores",
+    "numero": "123",
+    "complemento": "Apto 101",
+    "latitude": "-5.0892",
+    "longitude": "-42.8019"
+  },
+  "observacoes": "Produtor não estava no local",
+  "estado": "CANCELADA"
+}
+```
+
+**Observações:**
+- Diferença para cancelamento antes: resíduos vão para CANCELADO (não AGENDADO)
+- Resíduos já coletados/rejeitados mantêm seus status
+- Verifica conclusão do agendamento automaticamente
+
+---
+
+### Listar Minhas Coletas
+**GET** `http://localhost:8000/coletas/minhas`
+
+Lista coletas do coletor autenticado, com filtro opcional por estado.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Parâmetros de Query (opcionais):**
+- `estado`: Filtrar por estado (PENDENTE, EM_ANDAMENTO, CANCELADA)
+- `limit`: Máximo de registros (padrão: 100, máx: 500)
+- `skip`: Paginação - registros a pular (padrão: 0)
+
+**Exemplo:** `http://localhost:8000/coletas/minhas?estado=EM_ANDAMENTO&limit=10`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "674a1b2c3d4e5f6g7h8i9j0k",
+    "agendamento_id": "60c72b2f9b1d4c3a4c8e4d3e",
+    "produtor_id": "60c72b2f9b1d4c3a4c8e4d3a",
+    "coletor_id": "60c72b2f9b1d4c3a4c8e4d3b",
+    "residuos_id": [
+      "60c72b2f9b1d4c3a4c8e4d3f"
+    ],
+    "data_hora": "2025-10-22T15:00:00Z",
+    "local": {
+      "address_id": 1,
+      "apelido": "Casa",
+      "cep": "64000-000",
+      "logradouro": "Rua das Flores",
+      "numero": "123",
+      "complemento": "Apto 101",
+      "latitude": "-5.0892",
+      "longitude": "-42.8019"
+    },
+    "observacoes": null,
+    "estado": "EM_ANDAMENTO"
+  }
+]
+```
+
+**Observações:**
+- Retorna apenas coletas do coletor autenticado
+- Ordenado por `data_hora` (mais recente primeiro)
+- Lista vazia `[]` se não houver coletas
+
+---
+
+### Obter Detalhes de uma Coleta
+**GET** `http://localhost:8000/coletas/{coleta_id}`
+
+Obtém detalhes completos de uma coleta específica.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Exemplo:** `http://localhost:8000/coletas/674a1b2c3d4e5f6g7h8i9j0k`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "674a1b2c3d4e5f6g7h8i9j0k",
+  "agendamento_id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "produtor_id": "60c72b2f9b1d4c3a4c8e4d3a",
+  "coletor_id": "60c72b2f9b1d4c3a4c8e4d3b",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3f",
+    "60c72b2f9b1d4c3a4c8e4d40"
+  ],
+  "data_hora": "2025-10-22T15:00:00Z",
+  "local": {
+    "address_id": 1,
+    "apelido": "Casa",
+    "cep": "64000-000",
+    "logradouro": "Rua das Flores",
+    "numero": "123",
+    "complemento": "Apto 101",
+    "latitude": "-5.0892",
+    "longitude": "-42.8019"
+  },
+  "observacoes": "Resíduo coletado em bom estado",
+  "estado": "EM_ANDAMENTO"
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário tentando acessar coleta de outro coletor:
+```json
+{
+  "detail": "Você não tem permissão para acessar esta coleta"
+}
+```
+
+**404 Not Found** - Coleta não encontrada:
+```json
+{
+  "detail": "Coleta não encontrada"
+}
+```
+
+---
+
+## �🔧 Desenvolvimento
 
 ⚠️ **ATENÇÃO:** Estas rotas devem ser DESABILITADAS em produção!
 

@@ -14,10 +14,9 @@ class Coleta(BaseModel):
     agendamento_id: str = Field(..., description="Referência ao agendamento associado")
     produtor_id: str = Field(..., description="Referência ao produtor")
     coletor_id: str = Field(..., description="Referência ao coletor")
-    resíduos_id: list[str] = Field(..., description="Lista de IDs dos resíduos coletados")
-    data_hora_inicio: datetime = Field(..., description="Data e hora de início da coleta")
-    data_hora_fim: Optional[datetime] = Field(None, description="Data e hora de fim da coleta")
-    local: str = Field(..., description="Local da coleta")
+    residuos_id: list[str] = Field(..., description="Lista de IDs dos  coresíduosletados")
+    data_hora: datetime = Field(..., description="Data e hora de início da coleta")
+    local: dict = Field(..., description="Local da coleta")
     observacoes: Optional[str] = Field(None, description="Observações adicionais sobre a coleta")
     estado: str = Field(default=EstadoColeta.PENDENTE, description="Estado atual da coleta")
 
@@ -28,14 +27,10 @@ class Coleta(BaseModel):
         "use_enum_values": True
     }
 
-    def marcar_como_concluida(self, data_hora_fim: datetime):
+    def marcar_como_concluida(self):
         """
         Marca a coleta como concluída, definindo a data e hora de fim.
-        
-        Args:
-            data_hora_fim: Data e hora de término da coleta
         """
-        self.data_hora_fim = data_hora_fim
         self.estado = EstadoColeta.CONCLUIDA
 
     def adicionar_observacao(self, observacao: str):
