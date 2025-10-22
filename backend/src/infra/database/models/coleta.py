@@ -14,7 +14,7 @@ class Coleta(BaseModel):
     agendamento_id: str = Field(..., description="Referência ao agendamento associado")
     produtor_id: str = Field(..., description="Referência ao produtor")
     coletor_id: str = Field(..., description="Referência ao coletor")
-    residuos_id: list[str] = Field(..., description="Lista de IDs dos resíduos coletados")
+    residuos_id: list[str] = Field(..., description="Lista de IDs dos  coresíduosletados")
     data_hora: datetime = Field(..., description="Data e hora de início da coleta")
     local: dict = Field(..., description="Local da coleta")
     observacoes: Optional[str] = Field(None, description="Observações adicionais sobre a coleta")
