@@ -8,18 +8,21 @@ class StatusResiduo(str, Enum):
     """Estados possíveis de um resíduo no ciclo de vida"""
     DISPONIVEL = "DISPONIVEL"
     AGENDADO = "AGENDADO"
+    RESERVADO = "RESERVADO"
     COLETADO = "COLETADO"
+    REJEITADO = "REJEITADO"
     ENTREGUE = "ENTREGUE"
-    CANCELADO = "CANCELADO"
+    DESCARTADO = "DESCARTADO"
 
 
-class AcaoHistorico(str, Enum):
+class AcaoHistorico(str, Enum): # vê se estamos usando
     """Ações que podem ser registradas no histórico"""
     CRIADO = "CRIADO"
     AGENDADO = "AGENDADO"
     COLETADO = "COLETADO"
+    REJEITADO = "REJEITADO"
     ENTREGUE = "ENTREGUE"
-    CANCELADO = "CANCELADO"
+    DESCARTADO = "DESCARTADO"
 
 
 class StatusAgendamento(str, Enum):
@@ -34,3 +37,4 @@ class EstadoColeta(str, Enum):
     EM_ANDAMENTO = "EM_ANDAMENTO"
     CONCLUIDA = "CONCLUIDA"
     CANCELADA = "CANCELADA"
+    DESCARTADA = "DESCARTADA" # pode pensar em outro nome melhor

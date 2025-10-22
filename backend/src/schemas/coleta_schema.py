@@ -9,9 +9,8 @@ class ColetaCreateSchema(BaseModel):
     produtor_id: str = Field(..., description="Referência ao produtor")
     coletor_id: str = Field(..., description="Referência ao coletor")
     resíduos_id: list[str] = Field(..., description="Lista de IDs dos resíduos coletados")
-    data_hora_inicio: datetime = Field(..., description="Data e hora de início da coleta")
-    data_hora_fim: Optional[datetime] = Field(None, description="Data e hora de fim da coleta")
-    local: str = Field(..., description="Local da coleta")
+    data_hora: datetime = Field(..., description="Data e hora de início da coleta")
+    local: dict = Field(..., description="Local da coleta")
     observacoes: Optional[str] = Field(None, description="Observações adicionais sobre a coleta")
     estado: str = Field(default=EstadoColeta.PENDENTE, description="Estado atual da coleta")
 
@@ -29,8 +28,7 @@ class ColetaCreateSchema(BaseModel):
                 "produtor_id": "60c72b2f9b1d4c3a4c8e4d3f",
                 "coletor_id": "60c72b2f9b1d4c3a4c8e4d40",
                 "resíduos_id": ["60c72b2f9b1d4c3a4c8e4d41", "60c72b2f9b1d4c3a4c8e4d42"],
-                "data_hora_inicio": "2024-07-01T10:00:00Z",
-                "data_hora_fim": "2024-07-01T11:00:00Z",
+                "data_hora": "2024-07-01T10:00:00Z",
                 "local": "Rua Exemplo, 123, Cidade, Estado",
                 "observacoes": "Deixar os resíduos na porta.",
                 "estado": "PENDENTE"
@@ -38,8 +36,7 @@ class ColetaCreateSchema(BaseModel):
         }
 
 class ColetaUpdateSchema(BaseModel):
-    data_hora_fim: Optional[datetime] = Field(None, description="Data e hora de fim da coleta")
-    local: Optional[str] = Field(None, description="Local da coleta")
+    local: Optional[dict] = Field(None, description="Local da coleta")
     observacoes: Optional[str] = Field(None, description="Observações adicionais sobre a coleta")
     estado: Optional[str] = Field(None, description="Estado atual da coleta")
 
@@ -53,7 +50,6 @@ class ColetaUpdateSchema(BaseModel):
     class Config:
         schema_extra = {
             "example": {
-                "data_hora_fim": "2024-07-01T11:30:00Z",
                 "local": "Rua Atualizada, 456, Cidade, Estado",
                 "observacoes": "Coleta realizada com sucesso.",
                 "estado": "CONCLUIDA"
@@ -74,10 +70,9 @@ class ColetaInDBSchema(ColetaCreateSchema):
                 "agendamento_id": "60c72b2f9b1d4c3a4c8e4d3e",
                 "produtor_id": "60c72b2f9b1d4c3a4c8e4d3f",
                 "coletor_id": "60c72b2f9b1d4c3a4c8e4d40",
-                "resíduos_id": ["60c72b2f9b1d4c3a4c8e4d41", "60c72b2f9b1d4c3a4c8e4d42"],
-                "data_hora_inicio": "2024-07-01T10:00:00Z",
-                "data_hora_fim": "2024-07-01T11:00:00Z",
-                "local": "Rua Exemplo, 123, Cidade, Estado",
+                "residuos_id": ["60c72b2f9b1d4c3a4c8e4d41", "60c72b2f9b1d4c3a4c8e4d42"],
+                "data_hora": "2024-07-01T10:00:00Z",
+                "local": {"endereco": "Rua Exemplo, 123, Cidade, Estado"},
                 "observacoes": "Deixar os resíduos na porta.",
                 "estado": "PENDENTE"
             }
