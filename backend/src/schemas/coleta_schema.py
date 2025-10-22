@@ -8,7 +8,7 @@ class ColetaCreateSchema(BaseModel):
     agendamento_id: str = Field(..., description="Referência ao agendamento associado")
     produtor_id: str = Field(..., description="Referência ao produtor")
     coletor_id: str = Field(..., description="Referência ao coletor")
-    resíduos_id: list[str] = Field(..., description="Lista de IDs dos resíduos coletados")
+    residuos_id: list[str] = Field(..., description="Lista de IDs dos resíduos coletados")
     data_hora: datetime = Field(..., description="Data e hora de início da coleta")
     local: dict = Field(..., description="Local da coleta")
     observacoes: Optional[str] = Field(None, description="Observações adicionais sobre a coleta")
@@ -27,7 +27,7 @@ class ColetaCreateSchema(BaseModel):
                 "agendamento_id": "60c72b2f9b1d4c3a4c8e4d3e",
                 "produtor_id": "60c72b2f9b1d4c3a4c8e4d3f",
                 "coletor_id": "60c72b2f9b1d4c3a4c8e4d40",
-                "resíduos_id": ["60c72b2f9b1d4c3a4c8e4d41", "60c72b2f9b1d4c3a4c8e4d42"],
+                "residuos_id": ["60c72b2f9b1d4c3a4c8e4d41", "60c72b2f9b1d4c3a4c8e4d42"],
                 "data_hora": "2024-07-01T10:00:00Z",
                 "local": "Rua Exemplo, 123, Cidade, Estado",
                 "observacoes": "Deixar os resíduos na porta.",
