@@ -28,12 +28,12 @@ class AceitarColetaRequest(BaseModel):
 
 
 class ColetarResiduoRequest(BaseModel):
-    residuo_id: str = Field(..., description="ID do resíduo a marcar como coletado")
+    residuos_ids: List[str] = Field(..., description="Lista de IDs dos resíduos a marcar como coletados", min_length=1)
     observacao: Optional[str] = Field(None, description="Observação opcional")
 
 
 class RejeitarResiduoRequest(BaseModel):
-    residuo_id: str = Field(..., description="ID do resíduo a rejeitar")
+    residuos_ids: List[str] = Field(..., description="Lista de IDs dos resíduos a rejeitar", min_length=1)
     motivo: str = Field(..., min_length=3, description="Motivo da rejeição")
 
 
@@ -58,10 +58,13 @@ async def aceitar_coleta(
     if current_user.get("role_id") != "coletor":
         raise HTTPException(403, "Apenas coletores podem aceitar coletas")
 
+    coletor_id = current_user.get("id")
+    if not isinstance(coletor_id, str) or not coletor_id:
+        raise HTTPException(401, "Usuário não autenticado ou ID inválido")
     return await coleta_service.aceitar_coleta(
         agendamento_id=body.agendamento_id,
         residuos_ids=body.residuos_ids,
-        coletor_id=current_user.get("id"),
+        coletor_id=coletor_id,
     )
 
 
@@ -77,14 +80,17 @@ async def iniciar_coleta(
 ) -> ColetaInDBSchema:
     if current_user.get("role_id") != "coletor":
         raise HTTPException(403, "Apenas coletores podem iniciar coletas")
-    return await coleta_service.iniciar_coleta(coleta_id, current_user.get("id"))
+    coletor_id = current_user.get("id")
+    if not isinstance(coletor_id, str) or not coletor_id:
+        raise HTTPException(401, "Usuário não autenticado ou ID inválido")
+    return await coleta_service.iniciar_coleta(coleta_id, coletor_id)
 
 
 @router.patch(
     "/{coleta_id}/coletar-residuo",
     response_model=ColetaInDBSchema,
-    summary="Coletar um resíduo",
-    description="Marca um resíduo da coleta como COLETADO (mantém na lista).",
+    summary="Coletar resíduos",
+    description="Marca um ou mais resíduos da coleta como COLETADO (mantém na lista).",
 )
 async def coletar_residuo(
     coleta_id: str,
@@ -93,10 +99,13 @@ async def coletar_residuo(
 ) -> ColetaInDBSchema:
     if current_user.get("role_id") != "coletor":
         raise HTTPException(403, "Apenas coletores podem coletar resíduos")
+    coletor_id = current_user.get("id")
+    if not isinstance(coletor_id, str) or not coletor_id:
+        raise HTTPException(401, "Usuário não autenticado ou ID inválido")
     return await coleta_service.coletar_residuo(
         coleta_id=coleta_id,
-        residuo_id=body.residuo_id,
-        coletor_id=current_user.get("id"),
+        residuos_ids=body.residuos_ids,
+        coletor_id=coletor_id,
         observacao=body.observacao,
     )
 
@@ -104,8 +113,8 @@ async def coletar_residuo(
 @router.patch(
     "/{coleta_id}/rejeitar-residuo",
     response_model=ColetaInDBSchema,
-    summary="Rejeitar um resíduo",
-    description="Marca um resíduo da coleta como REJEITADO e remove da lista.",
+    summary="Rejeitar resíduos",
+    description="Marca um ou mais resíduos da coleta como REJEITADO e remove da lista.",
 )
 async def rejeitar_residuo(
     coleta_id: str,
@@ -114,10 +123,13 @@ async def rejeitar_residuo(
 ) -> ColetaInDBSchema:
     if current_user.get("role_id") != "coletor":
         raise HTTPException(403, "Apenas coletores podem rejeitar resíduos")
+    coletor_id = current_user.get("id")
+    if not isinstance(coletor_id, str) or not coletor_id:
+        raise HTTPException(401, "Usuário não autenticado ou ID inválido")
     return await coleta_service.rejeitar_residuo(
         coleta_id=coleta_id,
-        residuo_id=body.residuo_id,
-        coletor_id=current_user.get("id"),
+        residuos_ids=body.residuos_ids,
+        coletor_id=coletor_id,
         motivo=body.motivo,
     )
 
@@ -135,9 +147,12 @@ async def cancelar_antes_local(
 ) -> ColetaInDBSchema:
     if current_user.get("role_id") != "coletor":
         raise HTTPException(403, "Apenas coletores podem cancelar coletas")
+    coletor_id = current_user.get("id")
+    if not isinstance(coletor_id, str) or not coletor_id:
+        raise HTTPException(401, "Usuário não autenticado ou ID inválido")
     return await coleta_service.cancelar_coleta_antes_local(
         coleta_id=coleta_id,
-        coletor_id=current_user.get("id"),
+        coletor_id=coletor_id,
         motivo=body.motivo or "",
     )
 
@@ -155,9 +170,12 @@ async def cancelar_apos_local(
 ) -> ColetaInDBSchema:
     if current_user.get("role_id") != "coletor":
         raise HTTPException(403, "Apenas coletores podem cancelar coletas")
+    coletor_id = current_user.get("id")
+    if not isinstance(coletor_id, str) or not coletor_id:
+        raise HTTPException(401, "Usuário não autenticado ou ID inválido")
     return await coleta_service.cancelar_coleta_apos_local(
         coleta_id=coleta_id,
-        coletor_id=current_user.get("id"),
+        coletor_id=coletor_id,
         motivo=body.motivo or "",
     )
 
@@ -176,8 +194,11 @@ async def listar_minhas_coletas(
 ) -> List[ColetaInDBSchema]:
     if current_user.get("role_id") != "coletor":
         raise HTTPException(403, "Apenas coletores podem listar coletas")
+    coletor_id = current_user.get("id")
+    if not isinstance(coletor_id, str) or not coletor_id:
+        raise HTTPException(401, "Usuário não autenticado ou ID inválido")
     return await coleta_service.listar_coletas_coletor(
-        coletor_id=current_user.get("id"),
+        coletor_id=coletor_id,
         estado=estado,
         limit=limit,
         skip=skip,
@@ -195,4 +216,7 @@ async def obter_coleta(
 ) -> ColetaInDBSchema:
     if current_user.get("role_id") != "coletor":
         raise HTTPException(403, "Apenas coletores podem acessar coletas")
-    return await coleta_service.buscar_coleta(coleta_id, current_user.get("id"))
+    coletor_id = current_user.get("id")
+    if not isinstance(coletor_id, str) or not coletor_id:
+        raise HTTPException(401, "Usuário não autenticado ou ID inválido")
+    return await coleta_service.buscar_coleta(coleta_id, coletor_id)

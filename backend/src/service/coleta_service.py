@@ -132,12 +132,12 @@ class ColetaService:
     async def coletar_residuo(
         self,
         coleta_id: str,
-        residuo_id: str,
+        residuos_ids: List[str],
         coletor_id: str,
         observacao: Optional[str] = None,
     ) -> ColetaInDBSchema:
         """
-        Marca um resíduo como COLETADO e mantém seu ID em residuos_id.
+        Marca um ou mais resíduos como COLETADO e mantém seus IDs em residuos_id.
         """
         coleta = await coleta_repo.find_by_id(coleta_id)
         if not coleta:
@@ -147,22 +147,27 @@ class ColetaService:
         if coleta.get("estado") != EstadoColeta.EM_ANDAMENTO:
             raise HTTPException(400, "Coleta deve estar EM_ANDAMENTO para coletar resíduos")
 
-        if residuo_id not in (coleta.get("residuos_id") or []):
-            raise HTTPException(400, "Resíduo não pertence à coleta")
+        coleta_residuos = coleta.get("residuos_id") or []
+        
+        # Validar todos os resíduos antes de processar
+        for residuo_id in residuos_ids:
+            if residuo_id not in coleta_residuos:
+                raise HTTPException(400, f"Resíduo {residuo_id} não pertence à coleta")
 
-        residuo = await residue_repo.find_by_id(residuo_id)
-        if not residuo:
-            raise HTTPException(404, "Resíduo não encontrado")
-        if residuo.get("status") != StatusResiduo.RESERVADO:
-            raise HTTPException(409, "Resíduo não está RESERVADO")
+            residuo = await residue_repo.find_by_id(residuo_id)
+            if not residuo:
+                raise HTTPException(404, f"Resíduo {residuo_id} não encontrado")
+            if residuo.get("status") != StatusResiduo.RESERVADO:
+                raise HTTPException(409, f"Resíduo {residuo_id} não está RESERVADO")
 
-        # Atualiza status do resíduo para COLETADO
-        await residue_repo.atualizar_status(
-            residuo_id=residuo_id,
-            novo_status=StatusResiduo.COLETADO,
-            usuario_id=coletor_id,
-            detalhes={"coleta_id": coleta_id, "acao": "coletar_residuo"},
-        )
+        # Atualizar status de todos os resíduos para COLETADO
+        for residuo_id in residuos_ids:
+            await residue_repo.atualizar_status(
+                residuo_id=residuo_id,
+                novo_status=StatusResiduo.COLETADO,
+                usuario_id=coletor_id,
+                detalhes={"coleta_id": coleta_id, "acao": "coletar_residuo"},
+            )
 
         # Anexar observação se houver
         if observacao:
@@ -179,12 +184,12 @@ class ColetaService:
     async def rejeitar_residuo(
         self,
         coleta_id: str,
-        residuo_id: str,
+        residuos_ids: List[str],
         coletor_id: str,
         motivo: str,
     ) -> ColetaInDBSchema:
         """
-        Marca um resíduo como REJEITADO e remove seu ID da coleta.
+        Marca um ou mais resíduos como REJEITADO e remove seus IDs da coleta.
         """
         if not motivo:
             raise HTTPException(400, "Motivo é obrigatório para rejeitar resíduo")
@@ -197,28 +202,34 @@ class ColetaService:
         if coleta.get("estado") != EstadoColeta.EM_ANDAMENTO:
             raise HTTPException(400, "Coleta deve estar EM_ANDAMENTO para rejeitar resíduos")
 
-        if residuo_id not in (coleta.get("residuos_id") or []):
-            raise HTTPException(400, "Resíduo não pertence à coleta")
+        coleta_residuos = coleta.get("residuos_id") or []
 
-        residuo = await residue_repo.find_by_id(residuo_id)
-        if not residuo:
-            raise HTTPException(404, "Resíduo não encontrado")
-        if residuo.get("status") != StatusResiduo.RESERVADO:
-            raise HTTPException(409, "Resíduo não está RESERVADO")
+        # Validar todos os resíduos antes de processar
+        for residuo_id in residuos_ids:
+            if residuo_id not in coleta_residuos:
+                raise HTTPException(400, f"Resíduo {residuo_id} não pertence à coleta")
 
-        # Atualiza status do resíduo para REJEITADO
-        await residue_repo.atualizar_status(
-            residuo_id=residuo_id,
-            novo_status=StatusResiduo.REJEITADO,
-            usuario_id=coletor_id,
-            detalhes={"coleta_id": coleta_id, "acao": "rejeitar_residuo", "motivo": motivo},
-        )
+            residuo = await residue_repo.find_by_id(residuo_id)
+            if not residuo:
+                raise HTTPException(404, f"Resíduo {residuo_id} não encontrado")
+            if residuo.get("status") != StatusResiduo.RESERVADO:
+                raise HTTPException(409, f"Resíduo {residuo_id} não está RESERVADO")
 
-        # Remove o ID do resíduo da coleta
-        await coleta_repo.remove_residuo(coleta_id, residuo_id)
+        # Atualizar status e remover cada resíduo
+        for residuo_id in residuos_ids:
+            # Atualiza status do resíduo para REJEITADO
+            await residue_repo.atualizar_status(
+                residuo_id=residuo_id,
+                novo_status=StatusResiduo.REJEITADO,
+                usuario_id=coletor_id,
+                detalhes={"coleta_id": coleta_id, "acao": "rejeitar_residuo", "motivo": motivo},
+            )
 
-        # Anexa motivo às observações da coleta
-        await coleta_repo.append_observacao(coleta_id, f"REJEITADO {residuo_id}: {motivo}")
+            # Remove o ID do resíduo da coleta
+            await coleta_repo.remove_residuo(coleta_id, residuo_id)
+
+            # Anexa motivo às observações da coleta
+            await coleta_repo.append_observacao(coleta_id, f"REJEITADO {residuo_id}: {motivo}")
 
         # Verificar conclusão do agendamento
         await self._verificar_conclusao_agendamento(coleta.get("agendamento_id"))
@@ -347,7 +358,7 @@ class ColetaService:
             await scheduling_repo.update_status(agendamento_id, StatusAgendamento.CONCLUIDO)
             return
 
-        finais = {StatusResiduo.COLETADO, StatusResiduo.REJEITADO, StatusResiduo.ENTREGUE, StatusResiduo.DESCARTADO, StatusResiduo.CANCELADO}
+        finais = {StatusResiduo.COLETADO, StatusResiduo.REJEITADO, StatusResiduo.ENTREGUE, StatusResiduo.DESCARTADO}
         for rid in residuos_ids:
             r = await residue_repo.find_by_id(rid)
             if not r:

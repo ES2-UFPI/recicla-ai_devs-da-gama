@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
-from backend.src.infra.database.models.enums import EstadoColeta
+from src.infra.database.models.enums import EstadoColeta
 
 class ColetaCreateSchema(BaseModel):
     agendamento_id: str = Field(..., description="Referência ao agendamento associado")
