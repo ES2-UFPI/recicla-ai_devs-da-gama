@@ -231,6 +231,13 @@ class ColetaService:
             # Anexa motivo às observações da coleta
             await coleta_repo.append_observacao(coleta_id, f"REJEITADO {residuo_id}: {motivo}")
 
+            # Verifica se a lista de resíduos da coleta está vazia
+            atual_coleta = await coleta_repo.find_by_id(coleta_id)
+            if atual_coleta and not atual_coleta.get("residuos_id"):
+                # Se vazia, marca coleta como CANCELADA
+                await coleta_repo.update_estado(coleta_id, EstadoColeta.CANCELADA)
+                await coleta_repo.append_observacao(coleta_id, "Coleta cancelada automaticamente após rejeição de todos os resíduos.")
+
         # Verificar conclusão do agendamento
         await self._verificar_conclusao_agendamento(coleta.get("agendamento_id"))
 
