@@ -1,0 +1,73 @@
+{
+  "categorias": [
+    { "id": "papel", "nome": "Papel", "preco_por_kg": 1.50 },
+    { "id": "plastico", "nome": "Plástico", "preco_por_kg": 2.50, "preco_por_unidade": 0.20 },
+    { "id": "vidro", "nome": "Vidro", "preco_por_kg": 0.80, "preco_por_unidade": 0.15 },
+    { "id": "metal", "nome": "Metal", "preco_por_kg": 3.00 },
+    { "id": "organico", "nome": "Orgânico", "preco_por_kg": 0.50 }
+  ],
+  "residuos": [
+    {
+      "id": "r-1001",
+      "quantidade": 2.5,
+      "unidade": "kg",
+      "dataCadastro": "2025-10-05T10:30:00.000Z",
+      "foto": "/mock/residuos/papel-01.jpg",
+      "categoriaId": "papel",
+      "produtorId": "u-1",
+      "status": "DISPONIVEL",
+      "valorEstimado": 3.75,
+      "historico": [
+        { "etapa": "DISPONIVEL", "dataHora": "2025-10-05T10:30:00.000Z", "descricao": "Resíduo cadastrado" }
+      ]
+    },
+    {
+      "id": "r-1002",
+      "quantidade": 12,
+      "unidade": "unidade",
+      "dataCadastro": "2025-10-03T14:00:00.000Z",
+      "foto": "/mock/residuos/garrafas-01.jpg",
+      "categoriaId": "plastico",
+      "produtorId": "u-1",
+      "status": "AGENDADO",
+      "valorEstimado": 2.40,
+      "historico": [
+        { "etapa": "DISPONIVEL", "dataHora": "2025-10-03T13:50:00.000Z", "descricao": "Resíduo cadastrado" },
+        { "etapa": "AGENDADO", "dataHora": "2025-10-04T09:00:00.000Z", "descricao": "Coleta agendada para 06/10 às 09:00" }
+      ]
+    },
+    {
+      "id": "r-1003",
+      "quantidade": 0.8,
+      "unidade": "kg",
+      "dataCadastro": "2025-09-28T08:15:00.000Z",
+      "foto": "/mock/residuos/vidro-01.jpg",
+      "categoriaId": "vidro",
+      "produtorId": "u-1",
+      "status": "COLETADO",
+      "valorEstimado": 0.64,
+      "historico": [
+        { "etapa": "DISPONIVEL", "dataHora": "2025-09-28T08:15:00.000Z", "descricao": "Resíduo cadastrado" },
+        { "etapa": "AGENDADO", "dataHora": "2025-09-29T10:00:00.000Z", "descricao": "Coleta agendada para 30/09 às 10:00" },
+        { "etapa": "COLETADO", "dataHora": "2025-09-30T10:25:00.000Z", "descricao": "Resíduo coletado pelo coletor Fulano" }
+      ]
+    },
+    {
+      "id": "r-1004",
+      "quantidade": 3,
+      "unidade": "kg",
+      "dataCadastro": "2025-09-20T16:45:00.000Z",
+      "foto": "/mock/residuos/oleo-01.jpg",
+      "categoriaId": "organico",
+      "produtorId": "u-1",
+      "status": "ENTREGUE",
+      "valorEstimado": 1.50,
+      "historico": [
+        { "etapa": "DISPONIVEL", "dataHora": "2025-09-20T16:45:00.000Z", "descricao": "Resíduo cadastrado" },
+        { "etapa": "AGENDADO", "dataHora": "2025-09-21T11:00:00.000Z", "descricao": "Coleta agendada para 22/09 às 11:00" },
+        { "etapa": "COLETADO", "dataHora": "2025-09-22T11:15:00.000Z", "descricao": "Resíduo coletado" },
+        { "etapa": "ENTREGUE", "dataHora": "2025-09-22T15:30:00.000Z", "descricao": "Entregue à empresa XYZ" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+# Ignora dependências e builds locais
+node_modules
+dist
+dist-ssr
+
+# Ignora arquivos de log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Ignora arquivos de ambiente locais
+.env*
+
+# Ignora caches e arquivos temporários
+.cache
+*.tsbuildinfo
+
+# Ignora arquivos de configuração do editor
+.vscode
+.idea
+.DS_Store
+
+# Outros
+*.local
+coverage
+storybook-static
+*.tgz

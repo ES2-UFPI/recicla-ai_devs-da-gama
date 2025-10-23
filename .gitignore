@@ -1,0 +1,12 @@
+# Ignore Docker MongoDB volume data
+/data/
+
+# Optional local overrides
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
+/.vscode
+
+/docs

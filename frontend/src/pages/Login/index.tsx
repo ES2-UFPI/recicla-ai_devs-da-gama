@@ -1,0 +1,107 @@
+import { useState } from 'react';
+import { validateEmail } from './validation';
+import { Box, Button, TextField, Typography, Alert, CircularProgress } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { AuthLayout } from '../../layouts/AuthLayout';
+import { useAuth } from '../../hooks/useAuth';
+
+export default function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEmail(value);
+    setEmailError(validateEmail(value));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    const emailValidation = validateEmail(email);
+    setEmailError(emailValidation);
+    if (emailValidation) return;
+    setLoading(true);
+    try {
+      await login({ email, password });
+      navigate('/', { replace: true });
+    } catch (err: unknown) {
+      // Tratamento específico de erros da API
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { 
+          response?: { 
+            data?: { detail?: string }; 
+            status?: number 
+          } 
+        };
+        const detail = axiosError.response?.data?.detail;
+        const status = axiosError.response?.status;
+        
+        // Por segurança, não diferenciar entre "usuário não existe" e "senha incorreta"
+        // para prevenir enumeração de usuários
+        if (status === 401 || status === 404) {
+          setError('E-mail ou senha inválidos.');
+        } else if (detail) {
+          setError(detail);
+        } else {
+          setError('Erro ao fazer login. Tente novamente.');
+        }
+      } else {
+        setError('Erro ao fazer login. Verifique sua conexão e tente novamente.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AuthLayout title="Entrar no ReciclaAi" subtitle="Acesse sua conta para continuar">
+      <Box component="form" onSubmit={handleSubmit} autoComplete="on" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {error && <Alert severity="error">{error}</Alert>}
+        <TextField
+          label="E-mail"
+          type="email"
+          value={email}
+          onChange={handleEmailChange}
+          required
+          autoFocus
+          fullWidth
+          autoComplete="email"
+          error={!!emailError}
+          helperText={emailError}
+        />
+        <TextField
+          label="Senha"
+          type="password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          required
+          fullWidth
+          autoComplete="current-password"
+        />
+        <Button
+          type="submit"
+          variant="contained"
+          color="primary"
+          size="large"
+          disabled={loading}
+          sx={{ mt: 1, fontWeight: 600 }}
+        >
+          {loading ? <CircularProgress size={24} color="inherit" /> : 'Entrar'}
+        </Button>
+        <Typography variant="body2" sx={{ textAlign: 'center', mt: 2, color: 'text.secondary' }}>
+          Esqueceu a senha? <a href="#" style={{ color: '#388e3c', textDecoration: 'underline' }}>Recuperar acesso</a>
+        </Typography>
+        <Typography variant="body2" sx={{ textAlign: 'center', mt: 1, color: 'text.secondary' }}>
+          Ainda não tem um cadastro?{' '}
+          <a href="/cadastro" style={{ color: '#388e3c', textDecoration: 'underline' }}>Cadastre-se</a>
+        </Typography>
+      </Box>
+    </AuthLayout>
+  );
+}
