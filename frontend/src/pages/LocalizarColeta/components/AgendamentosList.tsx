@@ -8,14 +8,17 @@ import {
   Stack,
   Collapse,
   IconButton,
+  Button,
 } from '@mui/material';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import RecyclingIcon from '@mui/icons-material/Recycling';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import type { Agendamento } from '../hooks/useAgendamentos';
 import { useCategorias } from '../hooks/useCategorias';
+import { ResiduosSelectionModal } from './ResiduosSelectionModal';
 import { useState } from 'react';
 
 interface AgendamentosListProps {
@@ -31,6 +34,8 @@ export function AgendamentosList({
 }: AgendamentosListProps) {
   const { getCategoriaById } = useCategorias();
   const [expandedResiduos, setExpandedResiduos] = useState<Set<string>>(new Set());
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedAgendamento, setSelectedAgendamento] = useState<Agendamento | null>(null);
 
   const toggleResiduoExpand = (residuoId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -44,6 +49,18 @@ export function AgendamentosList({
       return newSet;
     });
   };
+
+  const handleOpenModal = (agendamento: Agendamento, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedAgendamento(agendamento);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedAgendamento(null);
+  };
+
   const getGoogleMapsLink = (lat: string, lng: string) => {
     return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
   };
@@ -120,14 +137,69 @@ export function AgendamentosList({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <AccessTimeIcon fontSize="small" color="action" />
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                  {agendamento.disponibilidade.slice(0, 2).map((slot, idx) => (
-                    <Chip
-                      key={idx}
-                      label={`${slot.data} ${slot.hora_inicio}-${slot.hora_fim}`}
-                      size="small"
-                      variant="outlined"
-                    />
-                  ))}
+                  {agendamento.disponibilidade.slice(0, 2).map((slot, idx) => {
+                    // Converter UTC para horário local de Brasília para exibição
+                    try {
+                      const [dia, mes, ano] = slot.data.split('/');
+                      const [horaInicio, minutoInicio] = slot.hora_inicio.split(':');
+                      const [horaFim, minutoFim] = slot.hora_fim.split(':');
+                      
+                      // Criar Date UTC
+                      const dataHoraInicioUTC = new Date(Date.UTC(
+                        parseInt(ano),
+                        parseInt(mes) - 1,
+                        parseInt(dia),
+                        parseInt(horaInicio),
+                        parseInt(minutoInicio)
+                      ));
+                      
+                      const dataHoraFimUTC = new Date(Date.UTC(
+                        parseInt(ano),
+                        parseInt(mes) - 1,
+                        parseInt(dia),
+                        parseInt(horaFim),
+                        parseInt(minutoFim)
+                      ));
+                      
+                      // Formatar em horário local de Brasília
+                      const dataLocal = dataHoraInicioUTC.toLocaleDateString('pt-BR', {
+                        timeZone: 'America/Sao_Paulo',
+                        day: '2-digit',
+                        month: '2-digit',
+                      });
+                      
+                      const horaInicioLocal = dataHoraInicioUTC.toLocaleTimeString('pt-BR', {
+                        timeZone: 'America/Sao_Paulo',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      });
+                      
+                      const horaFimLocal = dataHoraFimUTC.toLocaleTimeString('pt-BR', {
+                        timeZone: 'America/Sao_Paulo',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      });
+                      
+                      return (
+                        <Chip
+                          key={idx}
+                          label={`${dataLocal} ${horaInicioLocal}-${horaFimLocal}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      );
+                    } catch (error) {
+                      // Fallback se houver erro na conversão
+                      return (
+                        <Chip
+                          key={idx}
+                          label={`${slot.data} ${slot.hora_inicio}-${slot.hora_fim}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      );
+                    }
+                  })}
                   {agendamento.disponibilidade.length > 2 && (
                     <Chip
                       label={`+${agendamento.disponibilidade.length - 2}`}
@@ -224,6 +296,26 @@ export function AgendamentosList({
                 </Typography>
               )}
 
+              {/* Botão de Seleção de Resíduos */}
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                onClick={(e) => handleOpenModal(agendamento, e)}
+                startIcon={<LocalShippingIcon />}
+                sx={{
+                  mb: 1.5,
+                  py: 1.2,
+                  fontWeight: 600,
+                  boxShadow: 2,
+                  '&:hover': {
+                    boxShadow: 4,
+                  },
+                }}
+              >
+                Selecionar Resíduos para Coletar
+              </Button>
+
               {/* Link Google Maps */}
               <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <MuiLink
@@ -241,6 +333,15 @@ export function AgendamentosList({
           </Card>
         );
       })}
+
+      {/* Modal de Seleção de Resíduos */}
+      {selectedAgendamento && (
+        <ResiduosSelectionModal
+          open={modalOpen}
+          onClose={handleCloseModal}
+          agendamento={selectedAgendamento}
+        />
+      )}
     </Stack>
   );
 }

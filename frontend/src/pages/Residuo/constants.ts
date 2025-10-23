@@ -9,16 +9,21 @@ export const statusColor: Record<ResiduoStatus, ChipProps['color']> = {
   COLETADO: 'info',
   ENTREGUE: 'success',
   CANCELADO: 'error',
+  REJEITADO: 'error',
+  RESERVADO: 'primary',
 };
 
 // Cores padronizadas de reciclagem (seguindo convenção internacional)
 export const categoriaColor: Record<string, string> = {
   papel: '#2196F3', // Azul
   plastico: '#F44336', // Vermelho
+  plástico: '#F44336', // Vermelho (com acento)
   vidro: '#4CAF50', // Verde
   metal: '#FFC107', // Amarelo
   organico: '#795548', // Marrom
+  orgânico: '#795548', // Marrom (com acento)
   eletronico: '#FF9800', // Laranja
+  eletrônico: '#FF9800', // Laranja (com acento)
 };
 
 // Backend só aceita 'kg' ou 'unidade'

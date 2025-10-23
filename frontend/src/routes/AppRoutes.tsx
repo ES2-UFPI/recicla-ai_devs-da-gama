@@ -7,6 +7,8 @@ import Residuo from '../pages/Residuo';
 import { Agendamento } from '../pages/Agendamento';
 import LocalizarColeta from '../pages/LocalizarColeta';
 import Coleta from '../pages/Coleta';
+//import ColetaAtiva from '../pages/ColetaAtiva';
+import ColetaDetalhes from '../pages/ColetaDetalhes';
 
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
@@ -68,6 +70,22 @@ export function AppRoutes() {
           </RoleBasedRoute>
         </ProtectedRoute>
       } />
+      {/* Rota Coleta Detalhes (substitui ColetaAtiva) */}
+      <Route path="/coleta/:id" element={
+        <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={['coletor']}>
+            <ColetaDetalhes />
+          </RoleBasedRoute>
+        </ProtectedRoute>
+      } />
+      {/* Rota Coleta Ativa (mantida temporariamente para compatibilidade) 
+      <Route path="/coleta-ativa" element={
+        <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={['coletor']}>
+            <ColetaAtiva />
+          </RoleBasedRoute>
+        </ProtectedRoute>
+      } />*/}
       {/* Exemplo de rota protegida futura:
       <Route path="/dashboard" element={
         <ProtectedRoute>

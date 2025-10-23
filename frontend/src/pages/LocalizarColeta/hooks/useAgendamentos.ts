@@ -35,7 +35,8 @@ interface Residuo {
 }
 
 export interface Agendamento {
-  id: string;
+  id?: string;
+  _id?: string;
   produtorId: string;
   residuosId: string[];
   disponibilidade: DisponibilidadeSlot[];
@@ -65,8 +66,16 @@ export const useAgendamentos = () => {
     setError(null);
     try {
       const response = await api.post<Agendamento[]>('/schedules/disponiveis', params);
-      setAgendamentos(response.data);
-      return response.data;
+      console.log('Resposta da API (agendamentos):', response.data);
+      
+      // Normaliza os IDs (converte _id para id se necessário)
+      const agendamentosNormalizados = response.data.map(agendamento => ({
+        ...agendamento,
+        id: agendamento.id || agendamento._id || '',
+      }));
+      
+      setAgendamentos(agendamentosNormalizados);
+      return agendamentosNormalizados;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Erro ao buscar agendamentos';
       setError(errorMsg);
