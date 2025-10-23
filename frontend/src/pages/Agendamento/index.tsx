@@ -37,6 +37,7 @@ import { categoriaService } from '../../services/categoria.service';
 import type { Scheduling, SchedulingCreate, DisponibilidadeSlot } from '../../types/scheduling';
 import type { Residue } from '../../types/residue';
 import type { Categoria } from '../../types/categoria';
+import { formatUTCToLocalString } from '../../utils/timezone';
 
 // Mapa de cores para status
 const statusColorMap: Record<
@@ -57,10 +58,61 @@ const statusLabelMap: Record<string, string> = {
   coletado: 'COLETADO',
 };
 
-// Função para formatar disponibilidade
+// Função para formatar disponibilidade (converte UTC para horário local)
 const formatarDisponibilidade = (disponibilidade: DisponibilidadeSlot[]): string => {
   return disponibilidade
-    .map((slot) => `${slot.data}: ${slot.hora_inicio} - ${slot.hora_fim}`)
+    .map((slot) => {
+      // Backend retorna em UTC (formato: dd/mm/yyyy HH:mm)
+      // Precisamos converter para horário local de Brasília para exibição
+      try {
+        const [dia, mes, ano] = slot.data.split('/');
+        const [horaInicio, minutoInicio] = slot.hora_inicio.split(':');
+        const [horaFim, minutoFim] = slot.hora_fim.split(':');
+        
+        // Criar Date UTC
+        const dataHoraInicioUTC = new Date(Date.UTC(
+          parseInt(ano),
+          parseInt(mes) - 1,
+          parseInt(dia),
+          parseInt(horaInicio),
+          parseInt(minutoInicio)
+        ));
+        
+        const dataHoraFimUTC = new Date(Date.UTC(
+          parseInt(ano),
+          parseInt(mes) - 1,
+          parseInt(dia),
+          parseInt(horaFim),
+          parseInt(minutoFim)
+        ));
+        
+        // Formatar em horário local de Brasília
+        const dataLocal = dataHoraInicioUTC.toLocaleDateString('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        });
+        
+        const horaInicioLocal = dataHoraInicioUTC.toLocaleTimeString('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        
+        const horaFimLocal = dataHoraFimUTC.toLocaleTimeString('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        
+        return `${dataLocal}: ${horaInicioLocal} - ${horaFimLocal}`;
+      } catch (error) {
+        // Fallback se houver erro na conversão
+        console.error('Erro ao converter timezone:', error);
+        return `${slot.data}: ${slot.hora_inicio} - ${slot.hora_fim}`;
+      }
+    })
     .join(' | ');
 };
 
@@ -226,18 +278,58 @@ export function Agendamento() {
     return status === 'pendente' || status === 'aceito';
   };
 
-  // Converter DisponibilidadeSlot (dd/mm/aaaa) para FaixaDisponibilidade (YYYY-MM-DD)
+  // Converter DisponibilidadeSlot UTC (dd/mm/aaaa) para FaixaDisponibilidade local (YYYY-MM-DD)
   const convertToFaixaDisponibilidade = (disponibilidades: DisponibilidadeSlot[]) => {
     return disponibilidades.map((slot) => {
-      // Converter dd/mm/aaaa para YYYY-MM-DD
-      const [dia, mes, ano] = slot.data.split('/');
-      const dataYYYYMMDD = `${ano}-${mes}-${dia}`;
-      
-      return {
-        data: dataYYYYMMDD,
-        horarioInicio: slot.hora_inicio,
-        horarioFim: slot.hora_fim,
-      };
+      try {
+        // Backend retorna em UTC, precisamos converter para horário local
+        const [dia, mes, ano] = slot.data.split('/');
+        const [horaInicio, minutoInicio] = slot.hora_inicio.split(':');
+        const [horaFim, minutoFim] = slot.hora_fim.split(':');
+        
+        // Criar Date UTC
+        const dataHoraInicioUTC = new Date(Date.UTC(
+          parseInt(ano),
+          parseInt(mes) - 1,
+          parseInt(dia),
+          parseInt(horaInicio),
+          parseInt(minutoInicio)
+        ));
+        
+        const dataHoraFimUTC = new Date(Date.UTC(
+          parseInt(ano),
+          parseInt(mes) - 1,
+          parseInt(dia),
+          parseInt(horaFim),
+          parseInt(minutoFim)
+        ));
+        
+        // Converter para horário local
+        const anoLocal = dataHoraInicioUTC.getFullYear();
+        const mesLocal = String(dataHoraInicioUTC.getMonth() + 1).padStart(2, '0');
+        const diaLocal = String(dataHoraInicioUTC.getDate()).padStart(2, '0');
+        const dataYYYYMMDD = `${anoLocal}-${mesLocal}-${diaLocal}`;
+        
+        const horaInicioLocal = `${String(dataHoraInicioUTC.getHours()).padStart(2, '0')}:${String(dataHoraInicioUTC.getMinutes()).padStart(2, '0')}`;
+        const horaFimLocal = `${String(dataHoraFimUTC.getHours()).padStart(2, '0')}:${String(dataHoraFimUTC.getMinutes()).padStart(2, '0')}`;
+        
+        return {
+          data: dataYYYYMMDD,
+          horarioInicio: horaInicioLocal,
+          horarioFim: horaFimLocal,
+        };
+      } catch (error) {
+        // Fallback se houver erro na conversão
+        console.error('Erro ao converter timezone na edição:', error);
+        const [dia, mes, ano] = slot.data.split('/');
+        const dataYYYYMMDD = `${ano}-${mes}-${dia}`;
+        
+        return {
+          data: dataYYYYMMDD,
+          horarioInicio: slot.hora_inicio,
+          horarioFim: slot.hora_fim,
+        };
+      }
     });
   };
 

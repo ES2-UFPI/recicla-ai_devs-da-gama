@@ -17,6 +17,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import type { DisponibilidadeSlot } from '../types/scheduling';
+import { dateTimeToUTC, getTodayInBrazil } from '../utils/timezone';
 
 export interface FaixaDisponibilidade {
   data: string; // YYYY-MM-DD
@@ -66,7 +67,7 @@ export function DisponibilidadeSelector({
 
   const handleDateChange = (index: number, date: Date | null) => {
     if (date) {
-      // Converter Date para formato YYYY-MM-DD
+      // Converter Date local para formato YYYY-MM-DD (mantém horário local)
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
@@ -79,8 +80,9 @@ export function DisponibilidadeSelector({
 
   const parseDate = (dateString: string): Date | null => {
     if (!dateString) return null;
+    // Criar Date em horário local (não UTC) para evitar problemas de timezone
     const [year, month, day] = dateString.split('-').map(Number);
-    return new Date(year, month - 1, day);
+    return new Date(year, month - 1, day, 12, 0, 0); // Meio-dia para evitar problemas de DST
   };
 
   const atualizarDisponibilidade = (faixasAtualizadas: FaixaDisponibilidade[]) => {
@@ -88,14 +90,27 @@ export function DisponibilidadeSelector({
     const disponibilidadeArray: DisponibilidadeSlot[] = [];
     faixasAtualizadas.forEach((faixa) => {
       if (faixa.data && faixa.horarioInicio && faixa.horarioFim) {
-        // Converter de YYYY-MM-DD para dd/mm/aaaa
-        const [ano, mes, dia] = faixa.data.split('-');
-        const dataFormatada = `${dia}/${mes}/${ano}`;
+        // Converter horário local (Brasília) para UTC antes de enviar
+        const dataHoraInicioUTC = dateTimeToUTC(faixa.data, faixa.horarioInicio);
+        const dataHoraFimUTC = dateTimeToUTC(faixa.data, faixa.horarioFim);
+        
+        // Extrair data e hora do resultado UTC
+        const inicioDate = new Date(dataHoraInicioUTC);
+        const fimDate = new Date(dataHoraFimUTC);
+        
+        // Formatar para o backend (ainda em UTC, mas no formato esperado)
+        const diaUTC = String(inicioDate.getUTCDate()).padStart(2, '0');
+        const mesUTC = String(inicioDate.getUTCMonth() + 1).padStart(2, '0');
+        const anoUTC = inicioDate.getUTCFullYear();
+        const dataFormatadaUTC = `${diaUTC}/${mesUTC}/${anoUTC}`;
+        
+        const horaInicioUTC = `${String(inicioDate.getUTCHours()).padStart(2, '0')}:${String(inicioDate.getUTCMinutes()).padStart(2, '0')}`;
+        const horaFimUTC = `${String(fimDate.getUTCHours()).padStart(2, '0')}:${String(fimDate.getUTCMinutes()).padStart(2, '0')}`;
         
         disponibilidadeArray.push({
-          data: dataFormatada,
-          hora_inicio: faixa.horarioInicio,
-          hora_fim: faixa.horarioFim,
+          data: dataFormatadaUTC,
+          hora_inicio: horaInicioUTC,
+          hora_fim: horaFimUTC,
         });
       }
     });
@@ -149,7 +164,7 @@ export function DisponibilidadeSelector({
                   label="Data"
                   value={parseDate(faixa.data)}
                   onChange={(date) => handleDateChange(index, date)}
-                  minDate={new Date()}
+                  minDate={getTodayInBrazil()}
                   slotProps={{
                     textField: {
                       size: 'small',

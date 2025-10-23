@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useRoleCheck } from '../hooks/useRoleCheck';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
+import { coletaService } from '../services/coleta.service';
 import {
   AppBar,
   Toolbar,
@@ -61,6 +62,29 @@ export function Navbar() {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [dropdownAnchor, setDropdownAnchor] = useState<null | HTMLElement>(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const [temColetaAtiva, setTemColetaAtiva] = useState(false);
+
+  // Verificar se há coleta em andamento (apenas para coletores)
+  useEffect(() => {
+    const verificarColetaAtiva = async () => {
+      if (hasRole(['coletor'])) {
+        try {
+          const coletaAtiva = await coletaService.buscarColetaAtiva();
+          const coletaPendente = await coletaService.buscarColetaPendente();
+          setTemColetaAtiva(!!(coletaAtiva || coletaPendente));
+        } catch (error) {
+          console.error('Erro ao verificar coleta ativa:', error);
+        }
+      }
+    };
+
+    verificarColetaAtiva();
+    
+    // Verificar a cada 30 segundos
+    const interval = setInterval(verificarColetaAtiva, 30000);
+    
+    return () => clearInterval(interval);
+  }, [hasRole]);
 
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => {
     setMenuAnchor(event.currentTarget);
@@ -95,16 +119,39 @@ export function Navbar() {
   const isActiveRoute = (path: string) => location.pathname === path;
 
   return (
-    <AppBar
-      position="sticky"
-      color="inherit"
-      elevation={2}
-      sx={{
-        bgcolor: 'background.default',
-        borderBottom: `1px solid ${theme.palette.divider}`,
-      }}
-    >
-      <Toolbar sx={{ justifyContent: 'space-between' }}>
+    <>
+      {/* Banner de Coleta Ativa */}
+      {temColetaAtiva && !location.pathname.startsWith('/coleta') && (
+        <Box
+          sx={{
+            bgcolor: 'warning.main',
+            color: 'warning.contrastText',
+            py: 1,
+            px: 2,
+            textAlign: 'center',
+            cursor: 'pointer',
+            '&:hover': {
+              bgcolor: 'warning.dark',
+            },
+          }}
+          onClick={() => navigate('/coletas')}
+        >
+          <Typography variant="body2" fontWeight={600}>
+            🚚 Você tem uma coleta em andamento • <strong>Clique aqui para continuar</strong>
+          </Typography>
+        </Box>
+      )}
+
+      <AppBar
+        position="sticky"
+        color="inherit"
+        elevation={2}
+        sx={{
+          bgcolor: 'background.default',
+          borderBottom: `1px solid ${theme.palette.divider}`,
+        }}
+      >
+        <Toolbar sx={{ justifyContent: 'space-between' }}>
         {/* Logo */}
         <Typography
           variant="h6"
@@ -270,5 +317,6 @@ export function Navbar() {
         </Menu>
       </Toolbar>
     </AppBar>
+    </>
   );
 }

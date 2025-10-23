@@ -16,6 +16,7 @@ import {
   useMediaQuery,
   useTheme,
   Alert,
+  CircularProgress,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import RecyclingIcon from '@mui/icons-material/Recycling';
@@ -25,6 +26,7 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import { useNavigate } from 'react-router-dom';
 import type { Agendamento } from '../hooks/useAgendamentos';
 import { useCategorias } from '../hooks/useCategorias';
+import { coletaService } from '../../../services/coleta.service';
 
 interface ResiduosSelectionModalProps {
   open: boolean;
@@ -44,6 +46,8 @@ export function ResiduosSelectionModal({
   const { getCategoriaById } = useCategorias();
   
   const [selectedResiduos, setSelectedResiduos] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleToggleResiduo = (residuoId: string) => {
     setSelectedResiduos((prev) => {
@@ -65,14 +69,50 @@ export function ResiduosSelectionModal({
     }
   };
 
-  const handleReservar = () => {
-    // TODO: Implementar lógica real de reserva
-    // Por enquanto, redireciona para /coletas
-    navigate('/coletas');
+  const handleReservar = async () => {
+    if (selectedResiduos.size === 0) return;
+
+    // Obter o ID corretamente (pode ser id ou _id)
+    const agendamentoComId = agendamento as Agendamento & { _id?: string };
+    const agendamentoId = agendamento.id || agendamentoComId._id;
+    
+    if (!agendamentoId) {
+      setError('ID do agendamento não encontrado');
+      console.error('Agendamento sem ID:', agendamento);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const payload = {
+        agendamento_id: agendamentoId,
+        residuos_ids: Array.from(selectedResiduos),
+      };
+      
+      console.log('Tentando aceitar coleta com dados:', payload);
+      console.log('Agendamento completo:', agendamento);
+      console.log('Agendamento ID extraído:', agendamentoId);
+      console.log('Resíduos selecionados:', Array.from(selectedResiduos));
+      
+      await coletaService.aceitarColeta(payload);
+
+      // Sucesso! Redireciona para a página de coletas
+      navigate('/coletas');
+    } catch (err) {
+      console.error('Erro ao aceitar coleta:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao reservar resíduos. Tente novamente.';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => {
+    if (loading) return; // Não permite fechar durante o loading
     setSelectedResiduos(new Set());
+    setError(null);
     onClose();
   };
 
@@ -254,6 +294,13 @@ export function ResiduosSelectionModal({
             Selecione pelo menos um resíduo para continuar
           </Alert>
         )}
+
+        {/* Alert de erro */}
+        {error && (
+          <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
       </DialogContent>
 
       {/* Actions */}
@@ -279,16 +326,16 @@ export function ResiduosSelectionModal({
         <Button
           onClick={handleReservar}
           variant="contained"
-          disabled={!someSelected}
+          disabled={!someSelected || loading}
           fullWidth={isTablet}
-          startIcon={<LocalShippingIcon />}
+          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <LocalShippingIcon />}
           sx={{
             order: isTablet ? 1 : 2,
             py: 1.5,
             fontWeight: 600,
           }}
         >
-          {isMobile ? 'Reservar' : 'Reservar Resíduos para Coletar'}
+          {loading ? 'Processando...' : (isMobile ? 'Reservar' : 'Reservar Resíduos para Coletar')}
         </Button>
       </DialogActions>
     </Dialog>
