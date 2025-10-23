@@ -129,6 +129,47 @@ async def listar_meus_residuos(
 
 
 @router.get(
+    "/coletor/{residuo_id}",
+    response_model=ResidueResponse,
+    summary="Obter detalhes de um resíduo (coletor)",
+    description="""
+    Retorna os detalhes completos de um resíduo específico.
+    
+    **Apenas COLETORES podem acessar este endpoint.**
+    
+    Este endpoint permite que coletores visualizem informações de qualquer resíduo
+    para fins de planejamento e execução de coletas.
+    """
+)
+async def obter_residuo_coletor(
+    residuo_id: str,
+    current_user: dict = Depends(get_current_user)
+) -> ResidueResponse:
+    """
+    Obtém detalhes de um resíduo (endpoint para coletores).
+    
+    Args:
+        residuo_id: ID do resíduo
+        current_user: Usuário autenticado
+    
+    Returns:
+        ResidueResponse: Dados completos do resíduo
+    
+    Raises:
+        HTTPException 403: Usuário não é coletor
+        HTTPException 404: Resíduo não encontrado
+    """
+    # Validar papel do usuário
+    if current_user.get("role_id") != "coletor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas coletores podem acessar este endpoint"
+        )
+    
+    return await residuo_service.obter_residuo_coletor(residuo_id=residuo_id)
+
+
+@router.get(
     "/{residuo_id}",
     response_model=ResidueResponse,
     summary="Obter detalhes de um resíduo",
