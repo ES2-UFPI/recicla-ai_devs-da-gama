@@ -1,5 +1,5 @@
 // Tipos compatíveis com o backend FastAPI
-export type ResiduoStatus = 'DISPONIVEL' | 'AGENDADO' | 'COLETADO' | 'ENTREGUE' | 'CANCELADO';
+export type ResiduoStatus = 'DISPONIVEL' | 'AGENDADO' | 'COLETADO' | 'ENTREGUE' | 'CANCELADO' | 'REJEITADO' | 'RESERVADO';
 
 // Backend só aceita 'kg' ou 'unidade'
 export type UnidadeMedida = 'kg' | 'unidade';

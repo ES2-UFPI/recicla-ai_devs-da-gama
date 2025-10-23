@@ -37,7 +37,7 @@ import { categoriaService } from '../../services/categoria.service';
 import type { Scheduling, SchedulingCreate, DisponibilidadeSlot } from '../../types/scheduling';
 import type { Residue } from '../../types/residue';
 import type { Categoria } from '../../types/categoria';
-import { formatUTCToLocalString } from '../../utils/timezone';
+
 
 // Mapa de cores para status
 const statusColorMap: Record<
@@ -48,6 +48,7 @@ const statusColorMap: Record<
   aceito: 'success',
   cancelado: 'error',
   coletado: 'info',
+  concluido: 'success',
 };
 
 // Mapa de labels para status
@@ -56,6 +57,7 @@ const statusLabelMap: Record<string, string> = {
   aceito: 'ACEITO',
   cancelado: 'CANCELADO',
   coletado: 'COLETADO',
+  concluido: 'CONCLUÍDO',
 };
 
 // Função para formatar disponibilidade (converte UTC para horário local)
@@ -63,13 +65,13 @@ const formatarDisponibilidade = (disponibilidade: DisponibilidadeSlot[]): string
   return disponibilidade
     .map((slot) => {
       // Backend retorna em UTC (formato: dd/mm/yyyy HH:mm)
-      // Precisamos converter para horário local de Brasília para exibição
+      // Precisamos converter para horário local do navegador para exibição
       try {
         const [dia, mes, ano] = slot.data.split('/');
         const [horaInicio, minutoInicio] = slot.hora_inicio.split(':');
         const [horaFim, minutoFim] = slot.hora_fim.split(':');
         
-        // Criar Date UTC
+        // Criar Date UTC - backend envia tudo em UTC
         const dataHoraInicioUTC = new Date(Date.UTC(
           parseInt(ano),
           parseInt(mes) - 1,
@@ -86,22 +88,20 @@ const formatarDisponibilidade = (disponibilidade: DisponibilidadeSlot[]): string
           parseInt(minutoFim)
         ));
         
-        // Formatar em horário local de Brasília
+        // Formatar em horário local do navegador (Brasília: UTC-3)
+        // toLocaleDateString e toLocaleTimeString já convertem automaticamente para o timezone local do navegador
         const dataLocal = dataHoraInicioUTC.toLocaleDateString('pt-BR', {
-          timeZone: 'America/Sao_Paulo',
           day: '2-digit',
           month: '2-digit',
           year: 'numeric',
         });
         
         const horaInicioLocal = dataHoraInicioUTC.toLocaleTimeString('pt-BR', {
-          timeZone: 'America/Sao_Paulo',
           hour: '2-digit',
           minute: '2-digit',
         });
         
         const horaFimLocal = dataHoraFimUTC.toLocaleTimeString('pt-BR', {
-          timeZone: 'America/Sao_Paulo',
           hour: '2-digit',
           minute: '2-digit',
         });
@@ -282,12 +282,12 @@ export function Agendamento() {
   const convertToFaixaDisponibilidade = (disponibilidades: DisponibilidadeSlot[]) => {
     return disponibilidades.map((slot) => {
       try {
-        // Backend retorna em UTC, precisamos converter para horário local
+        // Backend retorna em UTC no formato dd/mm/yyyy HH:mm
         const [dia, mes, ano] = slot.data.split('/');
         const [horaInicio, minutoInicio] = slot.hora_inicio.split(':');
         const [horaFim, minutoFim] = slot.hora_fim.split(':');
         
-        // Criar Date UTC
+        // Criar Date UTC - backend envia tudo em UTC
         const dataHoraInicioUTC = new Date(Date.UTC(
           parseInt(ano),
           parseInt(mes) - 1,
@@ -304,7 +304,8 @@ export function Agendamento() {
           parseInt(minutoFim)
         ));
         
-        // Converter para horário local
+        // Converter para horário local do navegador (Brasília: UTC-3)
+        // getFullYear/getMonth/getDate/getHours/getMinutes já retornam valores no timezone local
         const anoLocal = dataHoraInicioUTC.getFullYear();
         const mesLocal = String(dataHoraInicioUTC.getMonth() + 1).padStart(2, '0');
         const diaLocal = String(dataHoraInicioUTC.getDate()).padStart(2, '0');
