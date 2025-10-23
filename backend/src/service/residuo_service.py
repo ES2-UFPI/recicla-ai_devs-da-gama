@@ -158,6 +158,27 @@ class ResiduoService:
         return ResidueResponse(**residuo)
     
     
+    async def obter_residuo_coletor(self, residuo_id: str) -> ResidueResponse:
+        """
+        Obtém detalhes de um resíduo específico para coletores.
+        Coletores podem visualizar qualquer resíduo para fins de coleta.
+        
+        Args:
+            residuo_id: ID do resíduo
+        
+        Returns:
+            ResidueResponse: Dados completos do resíduo
+        
+        Raises:
+            HTTPException 404: Resíduo não encontrado
+        """
+        residuo = await residue_repo.find_by_id(residuo_id)
+        if not residuo:
+            raise HTTPException(404, "Resíduo não encontrado")
+        
+        return ResidueResponse(**residuo)
+    
+    
     async def atualizar_residuo(
         self, 
         residuo_id: str, 

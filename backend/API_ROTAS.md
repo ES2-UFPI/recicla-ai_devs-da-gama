@@ -533,6 +533,58 @@ Obtém detalhes de um resíduo específico (apenas o dono pode acessar).
 
 ---
 
+### Obter Resíduo por ID (Coletor)
+**GET** `http://localhost:8000/residuos/coletor/{residuo_id}`
+
+Obtém detalhes de um resíduo específico (apenas coletores).
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Regras:**
+- Apenas coletores podem acessar
+- Permite visualizar qualquer resíduo para fins de coleta
+- Não há restrição de propriedade
+
+**Exemplo:** `http://localhost:8000/residuos/coletor/60c72b2f9b1d4c3a4c8e4d3e`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
+  "categoriaId": "60c72b2f9b1d4c3a4c8e4d3b",
+  "quantidade": 10,
+  "tipo_medida": "kg",
+  "foto": "http://example.com/garrafas.jpg",
+  "valorEstimado": 25.00,
+  "status": "AGENDADO",
+  "dataCadastro": "2025-10-14T10:30:00Z"
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é coletor:
+```json
+{
+  "detail": "Apenas coletores podem acessar este endpoint"
+}
+```
+
+**404 Not Found** - Resíduo não encontrado:
+```json
+{
+  "detail": "Resíduo não encontrado"
+}
+```
+
+**Observações:**
+- Este endpoint é específico para coletores visualizarem resíduos durante o processo de coleta
+- Não há validação de propriedade, permitindo acesso a qualquer resíduo
+- Útil para visualizar detalhes durante a execução de uma coleta
+
+---
+
 ### Atualizar Resíduo
 **PUT** `http://localhost:8000/residuos/{residuo_id}`
 
