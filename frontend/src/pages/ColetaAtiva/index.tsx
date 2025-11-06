@@ -46,7 +46,6 @@ export default function ColetaAtiva() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [avaliacaoFinalizada, setAvaliacaoFinalizada] = useState(false);
   // Estado para seleção dos resíduos coletados
   const [residuosSelecionados, setResiduosSelecionados] = useState<string[]>([]);
   
@@ -85,7 +84,6 @@ export default function ColetaAtiva() {
         const todosAvaliados = detalhes.every(r => r.status === 'COLETADO' || r.status === 'REJEITADO');
         if (todosAvaliados) {
           setEstado('entrega');
-          setAvaliacaoFinalizada(true);
         } else {
           setEstado('avaliacao');
         }
@@ -170,7 +168,6 @@ export default function ColetaAtiva() {
     const todosAvaliados = detalhes.every(r => r.status === 'COLETADO' || r.status === 'REJEITADO');
     if (todosAvaliados) {
       setEstado('entrega');
-      setAvaliacaoFinalizada(true);
     }
   };
 
@@ -182,7 +179,6 @@ export default function ColetaAtiva() {
       
       if (todosAvaliados) {
         setEstado('entrega');
-        setAvaliacaoFinalizada(true);
       }
     }
   };

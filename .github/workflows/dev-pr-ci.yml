@@ -46,7 +46,7 @@ jobs:
         continue-on-error: true
 
   frontend-ci:
-    name: Frontend - Build e Lint
+    name: Frontend - Build
     runs-on: ubuntu-latest
     
     defaults:
