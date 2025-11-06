@@ -1,5 +1,3 @@
-import { ptBR } from 'date-fns/locale';
-import { format } from 'date-fns';
 import type { ResiduoStatus, UnidadeMedida } from '../../types/residuo';
 import type { ChipProps } from '@mui/material';
 
@@ -29,5 +27,20 @@ export const categoriaColor: Record<string, string> = {
 // Backend só aceita 'kg' ou 'unidade'
 export const unidades: UnidadeMedida[] = ['kg', 'unidade'];
 
-export const formatarData = (iso: string) =>
-  format(new Date(iso), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+/**
+ * Formata uma data ISO (UTC) para exibição no horário local de Brasília
+ * @param iso - String ISO em UTC (ex: "2025-10-22T13:00:00.000Z")
+ * @returns String formatada no horário local (ex: "22/10/2025 às 10:00")
+ */
+export const formatarData = (iso: string) => {
+  const date = new Date(iso);
+  // Formatar usando toLocaleString para garantir conversão correta de timezone
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/Sao_Paulo',
+  }).replace(',', ' às');
+};

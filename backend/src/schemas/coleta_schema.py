@@ -64,6 +64,9 @@ class ColetaInDBSchema(ColetaCreateSchema):
     id: str = Field(..., description="ID único da coleta")
 
     class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
+        }
         schema_extra = {
             "example": {
                 "id": "60c72b2f9b1d4c3a4c8e4d43",

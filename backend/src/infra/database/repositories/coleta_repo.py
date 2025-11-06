@@ -1,4 +1,5 @@
 from typing import Optional, Dict, Any, List
+from datetime import datetime
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorCollection
 
@@ -14,7 +15,13 @@ def _to_response(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         return None
     _id = doc.get("_id")
     id_str = str(_id) if isinstance(_id, ObjectId) else _id
-    return {**doc, "_id": id_str, "id": id_str}
+    
+    # Converter datetime para string ISO para garantir serialização correta no JSON
+    result = {**doc, "_id": id_str, "id": id_str}
+    if "data_hora" in result and isinstance(result["data_hora"], datetime):
+        result["data_hora"] = result["data_hora"].isoformat() + "Z"
+    
+    return result
 
 
 def _to_response_many(docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
