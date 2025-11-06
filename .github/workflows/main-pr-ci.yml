@@ -101,7 +101,7 @@ jobs:
       - name: Criar arquivo .env de teste para backend
         run: |
           cat > backend/.env << EOF
-          MONGODB_URI=mongodb://localhost:27017
+          MONGODB_URI=mongodb://mongodb:27017
           DATABASE_NAME=reciclaai_test
           SECRET_KEY=test_secret_key_for_ci
           ALGORITHM=HS256

@@ -88,6 +88,16 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v4
       
+      - name: Criar arquivo .env de teste para backend
+        run: |
+          cat > backend/.env << EOF
+          MONGODB_URI=mongodb://mongodb:27017
+          DATABASE_NAME=reciclaai_test
+          SECRET_KEY=test_secret_key_for_ci
+          ALGORITHM=HS256
+          ACCESS_TOKEN_EXPIRE_MINUTES=30
+          EOF
+      
       - name: Verificar docker-compose
         run: |
           docker compose config
