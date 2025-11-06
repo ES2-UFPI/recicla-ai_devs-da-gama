@@ -273,7 +273,7 @@ export default function Coleta() {
 
                   {/* Observações */}
                   {coleta.observacoes && (
-                    <Alert severity="info" icon={false} sx={{ fontSize: '0.875rem' }} sx={{ mb: 2 }}>
+                    <Alert severity="info" icon={false} sx={{ fontSize: '0.875rem', mb: 2 }}>
                       <strong>Observações:</strong> {coleta.observacoes}
                     </Alert>
                   )}
