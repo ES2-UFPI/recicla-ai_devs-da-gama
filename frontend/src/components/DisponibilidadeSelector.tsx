@@ -17,7 +17,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import type { DisponibilidadeSlot } from '../types/scheduling';
-import { dateTimeToUTC, getTodayInBrazil } from '../utils/timezone';
+import { getTodayInBrazil } from '../utils/timezone';
 
 export interface FaixaDisponibilidade {
   data: string; // YYYY-MM-DD
@@ -86,31 +86,19 @@ export function DisponibilidadeSelector({
   };
 
   const atualizarDisponibilidade = (faixasAtualizadas: FaixaDisponibilidade[]) => {
-    // Converter para o formato do backend: lista de DisponibilidadeSlot
+    // Converter para o formato do backend: lista de DisponibilidadeSlot (horários em Brasília)
+    // Enviar data e hora exatamente como selecionadas pelo usuário (sem converter para UTC)
     const disponibilidadeArray: DisponibilidadeSlot[] = [];
     faixasAtualizadas.forEach((faixa) => {
       if (faixa.data && faixa.horarioInicio && faixa.horarioFim) {
-        // Converter horário local (Brasília) para UTC antes de enviar
-        const dataHoraInicioUTC = dateTimeToUTC(faixa.data, faixa.horarioInicio);
-        const dataHoraFimUTC = dateTimeToUTC(faixa.data, faixa.horarioFim);
-        
-        // Extrair data e hora do resultado UTC
-        const inicioDate = new Date(dataHoraInicioUTC);
-        const fimDate = new Date(dataHoraFimUTC);
-        
-        // Formatar para o backend (ainda em UTC, mas no formato esperado)
-        const diaUTC = String(inicioDate.getUTCDate()).padStart(2, '0');
-        const mesUTC = String(inicioDate.getUTCMonth() + 1).padStart(2, '0');
-        const anoUTC = inicioDate.getUTCFullYear();
-        const dataFormatadaUTC = `${diaUTC}/${mesUTC}/${anoUTC}`;
-        
-        const horaInicioUTC = `${String(inicioDate.getUTCHours()).padStart(2, '0')}:${String(inicioDate.getUTCMinutes()).padStart(2, '0')}`;
-        const horaFimUTC = `${String(fimDate.getUTCHours()).padStart(2, '0')}:${String(fimDate.getUTCMinutes()).padStart(2, '0')}`;
-        
+        // faixa.data está em YYYY-MM-DD → converter para dd/mm/aaaa
+        const [year, month, day] = faixa.data.split('-');
+        const dataFormatadaBR = `${day}/${month}/${year}`;
+
         disponibilidadeArray.push({
-          data: dataFormatadaUTC,
-          hora_inicio: horaInicioUTC,
-          hora_fim: horaFimUTC,
+          data: dataFormatadaBR,
+          hora_inicio: faixa.horarioInicio, // já no formato HH:mm local
+          hora_fim: faixa.horarioFim,       // já no formato HH:mm local
         });
       }
     });

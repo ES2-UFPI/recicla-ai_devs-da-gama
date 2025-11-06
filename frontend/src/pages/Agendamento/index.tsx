@@ -60,59 +60,11 @@ const statusLabelMap: Record<string, string> = {
   concluido: 'CONCLUÍDO',
 };
 
-// Função para formatar disponibilidade (converte UTC para horário local)
+// Função para formatar disponibilidade (sem conversão de timezone)
+// Backend armazena e retorna horários no fuso de Brasília (strings dd/mm/aaaa e HH:mm)
 const formatarDisponibilidade = (disponibilidade: DisponibilidadeSlot[]): string => {
   return disponibilidade
-    .map((slot) => {
-      // Backend retorna em UTC (formato: dd/mm/yyyy HH:mm)
-      // Precisamos converter para horário local do navegador para exibição
-      try {
-        const [dia, mes, ano] = slot.data.split('/');
-        const [horaInicio, minutoInicio] = slot.hora_inicio.split(':');
-        const [horaFim, minutoFim] = slot.hora_fim.split(':');
-        
-        // Criar Date UTC - backend envia tudo em UTC
-        const dataHoraInicioUTC = new Date(Date.UTC(
-          parseInt(ano),
-          parseInt(mes) - 1,
-          parseInt(dia),
-          parseInt(horaInicio),
-          parseInt(minutoInicio)
-        ));
-        
-        const dataHoraFimUTC = new Date(Date.UTC(
-          parseInt(ano),
-          parseInt(mes) - 1,
-          parseInt(dia),
-          parseInt(horaFim),
-          parseInt(minutoFim)
-        ));
-        
-        // Formatar em horário local do navegador (Brasília: UTC-3)
-        // toLocaleDateString e toLocaleTimeString já convertem automaticamente para o timezone local do navegador
-        const dataLocal = dataHoraInicioUTC.toLocaleDateString('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        });
-        
-        const horaInicioLocal = dataHoraInicioUTC.toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-        
-        const horaFimLocal = dataHoraFimUTC.toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-        
-        return `${dataLocal}: ${horaInicioLocal} - ${horaFimLocal}`;
-      } catch (error) {
-        // Fallback se houver erro na conversão
-        console.error('Erro ao converter timezone:', error);
-        return `${slot.data}: ${slot.hora_inicio} - ${slot.hora_fim}`;
-      }
-    })
+    .map((slot) => `${slot.data}: ${slot.hora_inicio} - ${slot.hora_fim}`)
     .join(' | ');
 };
 
@@ -339,59 +291,16 @@ export function Agendamento() {
     return status === 'pendente' || status === 'aceito';
   };
 
-  // Converter DisponibilidadeSlot UTC (dd/mm/aaaa) para FaixaDisponibilidade local (YYYY-MM-DD)
+  // Converter DisponibilidadeSlot (dd/mm/aaaa) para FaixaDisponibilidade (YYYY-MM-DD) sem mudar horário
   const convertToFaixaDisponibilidade = (disponibilidades: DisponibilidadeSlot[]) => {
     return disponibilidades.map((slot) => {
-      try {
-        // Backend retorna em UTC no formato dd/mm/yyyy HH:mm
-        const [dia, mes, ano] = slot.data.split('/');
-        const [horaInicio, minutoInicio] = slot.hora_inicio.split(':');
-        const [horaFim, minutoFim] = slot.hora_fim.split(':');
-        
-        // Criar Date UTC - backend envia tudo em UTC
-        const dataHoraInicioUTC = new Date(Date.UTC(
-          parseInt(ano),
-          parseInt(mes) - 1,
-          parseInt(dia),
-          parseInt(horaInicio),
-          parseInt(minutoInicio)
-        ));
-        
-        const dataHoraFimUTC = new Date(Date.UTC(
-          parseInt(ano),
-          parseInt(mes) - 1,
-          parseInt(dia),
-          parseInt(horaFim),
-          parseInt(minutoFim)
-        ));
-        
-        // Converter para horário local do navegador (Brasília: UTC-3)
-        // getFullYear/getMonth/getDate/getHours/getMinutes já retornam valores no timezone local
-        const anoLocal = dataHoraInicioUTC.getFullYear();
-        const mesLocal = String(dataHoraInicioUTC.getMonth() + 1).padStart(2, '0');
-        const diaLocal = String(dataHoraInicioUTC.getDate()).padStart(2, '0');
-        const dataYYYYMMDD = `${anoLocal}-${mesLocal}-${diaLocal}`;
-        
-        const horaInicioLocal = `${String(dataHoraInicioUTC.getHours()).padStart(2, '0')}:${String(dataHoraInicioUTC.getMinutes()).padStart(2, '0')}`;
-        const horaFimLocal = `${String(dataHoraFimUTC.getHours()).padStart(2, '0')}:${String(dataHoraFimUTC.getMinutes()).padStart(2, '0')}`;
-        
-        return {
-          data: dataYYYYMMDD,
-          horarioInicio: horaInicioLocal,
-          horarioFim: horaFimLocal,
-        };
-      } catch (error) {
-        // Fallback se houver erro na conversão
-        console.error('Erro ao converter timezone na edição:', error);
-        const [dia, mes, ano] = slot.data.split('/');
-        const dataYYYYMMDD = `${ano}-${mes}-${dia}`;
-        
-        return {
-          data: dataYYYYMMDD,
-          horarioInicio: slot.hora_inicio,
-          horarioFim: slot.hora_fim,
-        };
-      }
+      const [dia, mes, ano] = slot.data.split('/');
+      const dataYYYYMMDD = `${ano}-${mes}-${dia}`;
+      return {
+        data: dataYYYYMMDD,
+        horarioInicio: slot.hora_inicio,
+        horarioFim: slot.hora_fim,
+      };
     });
   };
 
