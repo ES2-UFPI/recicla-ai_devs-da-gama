@@ -202,17 +202,26 @@ export function Agendamento() {
 
   const handleSave = async () => {
     try {
-      // Validações
+      // Validações no frontend
       if (selectedResiduosIds.length === 0) {
-        setError('Selecione pelo menos um resíduo');
+        setError('⚠️ Selecione pelo menos um resíduo para agendar a coleta');
         return;
       }
       if (!selectedAddressId) {
-        setError('Selecione um endereço');
+        setError('⚠️ Selecione um endereço para a coleta');
         return;
       }
       if (disponibilidade.length === 0) {
-        setError('Adicione pelo menos um horário de disponibilidade');
+        setError('⚠️ Adicione pelo menos um horário de disponibilidade');
+        return;
+      }
+
+      // Validação adicional: verificar se todos os slots têm data, hora início e fim
+      const slotsInvalidos = disponibilidade.some(
+        slot => !slot.data || !slot.hora_inicio || !slot.hora_fim
+      );
+      if (slotsInvalidos) {
+        setError('⚠️ Preencha todos os campos de data, hora de início e hora de fim nos horários de disponibilidade');
         return;
       }
 
@@ -236,13 +245,65 @@ export function Agendamento() {
         setSuccessMessage('Agendamento criado com sucesso!');
       }
 
-      // Recarregar dados
+      // Recarregar dados e fechar diálogo apenas em caso de sucesso
       await fetchData();
       handleCloseDialog();
     } catch (err) {
       console.error('Erro ao salvar agendamento:', err);
-      const error = err as { response?: { data?: { detail?: string } } };
-      setError(error.response?.data?.detail || 'Erro ao salvar agendamento');
+      
+      // Tratamento detalhado de erros
+      const error = err as { 
+        response?: { 
+          data?: { 
+            detail?: string | { msg: string; type: string }[];
+          };
+          status?: number;
+        };
+        message?: string;
+      };
+
+      let mensagemErro = 'Erro ao salvar agendamento. Tente novamente.';
+
+      // Se o erro vier do backend com mensagem específica
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        
+        // Se for um array de erros de validação do Pydantic
+        if (Array.isArray(detail)) {
+          const erros = detail.map(e => e.msg).join('; ');
+          mensagemErro = `❌ Erro de validação: ${erros}`;
+        } 
+        // Se for uma string de erro
+        else if (typeof detail === 'string') {
+          // Verificar erros comuns e torná-los mais amigáveis
+          if (detail.includes('passado') || detail.includes('past')) {
+            mensagemErro = '🕐 A data/horário selecionado já passou. Por favor, escolha uma data/horário futura.';
+          } else if (detail.includes('início') && detail.includes('fim')) {
+            mensagemErro = '⏰ O horário de início deve ser anterior ao horário de fim.';
+          } else if (detail.includes('formato') || detail.includes('format')) {
+            mensagemErro = '📅 Formato de data ou horário inválido. Use o formato correto (dd/mm/aaaa e hh:mm).';
+          } else if (detail.includes('tolerância') || detail.includes('tolerance')) {
+            mensagemErro = '⏳ ' + detail;
+          } else {
+            mensagemErro = `❌ ${detail}`;
+          }
+        }
+      }
+      // Se for erro de rede ou timeout
+      else if (error.message?.includes('Network') || error.message?.includes('timeout')) {
+        mensagemErro = '🌐 Erro de conexão. Verifique sua internet e tente novamente.';
+      }
+      // Se for erro 400 (bad request)
+      else if (error.response?.status === 400) {
+        mensagemErro = '⚠️ Dados inválidos. Verifique os campos preenchidos e tente novamente.';
+      }
+      // Se for erro 401/403 (não autorizado)
+      else if (error.response?.status === 401 || error.response?.status === 403) {
+        mensagemErro = '🔒 Você não tem permissão para realizar esta ação. Faça login novamente.';
+      }
+
+      setError(mensagemErro);
+      // NÃO fecha o diálogo para permitir correção
     } finally {
       setSubmitting(false);
     }
@@ -380,13 +441,6 @@ export function Agendamento() {
             Novo Agendamento
           </Button>
         </Box>
-
-        {/* Error alert */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
 
         {/* Loading state */}
         {loading ? (
@@ -633,6 +687,13 @@ export function Agendamento() {
                 size="small"
                 placeholder="Informações adicionais sobre a coleta (ex: portão azul, interfone 101)"
               />
+
+              {/* Alerta de erro - exibido no final do dialog */}
+              {error && (
+                <Alert severity="error" onClose={() => setError(null)}>
+                  {error}
+                </Alert>
+              )}
             </Stack>
           </DialogContent>
           <DialogActions sx={{ p: 2, gap: 1, borderTop: '1px solid', borderColor: 'divider' }}>
