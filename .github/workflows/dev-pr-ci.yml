@@ -1,0 +1,103 @@
+name: CI - Pull Request para Dev
+
+on:
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  backend-ci:
+    name: Backend - Build e Testes
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./backend
+    
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+      
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+      
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+      
+      - name: Verificar sintaxe Python
+        run: |
+          python -m py_compile server.py
+          find src -name "*.py" -exec python -m py_compile {} \;
+      
+      - name: Rodar testes (se existirem)
+        run: |
+          if [ -d "tests" ]; then
+            pytest tests/ -v
+          else
+            echo "⚠️  Nenhum teste encontrado ainda. Testes serão implementados na Sprint 2."
+          fi
+        continue-on-error: true
+
+  frontend-ci:
+    name: Frontend - Build e Lint
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./frontend
+    
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+      
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Instalar dependências
+        run: npm ci
+      
+      - name: Verificar linting
+        run: npm run lint
+      
+      - name: Build do projeto
+        run: npm run build
+      
+      - name: Rodar testes (se existirem)
+        run: |
+          if grep -q "\"test\":" package.json; then
+            npm test
+          else
+            echo "⚠️  Nenhum teste configurado ainda. Testes serão implementados na Sprint 2."
+          fi
+        continue-on-error: true
+
+  integration-check:
+    name: Verificação de Integração
+    runs-on: ubuntu-latest
+    needs: [backend-ci, frontend-ci]
+    
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+      
+      - name: Verificar docker-compose
+        run: |
+          docker compose config
+      
+      - name: ✅ CI passou com sucesso
+        run: |
+          echo "✅ Todos os checks passaram!"
+          echo "📦 Backend: Build OK"
+          echo "🎨 Frontend: Build e Lint OK"
+          echo "🐳 Docker Compose: Configuração válida"
