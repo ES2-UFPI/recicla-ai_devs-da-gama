@@ -289,171 +289,211 @@ class TestColetaIntegralSerializacao:
 # Teste de Fluxo
 class TestColetaIntegralFluxoCompleto:
     """
-    Testes de integração que simulam o fluxo real da aplicação.
-    
-    Cenários testados:
-    1. Coleta parcial: coletor pode pegar apenas alguns resíduos
-    2. Coleta integral: coletor DEVE pegar todos os resíduos
+    Testes de integração REAIS que validam a lógica de negócio no ColetaService.
+    Usa mocks para simular repositories e testa o comportamento do método aceitar_coleta.
     """
     
     @pytest.mark.asyncio
-    async def test_coleta_parcial_permite_coletar_alguns_residuos(self):
+    async def test_coleta_parcial_permite_coletar_alguns_residuos(self, mocker):
         """
-        Cenário: Agendamento com coleta parcial
+        Cenário: Agendamento com coleta parcial permite aceitar apenas alguns resíduos.
         
         Dado que:
-        - Produtor criou agendamento com 3 resíduos
-        - Agendamento configurado como coleta_integral=False (parcial)
+        - Agendamento tem 3 resíduos e coleta_integral=False
         
         Quando:
-        - Coletor tenta criar coleta com apenas 1 dos 3 resíduos
+        - Coletor tenta aceitar apenas 2 dos 3 resíduos
         
         Então:
-        - Sistema deve PERMITIR a coleta
-        - Coleta deve ser criada com sucesso
+        - Sistema PERMITE (coleta criada com sucesso)
         """
-        # TODO: Este teste será implementado quando o service de coleta
-        # for integrado com a validação de coleta_integral
-        # Por ora, validamos apenas que o campo existe e pode ser lido
+        from src.service.coleta_service import ColetaService
+        from src.infra.database.models.enums import StatusAgendamento, StatusResiduo
+        from datetime import datetime
         
-        scheduling = Scheduling(
-            produtorId="produtor123",
-            residuosId=["residuo1", "residuo2", "residuo3"],
-            disponibilidade=[{
-                "data": "17/12/2025",
-                "hora_inicio": "10:00",
-                "hora_fim": "18:00"
-            }],
-            local={
-                "address_id": 1,
-                "cep": "64000-000",
-                "logradouro": "Rua Exemplo",
-                "numero": "123"
-            },
-            coleta_integral=False  # Coleta parcial permitida
+        # Mock do agendamento com coleta_integral=False
+        mock_agendamento = {
+            "_id": "agend123",
+            "produtorId": "prod123",
+            "residuosId": ["res1", "res2", "res3"],
+            "status": StatusAgendamento.PENDENTE,
+            "coleta_integral": False,  # Permite coleta parcial
+            "local": {"latitude": -5.0892, "longitude": -42.8019},
+        }
+        
+        # Mock dos resíduos (todos AGENDADO)
+        mock_residuos = [
+            {"_id": "res1", "status": StatusResiduo.AGENDADO},
+            {"_id": "res2", "status": StatusResiduo.AGENDADO},
+        ]
+        
+        # Mock da coleta criada (com todos os campos obrigatórios)
+        mock_coleta = {
+            "_id": "coleta123",
+            "id": "coleta123",
+            "agendamento_id": "agend123",
+            "produtor_id": "prod123",
+            "coletor_id": "coletor456",
+            "residuos_id": ["res1", "res2"],
+            "data_hora": datetime.utcnow(),
+            "local": {"latitude": -5.0892, "longitude": -42.8019},
+            "estado": "PENDENTE",
+        }
+        
+        # Configurar mocks
+        mocker.patch("src.service.coleta_service.scheduling_repo.find_by_id", return_value=mock_agendamento)
+        mocker.patch("src.service.coleta_service.residue_repo.find_by_id", side_effect=mock_residuos)
+        mocker.patch("src.service.coleta_service.coleta_repo.create_coleta", return_value="coleta123")
+        mocker.patch("src.service.coleta_service.coleta_repo.find_by_id", return_value=mock_coleta)
+        mocker.patch("src.service.coleta_service.residue_repo.atualizar_status")
+        
+        # Executar
+        service = ColetaService()
+        resultado = await service.aceitar_coleta(
+            agendamento_id="agend123",
+            residuos_ids=["res1", "res2"],  # Apenas 2 dos 3 resíduos
+            coletor_id="coletor456"
         )
         
-        # Simula que o coletor pode escolher apenas alguns resíduos
-        residuos_a_coletar = ["residuo1"]  # Apenas 1 de 3
-        
-        # Com coleta parcial, isso deve ser permitido
-        assert scheduling.coleta_integral == False
-        assert len(residuos_a_coletar) < len(scheduling.residuosId)
-        # A validação real será feita no service de coleta
+        # Validar: não deve lançar exceção, coleta criada com sucesso
+        assert resultado.agendamento_id == "agend123"
+        assert len(resultado.residuos_id) == 2
     
     @pytest.mark.asyncio
-    async def test_coleta_integral_exige_todos_residuos(self):
+    async def test_coleta_integral_exige_todos_residuos(self, mocker):
         """
-        Cenário: Agendamento com coleta integral
+        Cenário: Agendamento com coleta integral REJEITA coleta parcial.
         
         Dado que:
-        - Produtor criou agendamento com 3 resíduos  
-        - Agendamento configurado como coleta_integral=True (integral)
+        - Agendamento tem 3 resíduos e coleta_integral=True
         
         Quando:
-        - Coletor tenta criar coleta com apenas 1 dos 3 resíduos
+        - Coletor tenta aceitar apenas 2 dos 3 resíduos
         
         Então:
-        - Sistema deve REJEITAR a coleta
-        - Deve retornar erro informando que todos os resíduos são obrigatórios
+        - Sistema REJEITA com HTTPException 400
+        - Mensagem de erro deve mencionar "integral"
         """
-        # TODO: Este teste será implementado quando o service de coleta
-        # implementar a validação de coleta_integral
+        from src.service.coleta_service import ColetaService
+        from src.infra.database.models.enums import StatusAgendamento
+        from fastapi import HTTPException
         
-        scheduling = Scheduling(
-            produtorId="produtor123",
-            residuosId=["residuo1", "residuo2", "residuo3"],
-            disponibilidade=[{
-                "data": "17/12/2025",
-                "hora_inicio": "10:00",
-                "hora_fim": "18:00"
-            }],
-            local={
-                "address_id": 1,
-                "cep": "64000-000",
-                "logradouro": "Rua Exemplo",
-                "numero": "123"
-            },
-            coleta_integral=True  # Coleta integral obrigatória
-        )
+        # Mock do agendamento com coleta_integral=True
+        mock_agendamento = {
+            "_id": "agend123",
+            "produtorId": "prod123",
+            "residuosId": ["res1", "res2", "res3"],
+            "status": StatusAgendamento.PENDENTE,
+            "coleta_integral": True,  # EXIGE coleta integral
+            "local": {"latitude": -5.0892, "longitude": -42.8019},
+        }
         
-        # Simula tentativa de coletar apenas alguns resíduos
-        residuos_a_coletar = ["residuo1"]  # Apenas 1 de 3
+        # Configurar mock
+        mocker.patch("src.service.coleta_service.scheduling_repo.find_by_id", return_value=mock_agendamento)
         
-        # Com coleta integral, deve validar que TODOS sejam coletados
-        assert scheduling.coleta_integral == True
-        assert len(residuos_a_coletar) < len(scheduling.residuosId)
+        # Executar e validar exceção
+        service = ColetaService()
+        with pytest.raises(HTTPException) as exc_info:
+            await service.aceitar_coleta(
+                agendamento_id="agend123",
+                residuos_ids=["res1", "res2"],  # Apenas 2 dos 3 resíduos
+                coletor_id="coletor456"
+            )
         
-        # A validação real será:
-        # if scheduling.coleta_integral and len(residuos_a_coletar) < len(scheduling.residuosId):
-        #     raise HTTPException(
-        #         status_code=400,
-        #         detail="Este agendamento exige coleta integral. Todos os resíduos devem ser coletados."
-        #     )
+        # Validar erro HTTP 400 com mensagem sobre coleta integral
+        assert exc_info.value.status_code == 400
+        assert "integral" in exc_info.value.detail.lower()
     
     @pytest.mark.asyncio
-    async def test_coleta_integral_aceita_todos_residuos(self):
+    async def test_coleta_integral_aceita_todos_residuos(self, mocker):
         """
-        Cenário: Coleta integral com todos os resíduos
+        Cenário: Agendamento com coleta integral ACEITA quando todos resíduos são selecionados.
         
         Dado que:
-        - Produtor criou agendamento com 3 resíduos
-        - Agendamento configurado como coleta_integral=True
+        - Agendamento tem 3 resíduos e coleta_integral=True
         
         Quando:
-        - Coletor cria coleta com TODOS os 3 resíduos
+        - Coletor aceita TODOS os 3 resíduos
         
         Então:
-        - Sistema deve PERMITIR a coleta
-        - Coleta deve ser criada com sucesso
+        - Sistema PERMITE (coleta criada com sucesso)
         """
-        scheduling = Scheduling(
-            produtorId="produtor123",
-            residuosId=["residuo1", "residuo2", "residuo3"],
-            disponibilidade=[{
-                "data": "17/12/2025",
-                "hora_inicio": "10:00",
-                "hora_fim": "18:00"
-            }],
-            local={
-                "address_id": 1,
-                "cep": "64000-000",
-                "logradouro": "Rua Exemplo",
-                "numero": "123"
-            },
-            coleta_integral=True
+        from src.service.coleta_service import ColetaService
+        from src.infra.database.models.enums import StatusAgendamento, StatusResiduo
+        from datetime import datetime
+        
+        # Mock do agendamento com coleta_integral=True
+        mock_agendamento = {
+            "_id": "agend123",
+            "produtorId": "prod123",
+            "residuosId": ["res1", "res2", "res3"],
+            "status": StatusAgendamento.PENDENTE,
+            "coleta_integral": True,  # Exige coleta integral
+            "local": {"latitude": -5.0892, "longitude": -42.8019},
+        }
+        
+        # Mock dos resíduos (todos AGENDADO)
+        mock_residuos = [
+            {"_id": "res1", "status": StatusResiduo.AGENDADO},
+            {"_id": "res2", "status": StatusResiduo.AGENDADO},
+            {"_id": "res3", "status": StatusResiduo.AGENDADO},
+        ]
+        
+        # Mock da coleta criada (com todos os campos obrigatórios)
+        mock_coleta = {
+            "_id": "coleta123",
+            "id": "coleta123",
+            "agendamento_id": "agend123",
+            "produtor_id": "prod123",
+            "coletor_id": "coletor456",
+            "residuos_id": ["res1", "res2", "res3"],
+            "data_hora": datetime.utcnow(),
+            "local": {"latitude": -5.0892, "longitude": -42.8019},
+            "estado": "PENDENTE",
+        }
+        
+        # Configurar mocks
+        mocker.patch("src.service.coleta_service.scheduling_repo.find_by_id", return_value=mock_agendamento)
+        mocker.patch("src.service.coleta_service.residue_repo.find_by_id", side_effect=mock_residuos)
+        mocker.patch("src.service.coleta_service.coleta_repo.create_coleta", return_value="coleta123")
+        mocker.patch("src.service.coleta_service.coleta_repo.find_by_id", return_value=mock_coleta)
+        mocker.patch("src.service.coleta_service.residue_repo.atualizar_status")
+        
+        # Executar
+        service = ColetaService()
+        resultado = await service.aceitar_coleta(
+            agendamento_id="agend123",
+            residuos_ids=["res1", "res2", "res3"],  # TODOS os 3 resíduos
+            coletor_id="coletor456"
         )
         
-        # Coletor seleciona TODOS os resíduos
-        residuos_a_coletar = ["residuo1", "residuo2", "residuo3"]
-        
-        # Validação: com coleta integral, todos os resíduos foram incluídos
-        assert scheduling.coleta_integral == True
-        assert set(residuos_a_coletar) == set(scheduling.residuosId)
-        # Deve ser permitido
+        # Validar: sucesso, coleta criada com todos os resíduos
+        assert resultado.agendamento_id == "agend123"
+        assert len(resultado.residuos_id) == 3
     
     @pytest.mark.asyncio  
     async def test_produtor_pode_alterar_tipo_coleta(self):
         """
-        Cenário: Produtor altera tipo de coleta
+        Cenário: Schema permite atualização do tipo de coleta
         
         Dado que:
-        - Existe agendamento com coleta parcial
+        - Existe um agendamento
         
         Quando:
-        - Produtor atualiza para coleta integral
+        - Produtor atualiza apenas o campo coleta_integral
         
         Então:
-        - Sistema deve atualizar o campo
-        - Próximas coletas devem respeitar novo tipo
+        - SchedulingUpdate deve aceitar a mudança (campo opcional)
         """
-        # Agendamento inicial com coleta parcial
-        scheduling_id = "agend123"
-        
-        # Dados de atualização
+        # Dados de atualização (apenas coleta_integral)
         update_data = SchedulingUpdate(
             coleta_integral=True  # Mudando para integral
         )
         
-        assert hasattr(update_data, 'coleta_integral')
+        # Validar que o campo foi aceito
         assert update_data.coleta_integral == True
+        
+        # Validar que outros campos são opcionais
+        assert update_data.residuosId is None
+        assert update_data.disponibilidade is None
+
