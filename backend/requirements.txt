@@ -12,3 +12,8 @@ pymongo[srv]>=4.0,<5.0
 python-dotenv==1.0.0
 requests==2.31.0
 pytz==2024.1
+
+# Testing dependencies
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-mock==3.14.0
