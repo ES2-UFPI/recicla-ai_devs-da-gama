@@ -56,8 +56,18 @@ class ColetaService:
         if agendamento.get("status") != StatusAgendamento.PENDENTE:
             raise HTTPException(400, "Agendamento não está PENDENTE")
 
-        # Validar pertencimento e status dos resíduos
+        # Validar coleta integral: se agendamento exige coleta integral,
+        # coletor DEVE aceitar TODOS os resíduos
         agendamento_residuos: List[str] = agendamento.get("residuosId", [])
+        coleta_integral: bool = agendamento.get("coleta_integral", False)
+        
+        if coleta_integral and len(residuos_ids) < len(agendamento_residuos):
+            raise HTTPException(
+                400,
+                "Este agendamento exige coleta integral. Todos os resíduos devem ser coletados."
+            )
+
+        # Validar pertencimento e status dos resíduos
         for rid in residuos_ids:
             if rid not in agendamento_residuos:
                 raise HTTPException(400, f"Resíduo {rid} não pertence ao agendamento")
