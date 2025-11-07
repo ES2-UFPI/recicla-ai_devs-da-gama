@@ -42,12 +42,33 @@ class ColetaService:
         """
         Cria uma nova coleta e reserva os resíduos selecionados.
 
-        Regras:
+        Regras de negócio:
         - Agendamento existe e está PENDENTE
         - Todos resíduos existem e estão AGENDADO
         - Todos resíduos pertencem ao agendamento
+        - **Coleta Integral**: Se agendamento tem coleta_integral=True,
+          o coletor DEVE aceitar TODOS os resíduos. Coleta parcial será rejeitada
+          com HTTP 400.
+        - **Coleta Parcial**: Se agendamento tem coleta_integral=False (padrão),
+          o coletor pode aceitar apenas alguns resíduos.
         - Cria Coleta em estado PENDENTE
         - Atualiza resíduos para RESERVADO (Observer em residue_repo)
+        
+        Args:
+            agendamento_id: ID do agendamento a ser aceito
+            residuos_ids: Lista de IDs dos resíduos que o coletor deseja coletar
+            coletor_id: ID do usuário coletor autenticado
+        
+        Returns:
+            ColetaInDBSchema: Dados da coleta criada
+        
+        Raises:
+            HTTPException 404: Agendamento não encontrado
+            HTTPException 400: Agendamento não está PENDENTE
+            HTTPException 400: Coleta integral exige todos os resíduos
+            HTTPException 400: Resíduo não pertence ao agendamento
+            HTTPException 404: Resíduo não encontrado
+            HTTPException 409: Resíduo não está AGENDADO
         """
         agendamento = await scheduling_repo.find_by_id(agendamento_id)
         if not agendamento:
@@ -56,8 +77,15 @@ class ColetaService:
         if agendamento.get("status") != StatusAgendamento.PENDENTE:
             raise HTTPException(400, "Agendamento não está PENDENTE")
 
-        # Validar coleta integral: se agendamento exige coleta integral,
-        # coletor DEVE aceitar TODOS os resíduos
+        # ============================================================
+        # VALIDAÇÃO DE COLETA INTEGRAL
+        # ============================================================
+        # Quando o produtor marca um agendamento como "coleta_integral=True",
+        # significa que TODOS os resíduos devem ser coletados juntos.
+        #
+        # Se coleta_integral=False (padrão), o coletor pode escolher
+        # coletar apenas alguns resíduos (coleta parcial).
+        # ============================================================
         agendamento_residuos: List[str] = agendamento.get("residuosId", [])
         coleta_integral: bool = agendamento.get("coleta_integral", False)
         

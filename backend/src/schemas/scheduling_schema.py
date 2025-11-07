@@ -129,7 +129,11 @@ class SchedulingCreate(BaseModel):
     observacoes: Optional[str] = Field(None, example="Deixar os resíduos na portaria.")
     coleta_integral: bool = Field(
         default=False,
-        description="Define se a coleta deve ser integral (True = todos os resíduos obrigatórios) ou parcial (False = alguns resíduos)"
+        description=(
+            "Tipo de coleta: True = integral (coletor DEVE aceitar TODOS os resíduos), "
+            "False = parcial (coletor pode aceitar apenas alguns). "
+        ),
+        example=False
     )
     
     @field_validator('disponibilidade')
@@ -172,7 +176,11 @@ class SchedulingUpdate(BaseModel):
     observacoes: Optional[str] = Field(None, example="Deixar os resíduos na portaria.")
     coleta_integral: Optional[bool] = Field(
         None,
-        description="Define se a coleta deve ser integral (True = todos os resíduos obrigatórios) ou parcial (False = alguns resíduos)"
+        description=(
+            "Tipo de coleta: True = integral (coletor DEVE aceitar TODOS os resíduos), "
+            "False = parcial (coletor pode aceitar apenas alguns). "
+            "Produtor pode alterar este campo a qualquer momento antes da coleta ser aceita."
+        )
     )
     
     @field_validator('disponibilidade')
