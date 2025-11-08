@@ -88,7 +88,7 @@ export function AgendamentosList({
           <Card
             key={agendamento.id}
             id={`agendamento-${agendamento.id}`}
-            onClick={() => onItemClick(agendamento.id)}
+            onClick={() => agendamento.id && onItemClick(agendamento.id)}
             sx={{
               cursor: 'pointer',
               transition: 'all 0.2s',

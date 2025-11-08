@@ -131,7 +131,7 @@ export function InteractiveMap({
               position={[lat, lng]}
               icon={isHighlighted ? HighlightedIcon : DefaultIcon}
               eventHandlers={{
-                click: () => onMarkerClick(agendamento.id),
+                click: () => agendamento.id && onMarkerClick(agendamento.id),
               }}
             >
               <Popup maxWidth={300}>
