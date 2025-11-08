@@ -78,6 +78,25 @@ class UserBuilder(ABC):
                 if "id" not in addr or addr["id"] is None:
                     addr["id"] = idx
         
+        # Processar campos role-specific se fornecidos
+        if hasattr(payload, 'is_business') and payload.is_business is not None:
+            self.with_is_business(payload.is_business)
+        
+        if hasattr(payload, 'cnpj') and payload.cnpj is not None:
+            self.with_cnpj(payload.cnpj)
+        
+        if hasattr(payload, 'points') and payload.points is not None:
+            self.with_points(payload.points)
+        
+        if hasattr(payload, 'ranking') and payload.ranking is not None:
+            self.with_ranking(payload.ranking)
+        
+        if hasattr(payload, 'inventory') and payload.inventory is not None:
+            self.with_inventory(payload.inventory)
+        
+        if hasattr(payload, 'accepted_material') and payload.accepted_material is not None:
+            self.with_accepted_material(payload.accepted_material)
+        
         return self
     
     def with_name(self, name: str) -> 'UserBuilder':
