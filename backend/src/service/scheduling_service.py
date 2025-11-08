@@ -95,6 +95,7 @@ class SchedulingService:
             disponibilidade=disponibilidade_dicts,  # Armazena como lista de dicts
             local=local_dict,  # Armazena endereço completo como dict
             observacoes=dados.observacoes,
+            coleta_integral=dados.coleta_integral,  # Incluir campo coleta_integral
         )
         doc = scheduling_obj.model_dump(by_alias=True, exclude_none=True)
         # Remover id se vier como None para evitar problemas

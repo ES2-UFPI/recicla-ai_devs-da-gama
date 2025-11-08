@@ -127,6 +127,14 @@ class SchedulingCreate(BaseModel):
     )
     address_id: int = Field(..., description="ID do endereço do produtor a ser usado na coleta", example=1)
     observacoes: Optional[str] = Field(None, example="Deixar os resíduos na portaria.")
+    coleta_integral: bool = Field(
+        default=False,
+        description=(
+            "Tipo de coleta: True = integral (coletor DEVE aceitar TODOS os resíduos), "
+            "False = parcial (coletor pode aceitar apenas alguns). "
+        ),
+        example=False
+    )
     
     @field_validator('disponibilidade')
     @classmethod
@@ -166,6 +174,14 @@ class SchedulingUpdate(BaseModel):
     )
     address_id: Optional[int] = Field(None, description="ID do endereço do produtor a ser usado na coleta", example=1)
     observacoes: Optional[str] = Field(None, example="Deixar os resíduos na portaria.")
+    coleta_integral: Optional[bool] = Field(
+        None,
+        description=(
+            "Tipo de coleta: True = integral (coletor DEVE aceitar TODOS os resíduos), "
+            "False = parcial (coletor pode aceitar apenas alguns). "
+            "Produtor pode alterar este campo a qualquer momento antes da coleta ser aceita."
+        )
+    )
     
     @field_validator('disponibilidade')
     @classmethod
@@ -201,6 +217,7 @@ class SchedulingInDB(BaseModel):
     local: dict[str, Any]  # Armazena objeto completo do endereço
     status: str
     observacoes: Optional[str] = None
+    coleta_integral: bool = False  # Valor padrão para compatibilidade com documentos antigos
 
 
 class BuscarAgendamentosRequest(BaseModel):
