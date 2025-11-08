@@ -1,14 +1,10 @@
-from passlib.context import CryptContext
 from fastapi import HTTPException, status
 from typing import List, Dict, Any
 
 from src.schemas.user_schema import UserCreate, UserInDB, UserUpdate, Endereco
 from src.schemas.return_schema import UserPublic
 from src.infra.database.repositories import user_repo
-
-
-# Use bcrypt_sha256 to avoid the 72-byte password input limit of raw bcrypt
-pwd_ctx = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
+from src.builders.user import UserBuilderFactory, get_user_builder
 
 
 class UserService:
@@ -20,7 +16,7 @@ class UserService:
 	@staticmethod
 	async def create_user(payload: UserCreate) -> UserPublic:
 		"""
-		Cria um novo usuário no sistema.
+		Cria um novo usuário no sistema utilizando User Builders.
 		
 		Args:
 			payload: Dados do usuário a ser criado
@@ -40,19 +36,24 @@ class UserService:
 					detail="E-mail já cadastrado."
 				)
 
-			# Gerar hash da senha
-			password_hash = pwd_ctx.hash(payload.password)
-
-			# Preparar documento para persistência
-			doc = {
-				"name": payload.name,
-				"email": payload.email,
-				"phone": payload.phone,
-				"password_hash": password_hash,
-				"role_id": payload.role_id,
-				"cidade_id": payload.cidade_id,
-				"estado_id": payload.estado_id,
-			}
+			# Criar builder específico baseado no role_id (type-safe)
+			if payload.role_id == "produtor":
+				builder = UserBuilderFactory.create_produtor()
+			elif payload.role_id == "coletor":
+				builder = UserBuilderFactory.create_coletor()
+			elif payload.role_id == "receptor":
+				builder = UserBuilderFactory.create_receptor()
+			else:
+				raise HTTPException(
+					status_code=status.HTTP_400_BAD_REQUEST,
+					detail=f"Role '{payload.role_id}' não suportado. Use: produtor, coletor ou receptor."
+				)
+			
+			# Inicializar builder com payload
+			builder.from_create_payload(payload)
+			
+			# Construir documento para persistência
+			doc = builder.build_for_db()
 
 			# Persistir usuário
 			inserted_id = await user_repo.create_user(doc)
@@ -65,15 +66,18 @@ class UserService:
 					detail="Falha ao recuperar usuário criado."
 				)
 			
-			# Retornar dados públicos
-			return UserPublic(
-				name=created["name"],
-				email=created["email"],
-				role_id=created["role_id"]
-			)
+			# Construir resposta pública usando builder
+			builder = get_user_builder(created)  # Auto-detecta o tipo
+			return builder.build_public()
 			
 		except HTTPException:
 			raise
+		except ValueError as e:
+			# Erros de validação do builder
+			raise HTTPException(
+				status_code=status.HTTP_400_BAD_REQUEST,
+				detail=str(e)
+			)
 		except Exception as e:
 			raise HTTPException(
 				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -101,11 +105,9 @@ class UserService:
 				detail="Usuário não encontrado."
 			)
 		
-		return UserPublic(
-			name=user["name"],
-			email=user["email"],
-			role_id=user["role_id"]
-		)
+		# Usar builder para construir resposta pública
+		builder = get_user_builder(user)  # Auto-detecta o tipo baseado no documento
+		return builder.build_public()
 
 	@staticmethod
 	async def get_user_by_email(email: str) -> UserPublic:
@@ -128,16 +130,14 @@ class UserService:
 				detail="Usuário não encontrado."
 			)
 		
-		return UserPublic(
-			name=user["name"],
-			email=user["email"],
-			role_id=user["role_id"]
-		)
+		# Usar builder para construir resposta pública
+		builder = get_user_builder(user)
+		return builder.build_public()
 
 	@staticmethod
 	async def update_user(user_id: str, payload: UserUpdate) -> UserPublic:
 		"""
-		Atualiza dados de um usuário.
+		Atualiza dados de um usuário utilizando User Builders.
 		
 		Args:
 			user_id: ID do usuário
@@ -157,24 +157,71 @@ class UserService:
 				detail="Usuário não encontrado."
 			)
 		
+		# Carregar builder com dados existentes
+		builder = get_user_builder(user)
+		
 		# Preparar updates
 		updates = payload.model_dump(exclude_unset=True)
 		
-		# Se estiver atualizando senha, gerar hash
+		# Aplicar updates ao builder
+		if "name" in updates:
+			builder.with_name(updates["name"])
+		
+		if "email" in updates:
+			# Verificar unicidade de email
+			if updates["email"] != user["email"]:
+				existing = await user_repo.find_by_email(updates["email"])
+				if existing:
+					raise HTTPException(
+						status_code=status.HTTP_409_CONFLICT,
+						detail="E-mail já cadastrado por outro usuário."
+					)
+			builder.with_email(updates["email"])
+		
+		if "phone" in updates:
+			builder.with_phone(updates["phone"])
+		
 		if "password" in updates:
-			updates["password_hash"] = pwd_ctx.hash(updates.pop("password"))
+			builder.with_password(updates["password"])
 		
-		# Se estiver atualizando email, verificar unicidade
-		if "email" in updates and updates["email"] != user["email"]:
-			existing = await user_repo.find_by_email(updates["email"])
-			if existing:
-				raise HTTPException(
-					status_code=status.HTTP_409_CONFLICT,
-					detail="E-mail já cadastrado por outro usuário."
-				)
+		if "cidade_id" in updates:
+			builder.with_cidade_id(updates["cidade_id"])
 		
-		# Atualizar usuário
-		success = await user_repo.update_user(user_id, updates)
+		if "estado_id" in updates:
+			builder.with_estado_id(updates["estado_id"])
+		
+		# Campos específicos de produtor
+		if "is_business" in updates:
+			builder.with_is_business(updates["is_business"])
+		
+		if "cnpj" in updates:
+			builder.with_cnpj(updates["cnpj"])
+		
+		if "points" in updates:
+			builder.with_points(updates["points"])
+		
+		if "ranking" in updates:
+			builder.with_ranking(updates["ranking"])
+		
+		# Campos específicos de coletor
+		if "inventory" in updates:
+			builder.with_inventory(updates["inventory"])
+		
+		# Campos específicos de receptor
+		if "accepted_material" in updates:
+			builder.with_accepted_material(updates["accepted_material"])
+		
+		# Construir documento atualizado
+		try:
+			doc = builder.build_for_db()
+		except ValueError as e:
+			raise HTTPException(
+				status_code=status.HTTP_400_BAD_REQUEST,
+				detail=f"Validação falhou: {str(e)}"
+			)
+		
+		# Atualizar usuário no banco
+		success = await user_repo.update_user(user_id, doc)
 		if not success:
 			raise HTTPException(
 				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -183,11 +230,8 @@ class UserService:
 		
 		# Recuperar usuário atualizado
 		updated = await user_repo.find_by_id(user_id)
-		return UserPublic(
-			name=updated["name"],
-			email=updated["email"],
-			role_id=updated["role_id"]
-		)
+		builder = get_user_builder(updated)
+		return builder.build_public()
 
 	@staticmethod
 	async def get_addresses(user_id: str) -> List[Dict[str, Any]]:
