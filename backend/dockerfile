@@ -9,6 +9,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código da aplicação
 COPY . .
 
+# Configurar PYTHONPATH para incluir o diretório atual
+ENV PYTHONPATH=/app
+
 EXPOSE 8000
 
 CMD ["uvicorn", "server:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
