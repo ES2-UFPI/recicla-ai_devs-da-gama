@@ -6,6 +6,7 @@ from src.infra.database.repositories import (
     coleta_repo,
     residue_repo,
     scheduling_repo,
+    user_repo,
 )
 
 from src.schemas.coleta_schema import (
@@ -146,6 +147,7 @@ class ColetaService:
         """
         Marca coleta como EM_ANDAMENTO (coletor chegou no local).
         Atualiza data_hora para o momento atual (início da verificação).
+        Adiciona os resíduos da coleta ao inventory do coletor.
         """
         coleta = await coleta_repo.find_by_id(coleta_id)
         if not coleta:
@@ -154,6 +156,10 @@ class ColetaService:
             raise HTTPException(403, "Você não pode iniciar esta coleta")
         if coleta.get("estado") != EstadoColeta.PENDENTE:
             raise HTTPException(400, "Somente coletas PENDENTE podem ser iniciadas")
+
+        # Adicionar resíduos ao inventory do coletor
+        residuos_ids = coleta.get("residuos_id", [])
+        await self._adicionar_residuos_ao_inventory(coletor_id, residuos_ids)
 
         ok = await coleta_repo.update_coleta(
             coleta_id,
@@ -284,6 +290,50 @@ class ColetaService:
             raise HTTPException(500, "Erro ao recuperar coleta atualizada")
         return ColetaInDBSchema(**atual)
 
+    async def concluir_coleta(
+        self,
+        coleta_id: str,
+        coletor_id: str,
+    ) -> ColetaInDBSchema:
+        """
+        Conclui uma coleta (EM_ANDAMENTO -> CONCLUIDA).
+        Remove os resíduos da coleta do inventory do coletor.
+        
+        Args:
+            coleta_id: ID da coleta a ser concluída
+            coletor_id: ID do coletor autenticado
+            
+        Returns:
+            ColetaInDBSchema: Dados da coleta concluída
+        """
+        coleta = await coleta_repo.find_by_id(coleta_id)
+        if not coleta:
+            raise HTTPException(404, "Coleta não encontrada")
+        if coleta.get("coletor_id") != coletor_id:
+            raise HTTPException(403, "Você não pode concluir esta coleta")
+        if coleta.get("estado") != EstadoColeta.EM_ANDAMENTO:
+            raise HTTPException(400, "Somente coletas EM_ANDAMENTO podem ser concluídas")
+
+        # Remover resíduos do inventory do coletor
+        residuos_ids = coleta.get("residuos_id", [])
+        await self._remover_residuos_do_inventory(coletor_id, residuos_ids)
+
+        # Atualizar estado da coleta
+        ok = await coleta_repo.update_coleta(
+            coleta_id,
+            {"estado": EstadoColeta.CONCLUIDA},
+        )
+        if not ok:
+            raise HTTPException(500, "Erro ao atualizar coleta")
+
+        # Verificar conclusão do agendamento
+        await self._verificar_conclusao_agendamento(coleta.get("agendamento_id"))
+
+        atual = await coleta_repo.find_by_id(coleta_id)
+        if not atual:
+            raise HTTPException(500, "Erro ao recuperar coleta atualizada")
+        return ColetaInDBSchema(**atual)
+
     async def cancelar_coleta_antes_local(
         self,
         coleta_id: str,
@@ -328,6 +378,7 @@ class ColetaService:
     ) -> ColetaInDBSchema:
         """
         Cancela coleta APÓS chegar ao local (EM_ANDAMENTO -> CANCELADA) e marca resíduos ainda RESERVADO como CANCELADO.
+        Remove os resíduos da coleta do inventory do coletor.
         """
         coleta = await coleta_repo.find_by_id(coleta_id)
         if not coleta:
@@ -336,6 +387,10 @@ class ColetaService:
             raise HTTPException(403, "Você não pode cancelar esta coleta")
         if coleta.get("estado") != "EM_ANDAMENTO":
             raise HTTPException(400, "A coleta precisa estar EM_ANDAMENTO para cancelamento após chegar ao local")
+
+        # Remover resíduos do inventory do coletor
+        residuos_ids = coleta.get("residuos_id", [])
+        await self._remover_residuos_do_inventory(coletor_id, residuos_ids)
 
         await coleta_repo.update_estado(coleta_id, EstadoColeta.CANCELADA)
         if motivo:
@@ -360,6 +415,18 @@ class ColetaService:
             raise HTTPException(500, "Erro ao recuperar coleta atualizada")
         return ColetaInDBSchema(**atual)
 
+    async def cancelar_apos_chegar_local(
+        self,
+        coleta_id: str,
+        coletor_id: str,
+        motivo: str,
+    ) -> ColetaInDBSchema:
+        """
+        Alias para cancelar_coleta_apos_local.
+        Mantido para compatibilidade com testes e código existente.
+        """
+        return await self.cancelar_coleta_apos_local(coleta_id, coletor_id, motivo)
+
     async def listar_coletas_coletor(
         self,
         coletor_id: str,
@@ -382,6 +449,72 @@ class ColetaService:
         return ColetaInDBSchema(**coleta)
 
     # ==================== AUXILIARES ====================
+
+    async def _adicionar_residuos_ao_inventory(
+        self,
+        coletor_id: str,
+        residuos_ids: List[str]
+    ) -> None:
+        """
+        Adiciona resíduos ao inventory do coletor.
+        
+        Args:
+            coletor_id: ID do coletor
+            residuos_ids: Lista de IDs de resíduos a serem adicionados
+        """
+        coletor = await user_repo.find_by_id(coletor_id)
+        if not coletor:
+            raise HTTPException(404, "Coletor não encontrado")
+        
+        # Pegar inventory atual (ou inicializar como lista vazia)
+        inventory_atual = coletor.get("inventory", [])
+        
+        # Adicionar novos resíduos (evitar duplicatas)
+        inventory_atualizado = list(set(inventory_atual + residuos_ids))
+        
+        # Atualizar no banco
+        await user_repo.update_user(coletor_id, {"inventory": inventory_atualizado})
+
+    async def _remover_residuos_do_inventory(
+        self,
+        coletor_id: str,
+        residuos_ids: List[str]
+    ) -> None:
+        """
+        Remove resíduos do inventory do coletor.
+        
+        Args:
+            coletor_id: ID do coletor
+            residuos_ids: Lista de IDs de resíduos a serem removidos
+        """
+        coletor = await user_repo.find_by_id(coletor_id)
+        if not coletor:
+            raise HTTPException(404, "Coletor não encontrado")
+        
+        # Pegar inventory atual
+        inventory_atual = coletor.get("inventory", [])
+        
+        # Remover os resíduos especificados
+        inventory_atualizado = [rid for rid in inventory_atual if rid not in residuos_ids]
+        
+        # Atualizar no banco
+        await user_repo.update_user(coletor_id, {"inventory": inventory_atualizado})
+
+    async def get_coletor_inventory(self, coletor_id: str) -> List[str]:
+        """
+        Retorna o inventory atual do coletor.
+        
+        Args:
+            coletor_id: ID do coletor
+            
+        Returns:
+            Lista de IDs de resíduos no inventory
+        """
+        coletor = await user_repo.find_by_id(coletor_id)
+        if not coletor:
+            raise HTTPException(404, "Coletor não encontrado")
+        
+        return coletor.get("inventory", [])
 
     async def _verificar_conclusao_agendamento(self, agendamento_id: Optional[str]):
         """

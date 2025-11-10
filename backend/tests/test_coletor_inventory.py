@@ -16,6 +16,7 @@ Regras de Negócio:
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from bson import ObjectId
+from datetime import datetime
 
 from src.service.coleta_service import ColetaService
 from src.infra.database.models.enums import EstadoColeta
@@ -46,9 +47,19 @@ class TestColetorInventory:
         
         mock_coleta = {
             "_id": coleta_id,
+            "id": coleta_id,
+            "agendamento_id": str(ObjectId()),
+            "produtor_id": str(ObjectId()),
             "coletor_id": coletor_id,
             "residuos_id": residuos_ids,
+            "data_hora": datetime.now(),
+            "local": {"address_id": 1},
             "estado": EstadoColeta.PENDENTE
+        }
+        
+        mock_coleta_atualizada = {
+            **mock_coleta,
+            "estado": EstadoColeta.EM_ANDAMENTO
         }
         
         mock_coletor_antes = {
@@ -61,14 +72,16 @@ class TestColetorInventory:
         
         service = ColetaService()
         
-        with patch('src.infra.database.repositories.coleta_repo.find_by_id', 
-                   new_callable=AsyncMock, return_value=mock_coleta), \
+        with patch('src.infra.database.repositories.coleta_repo.find_by_id') as mock_find, \
              patch('src.infra.database.repositories.user_repo.find_by_id',
                    new_callable=AsyncMock, return_value=mock_coletor_antes) as mock_user_find, \
              patch('src.infra.database.repositories.coleta_repo.update_coleta',
                    new_callable=AsyncMock, return_value=True), \
              patch('src.infra.database.repositories.user_repo.update_user',
                    new_callable=AsyncMock, return_value=True) as mock_user_update:
+            
+            # Configurar mock para retornar coleta antes e depois da atualização
+            mock_find.side_effect = AsyncMock(side_effect=[mock_coleta, mock_coleta_atualizada])
             
             # ACT
             await service.iniciar_coleta(coleta_id, coletor_id)
@@ -108,9 +121,19 @@ class TestColetorInventory:
         
         mock_coleta = {
             "_id": coleta_id,
+            "id": coleta_id,
+            "agendamento_id": str(ObjectId()),
+            "produtor_id": str(ObjectId()),
             "coletor_id": coletor_id,
             "residuos_id": residuos_novos,
+            "data_hora": datetime.now(),
+            "local": {"address_id": 1},
             "estado": EstadoColeta.PENDENTE
+        }
+        
+        mock_coleta_atualizada = {
+            **mock_coleta,
+            "estado": EstadoColeta.EM_ANDAMENTO
         }
         
         mock_coletor_antes = {
@@ -123,14 +146,16 @@ class TestColetorInventory:
         
         service = ColetaService()
         
-        with patch('src.infra.database.repositories.coleta_repo.find_by_id', 
-                   new_callable=AsyncMock, return_value=mock_coleta), \
+        with patch('src.infra.database.repositories.coleta_repo.find_by_id') as mock_find, \
              patch('src.infra.database.repositories.user_repo.find_by_id',
                    new_callable=AsyncMock, return_value=mock_coletor_antes), \
              patch('src.infra.database.repositories.coleta_repo.update_coleta',
                    new_callable=AsyncMock, return_value=True), \
              patch('src.infra.database.repositories.user_repo.update_user',
                    new_callable=AsyncMock, return_value=True) as mock_user_update:
+            
+            # Configurar mock para retornar coleta antes e depois da atualização
+            mock_find.side_effect = AsyncMock(side_effect=[mock_coleta, mock_coleta_atualizada])
             
             # ACT
             await service.iniciar_coleta(coleta_id, coletor_id)
@@ -169,9 +194,19 @@ class TestColetorInventory:
         
         mock_coleta = {
             "_id": coleta_id,
+            "id": coleta_id,
+            "agendamento_id": str(ObjectId()),
+            "produtor_id": str(ObjectId()),
             "coletor_id": coletor_id,
             "residuos_id": residuos_desta_coleta,
+            "data_hora": datetime.now(),
+            "local": {"address_id": 1},
             "estado": EstadoColeta.EM_ANDAMENTO
+        }
+        
+        mock_coleta_atualizada = {
+            **mock_coleta,
+            "estado": EstadoColeta.CONCLUIDA
         }
         
         mock_coletor_antes = {
@@ -184,14 +219,18 @@ class TestColetorInventory:
         
         service = ColetaService()
         
-        with patch('src.infra.database.repositories.coleta_repo.find_by_id', 
-                   new_callable=AsyncMock, return_value=mock_coleta), \
+        with patch('src.infra.database.repositories.coleta_repo.find_by_id') as mock_find, \
              patch('src.infra.database.repositories.user_repo.find_by_id',
                    new_callable=AsyncMock, return_value=mock_coletor_antes), \
              patch('src.infra.database.repositories.coleta_repo.update_coleta',
                    new_callable=AsyncMock, return_value=True), \
              patch('src.infra.database.repositories.user_repo.update_user',
-                   new_callable=AsyncMock, return_value=True) as mock_user_update:
+                   new_callable=AsyncMock, return_value=True) as mock_user_update, \
+             patch.object(service, '_verificar_conclusao_agendamento',
+                          new_callable=AsyncMock):
+            
+            # Configurar mock para retornar coleta antes e depois da atualização
+            mock_find.side_effect = AsyncMock(side_effect=[mock_coleta, mock_coleta_atualizada])
             
             # ACT
             await service.concluir_coleta(coleta_id, coletor_id)
@@ -227,9 +266,19 @@ class TestColetorInventory:
         
         mock_coleta = {
             "_id": coleta_id,
+            "id": coleta_id,
+            "agendamento_id": str(ObjectId()),
+            "produtor_id": str(ObjectId()),
             "coletor_id": coletor_id,
             "residuos_id": residuos_desta_coleta,
+            "data_hora": datetime.now(),
+            "local": {"address_id": 1},
             "estado": EstadoColeta.EM_ANDAMENTO
+        }
+        
+        mock_coleta_atualizada = {
+            **mock_coleta,
+            "estado": EstadoColeta.CANCELADA
         }
         
         mock_coletor_antes = {
@@ -242,16 +291,22 @@ class TestColetorInventory:
         
         service = ColetaService()
         
-        with patch('src.infra.database.repositories.coleta_repo.find_by_id', 
-                   new_callable=AsyncMock, return_value=mock_coleta), \
+        with patch('src.infra.database.repositories.coleta_repo.find_by_id') as mock_find, \
              patch('src.infra.database.repositories.user_repo.find_by_id',
                    new_callable=AsyncMock, return_value=mock_coletor_antes), \
-             patch('src.infra.database.repositories.coleta_repo.update_coleta',
+             patch('src.infra.database.repositories.coleta_repo.update_estado',
                    new_callable=AsyncMock, return_value=True), \
-             patch('src.infra.database.repositories.residue_repo.update_residue_status_bulk',
+             patch('src.infra.database.repositories.coleta_repo.append_observacao',
                    new_callable=AsyncMock, return_value=True), \
+             patch('src.infra.database.repositories.residue_repo.find_by_id',
+                   new_callable=AsyncMock, return_value=None), \
              patch('src.infra.database.repositories.user_repo.update_user',
-                   new_callable=AsyncMock, return_value=True) as mock_user_update:
+                   new_callable=AsyncMock, return_value=True) as mock_user_update, \
+             patch.object(service, '_verificar_conclusao_agendamento',
+                          new_callable=AsyncMock):
+            
+            # Configurar mock para retornar coleta antes e depois da atualização
+            mock_find.side_effect = AsyncMock(side_effect=[mock_coleta, mock_coleta_atualizada])
             
             # ACT
             await service.cancelar_apos_chegar_local(coleta_id, coletor_id, "Motivo do cancelamento")
