@@ -32,6 +32,18 @@ class UserCreate(BaseModel):
     }])
     cidade_id: str = Field(..., example="cidade_id")
     estado_id: str = Field(..., example="estado_id")
+    
+    # Campos específicos de Produtor (opcionais)
+    is_business: Optional[bool] = Field(None, example=False)
+    cnpj: Optional[str] = Field(None, example="12.345.678/0001-90")
+    points: Optional[int] = Field(None, example=0)
+    ranking: Optional[int] = Field(None, example=0)
+    
+    # Campo específico de Coletor (opcional)
+    inventory: Optional[list[str]] = Field(None, example=[])
+    
+    # Campo específico de Receptor (opcional)
+    accepted_material: Optional[list[str]] = Field(None, example=["plástico", "papel"])
 
     # Email validations (format and normalization)
     @field_validator("email")
@@ -91,6 +103,18 @@ class UserUpdate(BaseModel):
     }])
     cidade_id: Optional[str] = Field(None, example="new_cidade_id")
     estado_id: Optional[str] = Field(None, example="new_estado_id")
+    
+    # Campos específicos de Produtor (opcionais)
+    is_business: Optional[bool] = Field(None, example=False)
+    cnpj: Optional[str] = Field(None, example="12.345.678/0001-90")
+    points: Optional[int] = Field(None, example=0)
+    ranking: Optional[int] = Field(None, example=0)
+    
+    # Campo específico de Coletor (opcional)
+    inventory: Optional[list[str]] = Field(None, example=[])
+    
+    # Campo específico de Receptor (opcional)
+    accepted_material: Optional[list[str]] = Field(None, example=["plástico", "papel"])
 
     @field_validator("email")
     def validate_email(cls, value: Optional[str]):
