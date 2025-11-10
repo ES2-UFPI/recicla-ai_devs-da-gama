@@ -6,8 +6,53 @@ Esta documentação lista todas as rotas disponíveis no backend da aplicação 
 
 ---
 
-## 📑 Índice
+## Arquitetura de Usuários - User Builders
 
+O sistema implementa o **padrão Builder** para construção de usuários, garantindo validação e type-safety específica para cada role:
+
+### Tipos de Usuários (Roles)
+
+#### **Produtor** (`role_id: "produtor"`)
+- **Responsabilidade:** Gera resíduos e solicita coletas
+- **Builder:** `ProdutorBuilder`
+- **Campos Específicos:**
+  - `is_business`: boolean (empresa ou pessoa física)
+  - `cnpj`: string (obrigatório se `is_business = true`)
+  - `points`: int (pontos de gamificação)
+  - `ranking`: int (posição no ranking)
+- **Validações:**
+  - Deve ter pelo menos 1 endereço para solicitar coletas
+  - CNPJ obrigatório quando `is_business = true`
+
+#### **Coletor** (`role_id: "coletor"`)
+- **Responsabilidade:** Realiza coletas de resíduos
+- **Builder:** `ColetorBuilder`
+- **Campos Específicos:**
+  - `inventory`: list[string] (IDs de resíduos coletados/em estoque)
+- **Validações:**
+  - Inventory deve ser uma lista válida
+
+#### **Receptor** (`role_id: "receptor"`)
+- **Responsabilidade:** Ponto de coleta que recebe resíduos
+- **Builder:** `ReceptorBuilder`
+- **Campos Específicos:**
+  - `accepted_material`: list[string] (tipos de materiais aceitos)
+- **Validações:**
+  - Deve ter pelo menos 1 endereço (ponto de coleta fixo)
+  - Deve especificar pelo menos 1 tipo de material aceito
+
+### Vantagens do User Builder Pattern
+
+✅ **Type-Safety:** Cada builder garante campos obrigatórios específicos  
+✅ **Validação Automática:** Regras de negócio validadas antes de persistir  
+✅ **Flexibilidade:** Fácil adicionar novos tipos de usuários  
+✅ **Manutenibilidade:** Lógica de construção centralizada e reutilizável  
+
+---
+
+## Índice
+
+- [Arquitetura de Usuários](#arquitetura-de-usuários---user-builders)
 - [Rotas Públicas](#rotas-públicas)
 - [Autenticação](#autenticação)
 - [Usuários](#usuários)
@@ -19,7 +64,7 @@ Esta documentação lista todas as rotas disponíveis no backend da aplicação 
 
 ---
 
-## 🌐 Rotas Públicas
+## Rotas Públicas
 
 ### Health Check
 **GET** `http://localhost:8000/health`
@@ -57,7 +102,7 @@ Verifica a conexão com o banco de dados MongoDB.
 
 ---
 
-## 🔐 Autenticação
+## Autenticação
 
 Todas as rotas de autenticação utilizam cookies HTTP-only para armazenar tokens JWT.
 
@@ -153,16 +198,41 @@ Retorna informações do usuário atualmente autenticado.
 
 ---
 
-## 👥 Usuários
+## Usuários
 
 ### Criar Usuário
 **POST** `http://localhost:8000/users`
 
-Cria um novo usuário no sistema (registro).
+Cria um novo usuário no sistema (registro) utilizando **User Builders** específicos para cada role.
 
 **Autenticação:** Não requerida
 
-**Corpo da Requisição:**
+**Arquitetura:**
+O sistema utiliza o padrão **Builder Pattern** para construir usuários de forma type-safe:
+- `ProdutorBuilder` - para produtores de resíduos
+- `ColetorBuilder` - para coletores
+- `ReceptorBuilder` - para pontos de coleta
+
+Cada builder valida campos obrigatórios específicos da role antes de persistir.
+
+---
+
+#### Criar Produtor
+
+**Campos Obrigatórios:**
+- `name`, `email`, `phone`, `password`
+- `role_id`: deve ser `"produtor"`
+- `addresses`: **obrigatório** (mínimo 1 endereço para solicitar coletas)
+- `cidade_id`, `estado_id`
+
+**Campos Específicos de Produtor:**
+- `is_business`: `boolean` (True = empresa, False = pessoa física)
+  - Se `is_business = true`, então `cnpj` é **obrigatório**
+- `cnpj`: `string` (CNPJ da empresa)
+- `points`: `int` (pontos de gamificação, padrão: 0)
+- `ranking`: `int` (posição no ranking, padrão: 0)
+
+**Exemplo - Produtor Pessoa Física:**
 ```json
 {
   "name": "João Silva",
@@ -170,8 +240,9 @@ Cria um novo usuário no sistema (registro).
   "phone": "(99) 99999-9999",
   "password": "Senha123!",
   "role_id": "produtor",
-  "cidade_id": "cidade_id_exemplo",
-  "estado_id": "estado_id_exemplo",
+  "cidade_id": "cidade_123",
+  "estado_id": "estado_456",
+  "is_business": false,
   "addresses": [
     {
       "apelido": "Casa",
@@ -186,18 +257,133 @@ Cria um novo usuário no sistema (registro).
 }
 ```
 
-**Requisitos de Senha:**
+**Exemplo - Produtor Empresa:**
+```json
+{
+  "name": "Empresa ABC Ltda",
+  "email": "contato@empresaabc.com",
+  "phone": "(11) 98888-7777",
+  "password": "Senha123!",
+  "role_id": "produtor",
+  "cidade_id": "cidade_123",
+  "estado_id": "estado_456",
+  "is_business": true,
+  "cnpj": "12.345.678/0001-90",
+  "addresses": [
+    {
+      "apelido": "Matriz",
+      "cep": "12345-678",
+      "logradouro": "Av. Principal",
+      "numero": "1000",
+      "latitude": "-23.5505",
+      "longitude": "-46.6333"
+    }
+  ]
+}
+```
+
+---
+
+#### Criar Coletor
+
+**Campos Obrigatórios:**
+- `name`, `email`, `phone`, `password`
+- `role_id`: deve ser `"coletor"`
+- `cidade_id`, `estado_id`
+
+**Campos Específicos de Coletor:**
+- `inventory`: `list[string]` (lista de IDs de resíduos coletados, padrão: [])
+- `addresses`: opcional (coletores podem ter endereços, mas não é obrigatório)
+
+**Exemplo - Coletor:**
+```json
+{
+  "name": "Maria Coletora",
+  "email": "maria.coletora@example.com",
+  "phone": "(11) 97777-6666",
+  "password": "Senha123!",
+  "role_id": "coletor",
+  "cidade_id": "cidade_123",
+  "estado_id": "estado_456",
+  "inventory": [],
+  "addresses": [
+    {
+      "apelido": "Base de Operações",
+      "cep": "98765-432",
+      "logradouro": "Rua B",
+      "numero": "456",
+      "latitude": "-23.5600",
+      "longitude": "-46.6400"
+    }
+  ]
+}
+```
+
+---
+
+#### Criar Receptor
+
+**Campos Obrigatórios:**
+- `name`, `email`, `phone`, `password`
+- `role_id`: deve ser `"receptor"`
+- `addresses`: **obrigatório** (mínimo 1 endereço - ponto de coleta fixo)
+- `accepted_material`: **obrigatório** (lista com pelo menos 1 tipo de material aceito)
+- `cidade_id`, `estado_id`
+
+**Campos Específicos de Receptor:**
+- `accepted_material`: `list[string]` (ex: ["plástico", "papel", "metal", "vidro", "eletrônico"])
+
+**Exemplo - Receptor:**
+```json
+{
+  "name": "EcoPonto Central",
+  "email": "contato@ecoponto.com",
+  "phone": "(11) 96666-5555",
+  "password": "Senha123!",
+  "role_id": "receptor",
+  "cidade_id": "cidade_123",
+  "estado_id": "estado_456",
+  "accepted_material": ["plástico", "papel", "metal", "vidro"],
+  "addresses": [
+    {
+      "apelido": "Ponto de Coleta Principal",
+      "cep": "11111-222",
+      "logradouro": "Av. Reciclagem",
+      "numero": "500",
+      "latitude": "-23.5700",
+      "longitude": "-46.6500",
+      "complemento": "Galpão 3"
+    }
+  ]
+}
+```
+
+---
+
+**Requisitos de Senha (todos os roles):**
 - Mínimo 8 caracteres
 - Pelo menos 1 número
 - Pelo menos 1 letra maiúscula
 - Pelo menos 1 caractere especial (!, @, #, $, %, &, *)
 
-**Observação sobre endereços:**
+**Observações sobre Endereços:**
 - O campo `apelido` é opcional nos endereços
-- O ID do endereço é gerado automaticamente de forma incremental (1, 2, 3...)
+- O campo `id` é gerado automaticamente de forma incremental (1, 2, 3...)
 - Cada usuário tem sua própria numeração de endereços
+- **Não envie** o campo `id` no corpo da requisição ao criar endereços
+
+**Validações Automáticas (User Builders):**
+- ✅ Email único no sistema
+- ✅ Senha hash com bcrypt_sha256
+- ✅ Campos obrigatórios por role
+- ✅ CNPJ obrigatório se `is_business = true`
+- ✅ Receptor deve ter endereço e materiais aceitos
+- ✅ Produtor deve ter pelo menos um endereço
 
 **Resposta de Sucesso (201):**
+
+⚠️ **Importante:** A resposta contém apenas dados públicos do usuário através do schema `UserPublic`. Informações sensíveis como `password_hash` e campos internos **não são retornados**.
+
 ```json
 {
   "name": "João Silva",
@@ -215,6 +401,45 @@ Cria um novo usuário no sistema (registro).
       "complemento": "Apto 101"
     }
   ]
+}
+```
+
+> **Nota:** Campos específicos da role (como `points`, `ranking`, `inventory`, `accepted_material`) **não são retornados** na resposta pública por questões de segurança e privacidade. Esses dados são armazenados no banco de dados, mas não expostos publicamente.
+
+**Respostas de Erro:**
+
+**400 Bad Request** - Role inválida:
+```json
+{
+  "detail": "Role 'admin' não suportado. Use: produtor, coletor ou receptor."
+}
+```
+
+**400 Bad Request** - Validação de campos específicos:
+```json
+{
+  "detail": "CNPJ é obrigatório quando is_business é True"
+}
+```
+
+**400 Bad Request** - Produtor sem endereço:
+```json
+{
+  "detail": "Produtor deve ter pelo menos um endereço cadastrado"
+}
+```
+
+**400 Bad Request** - Receptor sem materiais aceitos:
+```json
+{
+  "detail": "Receptor deve especificar ao menos um tipo de material aceito"
+}
+```
+
+**409 Conflict** - Email duplicado:
+```json
+{
+  "detail": "E-mail já cadastrado."
 }
 ```
 
@@ -284,19 +509,67 @@ Retorna o perfil do usuário autenticado.
 ### Atualizar Meu Perfil
 **PUT** `http://localhost:8000/users/me`
 
-Atualiza dados do usuário autenticado.
+Atualiza dados do usuário autenticado utilizando **User Builders**.
 
 **Autenticação:** ✅ Requerida
 
+**Importante:** O sistema detecta automaticamente o tipo de usuário (Produtor, Coletor ou Receptor) e aplica as validações específicas através dos builders correspondentes.
+
 **Corpo da Requisição (todos os campos são opcionais):**
+
+**Campos Comuns (todos os roles):**
 ```json
 {
   "name": "João da Silva",
   "email": "novo.email@example.com",
   "phone": "(88) 88888-8888",
-  "password": "NovaSenha123!"   // Ainda será implementado um "Esqueci minha senha"
+  "password": "NovaSenha123!",
+  "cidade_id": "nova_cidade_123",
+  "estado_id": "novo_estado_456"
 }
 ```
+
+**Campos Específicos de Produtor:**
+```json
+{
+  "is_business": true,
+  "cnpj": "98.765.432/0001-10",
+  "points": 150,
+  "ranking": 5
+}
+```
+
+**Campos Específicos de Coletor:**
+```json
+{
+  "inventory": ["residuo_id_1", "residuo_id_2"]
+}
+```
+
+**Campos Específicos de Receptor:**
+```json
+{
+  "accepted_material": ["plástico", "papel", "metal", "vidro", "eletrônico"]
+}
+```
+
+**Exemplo Completo - Atualizar Produtor:**
+```json
+{
+  "name": "João da Silva Empresário",
+  "phone": "(11) 99999-8888",
+  "is_business": true,
+  "cnpj": "98.765.432/0001-10"
+}
+```
+
+**Validações Automáticas (User Builders):**
+- ✅ Se alterar email, verifica unicidade no sistema
+- ✅ Se Produtor alterar `is_business` para `true`, valida presença de `cnpj`
+- ✅ Senha é automaticamente hasheada com bcrypt_sha256
+- ✅ Campos específicos são validados conforme a role do usuário
+
+**Observação:** Não é possível alterar o `role_id` de um usuário após a criação.
 
 **Resposta de Sucesso (200):**
 ```json
