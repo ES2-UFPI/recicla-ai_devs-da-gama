@@ -13,6 +13,10 @@ from src.schemas.coleta_schema import (
     ColetaInDBSchema,
 )
 
+from src.schemas.residue_schema import (
+    ResidueResponse,
+)
+
 from src.infra.database.models.enums import (
     StatusResiduo, 
     EstadoColeta,
@@ -147,7 +151,9 @@ class ColetaService:
         """
         Marca coleta como EM_ANDAMENTO (coletor chegou no local).
         Atualiza data_hora para o momento atual (início da verificação).
-        Adiciona os resíduos da coleta ao inventory do coletor.
+        
+        Nota: Os resíduos são adicionados ao inventory apenas quando 
+        efetivamente coletados via coletar_residuo().
         """
         coleta = await coleta_repo.find_by_id(coleta_id)
         if not coleta:
@@ -156,10 +162,6 @@ class ColetaService:
             raise HTTPException(403, "Você não pode iniciar esta coleta")
         if coleta.get("estado") != EstadoColeta.PENDENTE:
             raise HTTPException(400, "Somente coletas PENDENTE podem ser iniciadas")
-
-        # Adicionar resíduos ao inventory do coletor
-        residuos_ids = coleta.get("residuos_id", [])
-        await self._adicionar_residuos_ao_inventory(coletor_id, residuos_ids)
 
         ok = await coleta_repo.update_coleta(
             coleta_id,
@@ -181,7 +183,8 @@ class ColetaService:
         observacao: Optional[str] = None,
     ) -> ColetaInDBSchema:
         """
-        Marca um ou mais resíduos como COLETADO e mantém seus IDs em residuos_id.
+        Marca um ou mais resíduos como COLETADO, mantém seus IDs em residuos_id
+        e adiciona ao inventory do coletor (resíduos fisicamente coletados).
         """
         coleta = await coleta_repo.find_by_id(coleta_id)
         if not coleta:
@@ -212,6 +215,9 @@ class ColetaService:
                 usuario_id=coletor_id,
                 detalhes={"coleta_id": coleta_id, "acao": "coletar_residuo"},
             )
+
+        # Adicionar resíduos coletados ao inventory do coletor
+        await self._adicionar_residuos_ao_inventory(coletor_id, residuos_ids)
 
         # Anexar observação se houver
         if observacao:
@@ -474,18 +480,34 @@ class ColetaService:
         # Atualizar no banco
         await user_repo.update_user(coletor_id, {self._INVENTORY_FIELD: inventory_atualizado})
 
-    async def get_coletor_inventory(self, coletor_id: str) -> List[str]:
+    async def get_coletor_inventory(self, coletor_id: str) -> List[ResidueResponse]:
         """
-        Retorna o inventory atual do coletor.
+        Retorna o inventory detalhado do coletor.
+        
+        Busca todos os resíduos que estão no inventory e retorna
+        seus dados completos (quantidade, categoria, valor, foto, etc).
         
         Args:
             coletor_id: ID do coletor
             
         Returns:
-            Lista de IDs de resíduos no inventory
+            Lista de ResidueResponse com dados completos dos resíduos
         """
         coletor = await self._get_coletor(coletor_id)
-        return coletor.get(self._INVENTORY_FIELD, [])
+        residuos_ids = coletor.get(self._INVENTORY_FIELD, [])
+        
+        # Se inventory vazio, retorna lista vazia
+        if not residuos_ids:
+            return []
+        
+        # Buscar dados completos de cada resíduo
+        residuos_completos = []
+        for residuo_id in residuos_ids:
+            residuo = await residue_repo.find_by_id(residuo_id)
+            if residuo:  # Só adiciona se encontrou (pode ter sido deletado)
+                residuos_completos.append(ResidueResponse(**residuo))
+        
+        return residuos_completos
 
     async def _verificar_conclusao_agendamento(self, agendamento_id: Optional[str]):
         """
