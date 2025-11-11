@@ -9,6 +9,7 @@ import LocalizarColeta from '../pages/LocalizarColeta';
 import Coleta from '../pages/Coleta';
 //import ColetaAtiva from '../pages/ColetaAtiva';
 import ColetaDetalhes from '../pages/ColetaDetalhes';
+import Inventario from '../pages/Inventario';
 
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
@@ -67,6 +68,14 @@ export function AppRoutes() {
         <ProtectedRoute>
           <RoleBasedRoute allowedRoles={['coletor']}>
             <Coleta />
+          </RoleBasedRoute>
+        </ProtectedRoute>
+      } />
+      {/* Rota Inventário */}
+      <Route path="/inventario" element={
+        <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={['coletor']}>
+            <Inventario />
           </RoleBasedRoute>
         </ProtectedRoute>
       } />
