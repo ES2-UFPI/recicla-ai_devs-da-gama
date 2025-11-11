@@ -134,24 +134,6 @@ async def rejeitar_residuo(
     )
 
 
-@router.patch(
-    "/{coleta_id}/concluir",
-    response_model=ColetaInDBSchema,
-    summary="Concluir coleta",
-    description="Marca a coleta como CONCLUIDA e remove os resíduos do inventory do coletor.",
-)
-async def concluir_coleta(
-    coleta_id: str,
-    current_user: dict = Depends(get_current_user),
-) -> ColetaInDBSchema:
-    if current_user.get("role_id") != "coletor":
-        raise HTTPException(403, "Apenas coletores podem concluir coletas")
-    coletor_id = current_user.get("id")
-    if not isinstance(coletor_id, str) or not coletor_id:
-        raise HTTPException(401, "Usuário não autenticado ou ID inválido")
-    return await coleta_service.concluir_coleta(coleta_id, coletor_id)
-
-
 @router.post(
     "/{coleta_id}/cancelar-antes-local",
     response_model=ColetaInDBSchema,
