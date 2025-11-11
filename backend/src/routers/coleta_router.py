@@ -220,3 +220,26 @@ async def obter_coleta(
     if not isinstance(coletor_id, str) or not coletor_id:
         raise HTTPException(401, "Usuário não autenticado ou ID inválido")
     return await coleta_service.buscar_coleta(coleta_id, coletor_id)
+
+
+@router.get(
+    "/inventory/me",
+    response_model=List[str],
+    summary="Obter inventory do coletor",
+    description="Retorna a lista de IDs de resíduos que o coletor tem em coletas EM_ANDAMENTO.",
+)
+async def obter_meu_inventory(
+    current_user: dict = Depends(get_current_user),
+) -> List[str]:
+    """
+    Retorna o inventory do coletor autenticado.
+    
+    O inventory contém os IDs de todos os resíduos que o coletor tem
+    em coletas que estão atualmente EM_ANDAMENTO.
+    """
+    if current_user.get("role_id") != "coletor":
+        raise HTTPException(403, "Apenas coletores podem acessar o inventory")
+    coletor_id = current_user.get("id")
+    if not isinstance(coletor_id, str) or not coletor_id:
+        raise HTTPException(401, "Usuário não autenticado ou ID inválido")
+    return await coleta_service.get_coletor_inventory(coletor_id)
