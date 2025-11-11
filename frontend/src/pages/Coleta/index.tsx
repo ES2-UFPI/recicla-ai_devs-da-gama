@@ -98,7 +98,7 @@ export default function Coleta() {
     try {
       // Backend retorna em UTC, converter para horário local de Brasília
       const data = new Date(dataISO);
-      return data.toLocaleDateString('pt-BR', {
+      return data.toLocaleString('pt-BR', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',

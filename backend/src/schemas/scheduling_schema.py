@@ -55,16 +55,30 @@ class DisponibilidadeSlot(BaseModel):
             raise ValueError("Horário deve estar no formato hh:mm (ex: 10:30)")
     
     def to_datetime_inicio(self) -> datetime:
-        """Converte data + hora_inicio para datetime"""
+        """
+        Converte data + hora_inicio para datetime com timezone de Brasília.
+        O frontend envia horários no timezone de Brasília (America/Sao_Paulo).
+        """
         data_obj = datetime.strptime(self.data, "%d/%m/%Y")
         hora_obj = datetime.strptime(self.hora_inicio, "%H:%M")
-        return data_obj.replace(hour=hora_obj.hour, minute=hora_obj.minute)
+        dt_naive = data_obj.replace(hour=hora_obj.hour, minute=hora_obj.minute)
+        
+        # Adiciona timezone de Brasília ao datetime
+        tz_brasilia = pytz.timezone('America/Sao_Paulo')
+        return tz_brasilia.localize(dt_naive)
     
     def to_datetime_fim(self) -> datetime:
-        """Converte data + hora_fim para datetime"""
+        """
+        Converte data + hora_fim para datetime com timezone de Brasília.
+        O frontend envia horários no timezone de Brasília (America/Sao_Paulo).
+        """
         data_obj = datetime.strptime(self.data, "%d/%m/%Y")
         hora_obj = datetime.strptime(self.hora_fim, "%H:%M")
-        return data_obj.replace(hour=hora_obj.hour, minute=hora_obj.minute)
+        dt_naive = data_obj.replace(hour=hora_obj.hour, minute=hora_obj.minute)
+        
+        # Adiciona timezone de Brasília ao datetime
+        tz_brasilia = pytz.timezone('America/Sao_Paulo')
+        return tz_brasilia.localize(dt_naive)
     
     def validar_slot(self) -> None:
         """
@@ -73,13 +87,15 @@ class DisponibilidadeSlot(BaseModel):
         2. Hora de início não pode ser no passado (tolerância de 30min)
         
         Nota: Usa timezone de Brasília (America/Sao_Paulo) para comparação.
+        Ambos os datetimes (dt_inicio e agora) possuem timezone para comparação correta.
         """
-        dt_inicio = self.to_datetime_inicio()
-        dt_fim = self.to_datetime_fim()
+        # Obter datetimes COM timezone de Brasília
+        dt_inicio = self.to_datetime_inicio()  # Já tem timezone de Brasília
+        dt_fim = self.to_datetime_fim()        # Já tem timezone de Brasília
         
-        # Usar timezone de Brasília para comparação
+        # Obter hora atual COM timezone de Brasília
         tz_brasilia = pytz.timezone('America/Sao_Paulo')
-        agora = datetime.now(tz_brasilia).replace(tzinfo=None)  # Remove timezone para comparação
+        agora = datetime.now(tz_brasilia)  # MANTÉM timezone para comparação correta
         tolerancia = timedelta(minutes=30)
         
         # Validação 1: Início deve ser antes do fim
@@ -89,11 +105,15 @@ class DisponibilidadeSlot(BaseModel):
             )
         
         # Validação 2: Início não pode ser muito no passado (tolerância de 30min)
+        # Agora compara timezone-aware com timezone-aware corretamente!
         if dt_inicio < (agora - tolerancia):
+            # Formatar para exibição sem timezone (fica mais limpo)
+            agora_str = agora.strftime('%d/%m/%Y %H:%M')
             raise ValueError(
                 f"Horário de início não pode estar no passado. "
-                f"Data/hora: {self.data} {self.hora_inicio} (tolerância: 30 minutos). "
-                f"Horário do servidor: {agora.strftime('%d/%m/%Y %H:%M')} (Brasília)"
+                f"Data/hora solicitada: {self.data} {self.hora_inicio} (Brasília). "
+                f"Horário atual do servidor: {agora_str} (Brasília). "
+                f"Tolerância: 30 minutos."
             )
     
     def to_string(self) -> str:
