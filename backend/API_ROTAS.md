@@ -28,9 +28,10 @@ O sistema implementa o **padrão Builder** para construção de usuários, garan
 - **Responsabilidade:** Realiza coletas de resíduos
 - **Builder:** `ColetorBuilder`
 - **Campos Específicos:**
-  - `inventory`: list[string] (IDs de resíduos coletados/em estoque)
+  - `inventory`: list[string] (IDs de resíduos fisicamente coletados - status COLETADO)
 - **Validações:**
   - Inventory deve ser uma lista válida
+  - Inventory é atualizado automaticamente ao coletar/cancelar resíduos
 
 #### **Receptor** (`role_id: "receptor"`)
 - **Responsabilidade:** Ponto de coleta que recebe resíduos
@@ -292,8 +293,13 @@ Cada builder valida campos obrigatórios específicos da role antes de persistir
 - `cidade_id`, `estado_id`
 
 **Campos Específicos de Coletor:**
-- `inventory`: `list[string]` (lista de IDs de resíduos coletados, padrão: [])
+- `inventory`: `list[string]` (lista de IDs de resíduos fisicamente coletados, gerenciado automaticamente, padrão: [])
 - `addresses`: opcional (coletores podem ter endereços, mas não é obrigatório)
+
+**Observação:** O campo `inventory` é gerenciado automaticamente pelo sistema:
+- Resíduos são adicionados ao inventory quando coletados (ação `coletar_residuo`)
+- Resíduos são removidos do inventory quando a coleta é cancelada após iniciar
+- Resíduos rejeitados NUNCA entram no inventory (não foram fisicamente coletados)
 
 **Exemplo - Coletor:**
 ```json
@@ -1980,6 +1986,7 @@ Marca a coleta como EM_ANDAMENTO (coletor chegou no local).
 - Coleta deve estar em estado PENDENTE
 - Atualiza data_hora para o momento atual
 - Muda estado para EM_ANDAMENTO
+- **NOTA:** Resíduos são adicionados ao inventory apenas quando efetivamente coletados (ver `coletar-residuo`)
 
 **Exemplo:** `http://localhost:8000/coletas/674a1b2c3d4e5f6g7h8i9j0k/iniciar`
 
@@ -2031,7 +2038,7 @@ Marca a coleta como EM_ANDAMENTO (coletor chegou no local).
 ### Coletar Resíduo
 **PATCH** `http://localhost:8000/coletas/{coleta_id}/coletar-residuo`
 
-Marca um ou mais resíduos como COLETADO (mantém na lista da coleta).
+Marca um ou mais resíduos como COLETADO, mantém na lista da coleta e **adiciona ao inventory do coletor**.
 
 **Autenticação:** ✅ Requerida (role: coletor)
 
@@ -2040,6 +2047,7 @@ Marca um ou mais resíduos como COLETADO (mantém na lista da coleta).
 - Todos os resíduos devem estar RESERVADO
 - Todos os resíduos devem pertencer à coleta
 - Atualiza resíduos para COLETADO
+- **Adiciona resíduos coletados ao inventory do coletor** (resíduos fisicamente coletados)
 - Mantém resíduos na lista `residuos_id`
 - Verifica se todos resíduos foram finalizados (auto-conclusão do agendamento)
 
@@ -2224,15 +2232,16 @@ Cancela uma coleta PENDENTE e libera os resíduos (RESERVADO → AGENDADO).
 ### Cancelar Coleta Após Chegar ao Local
 **POST** `http://localhost:8000/coletas/{coleta_id}/cancelar`
 
-Cancela uma coleta EM_ANDAMENTO e marca resíduos RESERVADO como CANCELADO.
+Cancela uma coleta EM_ANDAMENTO, marca resíduos RESERVADO como CANCELADO e **remove resíduos do inventory do coletor**.
 
 **Autenticação:** ✅ Requerida (role: coletor)
 
 **Regras:**
 - Coleta deve estar EM_ANDAMENTO
 - Muda estado para CANCELADA
-- Resíduos ainda RESERVADO → CANCELADO
+- Resíduos ainda RESERVADO → DESCARTADO
 - Resíduos já COLETADOS ou REJEITADOS não são alterados
+- **Remove todos os resíduos da coleta do inventory do coletor** (desfaz coletas realizadas)
 
 **Exemplo:** `http://localhost:8000/coletas/674a1b2c3d4e5f6g7h8i9j0k/cancelar`
 
@@ -2380,6 +2389,62 @@ Obtém detalhes completos de uma coleta específica.
   "detail": "Coleta não encontrada"
 }
 ```
+
+---
+
+### Obter Inventory do Coletor
+**GET** `http://localhost:8000/coletas/inventory/me`
+
+Retorna o inventory detalhado do coletor autenticado com dados completos dos resíduos fisicamente coletados.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Descrição:**
+- Retorna todos os resíduos que o coletor coletou fisicamente (status COLETADO)
+- Inclui dados completos: quantidade, categoria, valor estimado, foto, etc.
+- Útil para o coletor visualizar seu estoque atual de resíduos
+- **Performance otimizada:** 1 única requisição retorna todos os dados (não apenas IDs)
+
+**Exemplo:** `http://localhost:8000/coletas/inventory/me`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d3f",
+    "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
+    "categoriaId": "60c72b2f9b1d4c3a4c8e4d3b",
+    "quantidade": 10.0,
+    "tipo_medida": "unidade",
+    "foto": "http://example.com/garrafas.jpg",
+    "valorEstimado": 1.50,
+    "status": "COLETADO",
+    "dataCadastro": "2025-10-14T10:30:00Z"
+  },
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d40",
+    "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
+    "categoriaId": "60c72b2f9b1d4c3a4c8e4d3c",
+    "quantidade": 5.0,
+    "tipo_medida": "kg",
+    "foto": null,
+    "valorEstimado": 7.50,
+    "status": "COLETADO",
+    "dataCadastro": "2025-10-15T14:20:00Z"
+  }
+]
+```
+
+**Resposta quando inventory vazio (200):**
+```json
+[]
+```
+
+**Observações:**
+- Frontend recebe dados completos em 1 única requisição (evita N+1 queries)
+- Resíduos aparecem no inventory apenas após ação `coletar_residuo`
+- Resíduos rejeitados NUNCA aparecem no inventory
+- Inventory é atualizado automaticamente quando coleta é cancelada após iniciar
 
 ---
 
