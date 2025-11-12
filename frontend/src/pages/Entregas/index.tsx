@@ -110,7 +110,7 @@ export default function Entregas() {
         {/* Botão de ação */}
         <Button
           component={RouterLink}
-          to="/localizar-receptoras"
+          to="/localizar-receptora"
           variant="contained"
           color="primary"
           size="large"
