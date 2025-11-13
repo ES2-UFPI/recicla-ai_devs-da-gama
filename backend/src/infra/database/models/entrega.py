@@ -14,6 +14,7 @@ class Entrega(BaseModel):
     receptora_id: str = Field(..., description="Referência à receptora")
     coletor_id: str = Field(..., description="Referência ao coletor")
     residuos_id: list[str] = Field(..., description="Lista de IDs dos resíduos entregues")
+    categorias_residuos_entregues: list[str] = Field(..., description="Categorias dos resíduos entregues")
     observacoes: Optional[str] = Field(None, description="Observações adicionais sobre a entrega")
    
 
