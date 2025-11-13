@@ -173,17 +173,173 @@ class TestEntregaColeta:
             assert args[1] == "ENTREGUE" or kwargs.get("novo_status") == "ENTREGUE", \
                 "Status deve ser atualizado para ENTREGUE"
 
-    def test_se_entrega_altera_estado_residuos(self):
-        pass
+    @pytest.mark.asyncio
+    async def test_entrega_sem_residuos(
+        self,
+        mock_entrega_repo,
+        mock_residue_repo,
+        mock_user_repo
+    ):
+        """
+        Testa que não é possível criar entrega sem resíduos.
+        
+        Cenário:
+        - Lista de resíduos está vazia
+        
+        Resultado esperado:
+        - Levanta ValidationError do Pydantic
+        """
+        # Arrange
+        coletor_id = "coletor123"
+        
+        # Act & Assert
+        with pytest.raises(Exception) as exc_info:
+            # Schema já valida que residuos_id não pode ser vazio
+            EntregaCreate(
+                receptora_id="receptora456",
+                residuos_id=[],  # Lista vazia
+                observacoes="Teste"
+            )
+        
+        # Validação do Pydantic deve capturar
+        assert "residuos_id" in str(exc_info.value).lower() or "pelo menos um resíduo" in str(exc_info.value).lower()
 
-    def test_entrega_sem_residuos(self):
-        pass
+    @pytest.mark.asyncio
+    async def test_entrega_com_residuos_invalidos(
+        self,
+        mock_entrega_repo,
+        mock_residue_repo,
+        mock_user_repo,
+        mock_coletor_db,
+        mock_receptora_db,
+        entrega_payload
+    ):
+        """
+        Testa que não é possível entregar resíduos que não existem.
+        
+        Cenário:
+        - Um ou mais resíduos na lista não existem no banco
+        
+        Resultado esperado:
+        - Levanta HTTPException 404
+        """
+        # Arrange
+        coletor_id = "coletor123"
+        
+        # Mock: coletor e receptora existem
+        mock_user_repo.find_by_id.side_effect = [mock_coletor_db, mock_receptora_db]
+        
+        # Mock: primeiro resíduo existe, segundo não existe (retorna None)
+        mock_residue_repo.find_by_id.side_effect = [
+            {"_id": "residuo1", "categoriaId": "plastico", "status": "COLETADO"},
+            None  # Resíduo não encontrado
+        ]
+        
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await EntregaService.criar_entrega(coletor_id=coletor_id, entrega_payload=entrega_payload)
+        
+        assert exc_info.value.status_code == 404
+        assert "resíduo" in exc_info.value.detail.lower()
 
-    def test_entrega_com_residuos_invalidos(self):
-        pass
+    @pytest.mark.asyncio
+    async def test_entrega_para_receptora_inexistente(
+        self,
+        mock_entrega_repo,
+        mock_residue_repo,
+        mock_user_repo,
+        mock_coletor_db,
+        entrega_payload
+    ):
+        """
+        Testa que não é possível entregar para receptora que não existe.
+        
+        Cenário:
+        - Receptora ID fornecido não existe no banco
+        
+        Resultado esperado:
+        - Levanta HTTPException 404
+        """
+        # Arrange
+        coletor_id = "coletor123"
+        
+        # Mock: coletor existe, receptora NÃO existe
+        mock_user_repo.find_by_id.side_effect = [
+            mock_coletor_db,
+            None  # Receptora não encontrada
+        ]
+        
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await EntregaService.criar_entrega(coletor_id=coletor_id, entrega_payload=entrega_payload)
+        
+        assert exc_info.value.status_code == 404
+        assert "receptora" in exc_info.value.detail.lower()
 
-    def test_entrega_para_receptora_inexistente(self):
-        pass
+    @pytest.mark.asyncio
+    async def test_entrega_coletor_inexistente(
+        self,
+        mock_entrega_repo,
+        mock_residue_repo,
+        mock_user_repo,
+        entrega_payload
+    ):
+        """
+        Testa que não é possível criar entrega se coletor não existe.
+        
+        Cenário:
+        - Coletor ID fornecido não existe no banco
+        
+        Resultado esperado:
+        - Levanta HTTPException 404
+        """
+        # Arrange
+        coletor_id = "coletor_invalido"
+        
+        # Mock: coletor NÃO existe
+        mock_user_repo.find_by_id.return_value = None
+        
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await EntregaService.criar_entrega(coletor_id=coletor_id, entrega_payload=entrega_payload)
+        
+        assert exc_info.value.status_code == 404
+        assert "coletor" in exc_info.value.detail.lower()
 
-    def test_entrega_sem_receptora(self):
-        pass
+    @pytest.mark.asyncio
+    async def test_entrega_com_residuo_ja_entregue(
+        self,
+        mock_entrega_repo,
+        mock_residue_repo,
+        mock_user_repo,
+        mock_coletor_db,
+        mock_receptora_db,
+        entrega_payload
+    ):
+        """
+        Testa que não é possível entregar resíduo que já foi entregue.
+        
+        Cenário:
+        - Resíduo já tem status ENTREGUE
+        
+        Resultado esperado:
+        - Levanta HTTPException 400
+        """
+        # Arrange
+        coletor_id = "coletor123"
+        
+        # Mock: coletor e receptora existem
+        mock_user_repo.find_by_id.side_effect = [mock_coletor_db, mock_receptora_db]
+        
+        # Mock: resíduos já estão ENTREGUES
+        mock_residue_repo.find_by_id.side_effect = [
+            {"_id": "residuo1", "categoriaId": "plastico", "status": "ENTREGUE"},
+            {"_id": "residuo2", "categoriaId": "papel", "status": "ENTREGUE"}
+        ]
+        
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await EntregaService.criar_entrega(coletor_id=coletor_id, entrega_payload=entrega_payload)
+        
+        assert exc_info.value.status_code == 400
+        assert "status" in exc_info.value.detail.lower() or "entregue" in exc_info.value.detail.lower()
