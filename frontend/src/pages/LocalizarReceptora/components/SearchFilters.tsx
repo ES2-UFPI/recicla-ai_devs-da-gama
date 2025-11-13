@@ -83,9 +83,6 @@ export function SearchFilters({
     <Card 
       sx={{ 
         mb: 2,
-        position: { xs: 'sticky', md: 'static' },
-        top: { xs: 16, md: 'auto' },
-        zIndex: { xs: 10, md: 'auto' },
       }}
     >
       <CardContent>

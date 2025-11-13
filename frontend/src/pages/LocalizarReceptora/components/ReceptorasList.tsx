@@ -1,9 +1,11 @@
-import { Box, Card, CardContent, Typography, Chip, Divider, IconButton, Tooltip, Badge } from '@mui/material';
+import { Box, Card, CardContent, Typography, Chip, Divider, IconButton, Tooltip, Button } from '@mui/material';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PhoneIcon from '@mui/icons-material/Phone';
 import DirectionsIcon from '@mui/icons-material/Directions';
 import RecyclingIcon from '@mui/icons-material/Recycling';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import { useNavigate } from 'react-router-dom';
 import type { Receptora } from '../hooks/useReceptoras';
 import { useCategorias } from '../../LocalizarColeta/hooks/useCategorias';
 
@@ -14,7 +16,8 @@ interface ReceptorasListProps {
 }
 
 export function ReceptorasList({ receptoras, highlightedId, onItemClick }: ReceptorasListProps) {
-  const { getCategoriaById } = useCategorias();
+  const { getCategoriaById, categorias } = useCategorias();
+  const navigate = useNavigate();
 
   if (receptoras.length === 0) {
     return (
@@ -100,40 +103,32 @@ export function ReceptorasList({ receptoras, highlightedId, onItemClick }: Recep
               {/* Cabeçalho com Badge de Status */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                 <Box sx={{ flex: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                    <Typography variant="h6" fontWeight={600} color="success.main">
-                      {receptora.nome}
-                    </Typography>
-                    {horarioHoje.aberto && (
-                      <Badge
-                        badgeContent={aberta ? 'Aberto' : 'Fechado'}
-                        color={aberta ? 'success' : 'error'}
-                        sx={{
-                          '& .MuiBadge-badge': {
-                            fontSize: '0.65rem',
-                            height: 18,
-                            minWidth: 18,
-                            padding: '0 6px',
-                          },
-                        }}
-                      />
-                    )}
-                  </Box>
+                  <Typography variant="h6" fontWeight={600} color="success.main">
+                    {receptora.nome}
+                  </Typography>
                   {receptora.descricao && (
                     <Typography variant="body2" color="text.secondary" mt={0.5}>
                       {receptora.descricao}
                     </Typography>
                   )}
                 </Box>
-                {receptora.distancia_km !== undefined && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-end' }}>
+                  {receptora.distancia_km !== undefined && (
+                    <Chip
+                      label={`${receptora.distancia_km.toFixed(1)} km`}
+                      size="small"
+                      color="success"
+                      variant="outlined"
+                      sx={{ fontWeight: 600 }}
+                    />
+                  )}
                   <Chip
-                    label={`${receptora.distancia_km.toFixed(1)} km`}
+                    label={aberta ? 'Aberto' : 'Fechado'}
+                    color={aberta ? 'success' : 'error'}
                     size="small"
-                    color="success"
-                    variant="outlined"
                     sx={{ fontWeight: 600 }}
                   />
-                )}
+                </Box>
               </Box>
 
               <Divider sx={{ my: 1.5 }} />
@@ -202,23 +197,56 @@ export function ReceptorasList({ receptoras, highlightedId, onItemClick }: Recep
                 </Box>
               </Box>
 
+              {/* Botão Realizar Entrega */}
+              <Button
+                fullWidth
+                variant="contained"
+                color="success"
+                startIcon={<LocalShippingIcon />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/entrega/realizar/${receptora.id}`);
+                }}
+                sx={{ mb: 2, py: 1.2, fontWeight: 600 }}
+              >
+                Realizar Entrega
+              </Button>
+
               {/* Materiais aceitos */}
               <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
                 Materiais aceitos:
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {receptora.materiais_aceitos.map((categoriaId: string) => {
-                  const categoria = getCategoriaById(categoriaId);
-                  return (
-                    <Chip
-                      key={categoriaId}
-                      label={categoria?.tipo || 'Desconhecido'}
-                      size="small"
-                      color="success"
-                      variant="outlined"
-                    />
-                  );
-                })}
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, minHeight: 32 }}>
+                {categorias.size === 0 ? (
+                  <Chip
+                    label="Carregando..."
+                    size="small"
+                    color="default"
+                    variant="outlined"
+                  />
+                ) : receptora.materiais_aceitos.length === 0 ? (
+                  <Chip
+                    label="Nenhum material especificado"
+                    size="small"
+                    color="default"
+                    variant="outlined"
+                  />
+                ) : (
+                  receptora.materiais_aceitos
+                    .filter((categoriaId: string) => getCategoriaById(categoriaId) !== undefined)
+                    .map((categoriaId: string) => {
+                      const categoria = getCategoriaById(categoriaId);
+                      return (
+                        <Chip
+                          key={categoriaId}
+                          label={categoria!.tipo}
+                          size="small"
+                          color="success"
+                          variant="outlined"
+                        />
+                      );
+                    })
+                )}
               </Box>
 
               {/* Observações */}

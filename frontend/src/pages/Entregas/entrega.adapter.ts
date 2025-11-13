@@ -93,21 +93,21 @@ const MOCK_ENTREGAS: Entrega[] = [
     residuos: [
       {
         id: 'res001',
-        categoriaId: '68f01f938fe830786876ccd4', // Plástico
+        categoriaId: '691539406ac616e0bcb1141d', // Plástico
         quantidade: 15.5,
         tipo_medida: 'kg',
         valorEstimado: 31.0,
       },
       {
         id: 'res002',
-        categoriaId: '68f01f938fe830786876ccd6', // Papel
+        categoriaId: '691539406ac616e0bcb1141f', // Papel
         quantidade: 20.0,
         tipo_medida: 'kg',
         valorEstimado: 24.0,
       },
       {
         id: 'res003',
-        categoriaId: '68f01f938fe830786876ccd4', // Plástico
+        categoriaId: '691539406ac616e0bcb1141d', // Plástico
         quantidade: 50,
         tipo_medida: 'unidade',
         valorEstimado: 5.0,
@@ -138,14 +138,14 @@ const MOCK_ENTREGAS: Entrega[] = [
     residuos: [
       {
         id: 'res004',
-        categoriaId: '68f01f938fe830786876ccd7', // Metal
+        categoriaId: '691539406ac616e0bcb11420', // Metal
         quantidade: 30.0,
         tipo_medida: 'kg',
         valorEstimado: 90.0,
       },
       {
         id: 'res005',
-        categoriaId: '68f01f938fe830786876ccd5', // Vidro
+        categoriaId: '691539406ac616e0bcb1141e', // Vidro
         quantidade: 100,
         tipo_medida: 'unidade',
         valorEstimado: 20.0,
@@ -178,21 +178,21 @@ const MOCK_ENTREGAS: Entrega[] = [
     residuos: [
       {
         id: 'res006',
-        categoriaId: '68f01f938fe830786876ccd6', // Papel
+        categoriaId: '691539406ac616e0bcb1141f', // Papel
         quantidade: 50.0,
         tipo_medida: 'kg',
         valorEstimado: 60.0,
       },
       {
         id: 'res007',
-        categoriaId: '68f01f938fe830786876ccd6', // Papel
+        categoriaId: '691539406ac616e0bcb1141f', // Papel
         quantidade: 80,
         tipo_medida: 'unidade',
         valorEstimado: 8.0,
       },
       {
         id: 'res008',
-        categoriaId: '68f01f938fe830786876ccd4', // Plástico
+        categoriaId: '691539406ac616e0bcb1141d', // Plástico
         quantidade: 12.5,
         tipo_medida: 'kg',
         valorEstimado: 25.0,

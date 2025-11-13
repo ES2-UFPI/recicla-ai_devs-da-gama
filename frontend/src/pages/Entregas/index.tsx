@@ -244,52 +244,54 @@ export default function Entregas() {
                         📦 Resíduos Entregues
                       </Typography>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                        {residuosAgrupados.map((grupo, index) => {
-                          const categoria = getCategoriaById(grupo.categoriaId);
-                          
-                          return (
-                            <Card 
-                              key={index} 
-                              variant="outlined" 
-                              sx={{ 
-                                bgcolor: 'success.50', 
-                                borderColor: 'success.main',
-                                borderWidth: 1,
-                              }}
-                            >
-                              <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                                  <Typography variant="body1" fontWeight={600}>
-                                    {categoria?.tipo || 'Categoria desconhecida'}
-                                  </Typography>
-                                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                    {grupo.kg > 0 && (
-                                      <Chip
-                                        label={`${grupo.kg} kg`}
-                                        color="success"
-                                        size="small"
-                                        sx={{ fontWeight: 600 }}
-                                      />
-                                    )}
-                                    {grupo.unidade > 0 && (
-                                      <Chip
-                                        label={`${grupo.unidade} ${grupo.unidade === 1 ? 'unidade' : 'unidades'}`}
-                                        color="success"
-                                        size="small"
-                                        sx={{ fontWeight: 600 }}
-                                      />
-                                    )}
+                        {residuosAgrupados
+                          .filter((grupo) => getCategoriaById(grupo.categoriaId) !== undefined)
+                          .map((grupo, index) => {
+                            const categoria = getCategoriaById(grupo.categoriaId);
+                            
+                            return (
+                              <Card 
+                                key={index} 
+                                variant="outlined" 
+                                sx={{ 
+                                  bgcolor: 'success.50', 
+                                  borderColor: 'success.main',
+                                  borderWidth: 1,
+                                }}
+                              >
+                                <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                                    <Typography variant="body1" fontWeight={600}>
+                                      {categoria!.tipo}
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                      {grupo.kg > 0 && (
+                                        <Chip
+                                          label={`${grupo.kg} kg`}
+                                          color="success"
+                                          size="small"
+                                          sx={{ fontWeight: 600 }}
+                                        />
+                                      )}
+                                      {grupo.unidade > 0 && (
+                                        <Chip
+                                          label={`${grupo.unidade} ${grupo.unidade === 1 ? 'unidade' : 'unidades'}`}
+                                          color="success"
+                                          size="small"
+                                          sx={{ fontWeight: 600 }}
+                                        />
+                                      )}
+                                    </Box>
                                   </Box>
-                                </Box>
-                                {categoria?.descricao && (
-                                  <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-                                    {categoria.descricao}
-                                  </Typography>
-                                )}
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
+                                  {categoria!.descricao && (
+                                    <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                                      {categoria!.descricao}
+                                    </Typography>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
                       </Box>
                     </Box>
 

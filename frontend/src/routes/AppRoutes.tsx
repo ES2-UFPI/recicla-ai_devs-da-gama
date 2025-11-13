@@ -12,6 +12,7 @@ import ColetaDetalhes from '../pages/ColetaDetalhes';
 import Inventario from '../pages/Inventario';
 import Entregas from '../pages/Entregas';
 import LocalizarReceptora from '../pages/LocalizarReceptora';
+import RealizarEntrega from '../pages/RealizarEntrega';
 
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
@@ -94,6 +95,14 @@ export function AppRoutes() {
         <ProtectedRoute>
           <RoleBasedRoute allowedRoles={['coletor']}>
             <LocalizarReceptora />
+          </RoleBasedRoute>
+        </ProtectedRoute>
+      } />
+      {/* Rota Realizar Entrega */}
+      <Route path="/entrega/realizar/:id" element={
+        <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={['coletor']}>
+            <RealizarEntrega />
           </RoleBasedRoute>
         </ProtectedRoute>
       } />

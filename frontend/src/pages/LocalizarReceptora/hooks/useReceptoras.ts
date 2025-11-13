@@ -73,7 +73,7 @@ const MOCK_RECEPTORAS: Receptora[] = [
       latitude: '-5.0892',
       longitude: '-42.8019',
     },
-    materiais_aceitos: ['68f01f938fe830786876ccd4', '68f01f938fe830786876ccd6', '68f01f938fe830786876ccd7', '68f01f938fe830786876ccd5'],
+    materiais_aceitos: ['691539406ac616e0bcb1141d', '691539406ac616e0bcb1141f', '691539406ac616e0bcb11420', '691539406ac616e0bcb1141e'], // Plástico, Papel, Metal, Vidro
     horario_funcionamento: [
       { dia_semana: 'Segunda', hora_inicio: '08:00', hora_fim: '18:00', aberto: true },
       { dia_semana: 'Terça', hora_inicio: '08:00', hora_fim: '18:00', aberto: true },
@@ -103,7 +103,7 @@ const MOCK_RECEPTORAS: Receptora[] = [
       latitude: '-5.0820',
       longitude: '-42.8050',
     },
-    materiais_aceitos: ['68f01f938fe830786876ccd7', '68f01f938fe830786876ccd8', '68f01f938fe830786876ccd4'],
+    materiais_aceitos: ['691539406ac616e0bcb11420', '691539406ac616e0bcb11421', '691539406ac616e0bcb1141d'], // Metal, Eletrônico, Plástico
     horario_funcionamento: [
       { dia_semana: 'Segunda', hora_inicio: '07:00', hora_fim: '17:00', aberto: true },
       { dia_semana: 'Terça', hora_inicio: '07:00', hora_fim: '17:00', aberto: true },
@@ -133,7 +133,7 @@ const MOCK_RECEPTORAS: Receptora[] = [
       latitude: '-5.1000',
       longitude: '-42.7900',
     },
-    materiais_aceitos: ['68f01f938fe830786876ccd6', '68f01f938fe830786876ccd4'],
+    materiais_aceitos: ['691539406ac616e0bcb1141f', '691539406ac616e0bcb1141d'], // Papel, Plástico
     horario_funcionamento: [
       { dia_semana: 'Segunda', hora_inicio: '08:00', hora_fim: '17:00', aberto: true },
       { dia_semana: 'Terça', hora_inicio: '08:00', hora_fim: '17:00', aberto: true },
@@ -163,7 +163,7 @@ const MOCK_RECEPTORAS: Receptora[] = [
       latitude: '-5.0950',
       longitude: '-42.8100',
     },
-    materiais_aceitos: ['68f01f938fe830786876ccd5', '68f01f938fe830786876ccd4'],
+    materiais_aceitos: ['691539406ac616e0bcb1141e', '691539406ac616e0bcb1141d'], // Vidro, Plástico
     horario_funcionamento: [
       { dia_semana: 'Segunda', hora_inicio: '09:00', hora_fim: '18:00', aberto: true },
       { dia_semana: 'Terça', hora_inicio: '09:00', hora_fim: '18:00', aberto: true },
@@ -191,7 +191,7 @@ const MOCK_RECEPTORAS: Receptora[] = [
       latitude: '-5.0700',
       longitude: '-42.7950',
     },
-    materiais_aceitos: ['68f01f938fe830786876ccd8'],
+    materiais_aceitos: ['691539406ac616e0bcb11421'], // Eletrônico
     horario_funcionamento: [
       { dia_semana: 'Segunda', hora_inicio: '08:00', hora_fim: '17:30', aberto: true },
       { dia_semana: 'Terça', hora_inicio: '08:00', hora_fim: '17:30', aberto: true },
