@@ -61,6 +61,7 @@ O sistema implementa o **padrão Builder** para construção de usuários, garan
 - [Categorias](#categorias)
 - [Agendamentos](#agendamentos)
 - [Coletas](#coletas)
+- [Entregas](#entregas)
 - [Desenvolvimento](#desenvolvimento)
 
 ---
@@ -2448,7 +2449,178 @@ Retorna o inventory detalhado do coletor autenticado com dados completos dos res
 
 ---
 
-## �🔧 Desenvolvimento
+## 📦 Entregas
+
+O módulo de Entregas permite que coletores registrem a entrega de resíduos coletados para receptoras (ecopontos). 
+
+**Fluxo do Sistema:**
+1. Produtor cria resíduos → status: **DISPONIVEL**
+2. Coletor aceita agendamento → resíduos vão para: **AGENDADO** → **RESERVADO**
+3. Coletor coleta fisicamente → resíduos vão para: **COLETADO** (adicionados ao `inventory`)
+4. Coletor entrega na receptora → resíduos vão para: **ENTREGUE** (removidos do `inventory`)
+
+### Criar Entrega
+**POST** `http://localhost:8000/entregas`
+
+Registra uma entrega de resíduos do coletor para uma receptora (ecoponto).
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Regras de Autorização:**
+- ✅ **Coletor:** Pode criar entregas para seus resíduos coletados
+- ❌ **Produtor/Receptor:** Bloqueado
+
+**Fluxo Automático:**
+1. Valida que coletor tem os resíduos no `inventory`
+2. Valida que resíduos estão com status **COLETADO**
+3. Valida que receptora existe e é do tipo correto
+4. Cria registro da entrega no banco
+5. Atualiza status dos resíduos para **ENTREGUE**
+6. Remove resíduos do `inventory` do coletor
+7. Registra categorias dos resíduos entregues
+
+**Corpo da Requisição:**
+```json
+{
+  "receptora_id": "60c72b2f9b1d4c3a4c8e4d50",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3e",
+    "60c72b2f9b1d4c3a4c8e4d3f"
+  ],
+  "observacoes": "Entrega realizada com sucesso"
+}
+```
+
+**Campos:**
+- `receptora_id`: ID da receptora (ecoponto) que receberá os resíduos (obrigatório)
+- `residuos_id`: Array com IDs dos resíduos a entregar (obrigatório, mínimo 1)
+- `observacoes`: Observações sobre a entrega (opcional)
+
+**Validações Automáticas:**
+- ✅ Lista de resíduos não pode estar vazia
+- ✅ Todos os resíduos devem existir
+- ✅ Todos os resíduos devem estar no `inventory` do coletor
+- ✅ Todos os resíduos devem ter status **COLETADO**
+- ✅ Receptora deve existir e ter `role_id: "receptor"`
+
+**Resposta de Sucesso (201):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d60",
+  "data_hora": "2025-11-13T15:30:00Z",
+  "receptora_id": "60c72b2f9b1d4c3a4c8e4d50",
+  "coletor_id": "60c72b2f9b1d4c3a4c8e4d40",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3e",
+    "60c72b2f9b1d4c3a4c8e4d3f"
+  ],
+  "categorias_residuos_entregues": [
+    "plastico",
+    "papel"
+  ],
+  "observacoes": "Entrega realizada com sucesso"
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é coletor:
+```json
+{
+  "detail": "Apenas coletores podem criar entregas"
+}
+```
+
+**400 Bad Request** - Resíduo não está no inventory:
+```json
+{
+  "detail": "Resíduo '60c72b2f9b1d4c3a4c8e4d3e' não está no inventário do coletor"
+}
+```
+
+**404 Not Found** - Receptora não encontrada:
+```json
+{
+  "detail": "Receptora '60c72b2f9b1d4c3a4c8e4d50' não encontrada"
+}
+```
+
+---
+
+### Listar Minhas Entregas
+**GET** `http://localhost:8000/entregas`
+
+Lista todas as entregas realizadas pelo coletor autenticado.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Parâmetros de Query (opcionais):**
+- `skip`: Número de registros a pular (padrão: 0)
+- `limit`: Número máximo de registros (padrão: 100, máx: 1000)
+
+**Exemplo:** `http://localhost:8000/entregas?skip=0&limit=10`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d60",
+    "data_hora": "2025-11-13T15:30:00Z",
+    "receptora_id": "60c72b2f9b1d4c3a4c8e4d50",
+    "coletor_id": "60c72b2f9b1d4c3a4c8e4d40",
+    "residuos_id": ["60c72b2f9b1d4c3a4c8e4d3e", "60c72b2f9b1d4c3a4c8e4d3f"],
+    "categorias_residuos_entregues": ["plastico", "papel"],
+    "observacoes": "Entrega realizada com sucesso"
+  }
+]
+```
+
+**Observações:**
+- Retorna apenas entregas do coletor autenticado
+- Ordenado por `data_hora` (mais recente primeiro)
+- Lista vazia `[]` se não houver entregas
+
+---
+
+### Obter Sumário de Entregas
+**GET** `http://localhost:8000/entregas/sumario`
+
+Retorna estatísticas agregadas das entregas agrupadas por categoria e tipo de medida.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Exemplo:** `http://localhost:8000/entregas/sumario`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "categoriaId": "plastico",
+    "tipo_medida": "kg",
+    "quantidade_total": 150.5
+  },
+  {
+    "categoriaId": "papel",
+    "tipo_medida": "unidade",
+    "quantidade_total": 75.0
+  }
+]
+```
+
+**Casos de Uso:**
+- 📊 Dashboard do coletor mostrando total reciclado por categoria
+- 🎖️ Sistema de badges baseado em quantidade entregue
+- 📈 Relatórios de impacto ambiental
+- 🏆 Ranking de coletores
+
+**Observações:**
+- Agrupa por `categoriaId` e `tipo_medida`
+- Soma todas as quantidades entregues pelo coletor
+- Útil para gamificação e estatísticas
+
+---
+
+## Desenvolvimento
 
 ⚠️ **ATENÇÃO:** Estas rotas devem ser DESABILITADAS em produção!
 
