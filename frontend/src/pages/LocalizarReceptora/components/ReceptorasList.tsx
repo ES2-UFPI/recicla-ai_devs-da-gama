@@ -21,16 +21,16 @@ export function ReceptorasList({ receptoras, highlightedId, onItemClick }: Recep
 
   if (receptoras.length === 0) {
     return (
-      <Box 
-        sx={{ 
-          textAlign: 'center', 
-          py: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 2
-        }}
-      >
+        <Box 
+          sx={{ 
+            textAlign: 'center', 
+            py: 8,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2
+          }}
+        >
         <RecyclingIcon sx={{ fontSize: 80, color: 'action.disabled', opacity: 0.3 }} />
         <Typography variant="h6" color="text.secondary" fontWeight={600}>
           Nenhuma receptora encontrada
