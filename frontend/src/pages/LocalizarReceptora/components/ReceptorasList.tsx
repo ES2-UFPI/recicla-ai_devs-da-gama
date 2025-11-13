@@ -186,7 +186,7 @@ export function ReceptorasList({ receptoras, highlightedId, onItemClick }: Recep
                     <IconButton
                       size="small"
                       color="primary"
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${receptora.latitude},${receptora.longitude}`}
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${receptora.endereco.latitude},${receptora.endereco.longitude}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
