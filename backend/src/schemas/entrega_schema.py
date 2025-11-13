@@ -82,3 +82,33 @@ class EntregaResponse(BaseModel):
             }
         }
     }
+
+
+class EntregaSumario(BaseModel):
+    """
+    Schema para sumarização de entregas por categoria.
+    Usado para agregar estatísticas de entregas do coletor.
+    """
+    categoriaId: str = Field(
+        ..., 
+        description="ID da categoria do resíduo"
+    )
+    tipo_medida: str = Field(
+        ..., 
+        description="Tipo de medida (kg, unidade, litro, etc)"
+    )
+    quantidade_total: float = Field(
+        ..., 
+        description="Quantidade total entregue nesta categoria e tipo de medida",
+        ge=0
+    )
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "categoriaId": "plastico",
+                "tipo_medida": "kg",
+                "quantidade_total": 150.5
+            }
+        }
+    }

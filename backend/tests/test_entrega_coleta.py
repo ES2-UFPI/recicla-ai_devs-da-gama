@@ -137,8 +137,16 @@ class TestEntregaColeta:
         # Arrange
         coletor_id = "coletor123"
         
-        # Mock: encontrar coletor e receptora
-        mock_user_repo.find_by_id.side_effect = [mock_coletor_db, mock_receptora_db]
+        # Mock: encontrar coletor (3x: validação inicial, receptora, remover do inventory)
+        # e receptora (1x: validação)
+        mock_user_repo.find_by_id.side_effect = [
+            mock_coletor_db,    # 1ª chamada: validação inicial do coletor
+            mock_receptora_db,  # 2ª chamada: validação da receptora
+            mock_coletor_db     # 3ª chamada: buscar coletor para remover do inventory
+        ]
+        
+        # Mock: atualizar inventory do coletor
+        mock_user_repo.update_user = AsyncMock(return_value=True)
         
         # Mock: encontrar resíduos (um de cada vez)
         mock_residue_repo.find_by_id.side_effect = mock_residuos_db
@@ -169,9 +177,12 @@ class TestEntregaColeta:
         calls = mock_residue_repo.atualizar_status.call_args_list
         for call in calls:
             args, kwargs = call
-            # Verifica se o segundo argumento (novo_status) é "ENTREGUE"
-            assert args[1] == "ENTREGUE" or kwargs.get("novo_status") == "ENTREGUE", \
+            # Como a chamada usa argumentos nomeados, verifica kwargs
+            assert kwargs.get("novo_status") == "ENTREGUE", \
                 "Status deve ser atualizado para ENTREGUE"
+            assert "residuo_id" in kwargs, "Deve ter residuo_id nos argumentos"
+            assert "usuario_id" in kwargs, "Deve ter usuario_id nos argumentos"
+            assert kwargs["usuario_id"] == coletor_id, "usuario_id deve ser o coletor"
 
     @pytest.mark.asyncio
     async def test_entrega_sem_residuos(
