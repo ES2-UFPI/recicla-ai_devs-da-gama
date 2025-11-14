@@ -1,12 +1,10 @@
 import { Box, Card, CardContent, Typography, Chip, Divider, IconButton, Tooltip, Button } from '@mui/material';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import PhoneIcon from '@mui/icons-material/Phone';
 import DirectionsIcon from '@mui/icons-material/Directions';
 import RecyclingIcon from '@mui/icons-material/Recycling';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import { useNavigate } from 'react-router-dom';
-import type { Receptora } from '../hooks/useReceptoras';
+import type { Receptora } from '../../../types/entrega';
 import { useCategorias } from '../../LocalizarColeta/hooks/useCategorias';
 
 interface ReceptorasListProps {
@@ -42,42 +40,13 @@ export function ReceptorasList({ receptoras, highlightedId, onItemClick }: Recep
     );
   }
 
-  const getHorarioHoje = (receptora: Receptora): { texto: string; aberto: boolean } => {
-    const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-    const hoje = new Date().getDay();
-    const diaHoje = diasSemana[hoje];
-    
-    const horario = receptora.horario_funcionamento.find((h: { dia_semana: string; aberto: boolean }) => h.dia_semana === diaHoje);
-    
-    if (!horario || !horario.aberto) {
-      return { texto: 'Fechado hoje', aberto: false };
-    }
-    
-    return { texto: `${horario.hora_inicio} - ${horario.hora_fim}`, aberto: true };
-  };
-
-  const isReceptoraAberta = (horario: { texto: string; aberto: boolean }): boolean => {
-    if (!horario.aberto) return false;
-    
-    const now = new Date();
-    const currentTime = now.getHours() * 60 + now.getMinutes();
-    
-    const [inicio, fim] = horario.texto.split(' - ');
-    const [horaInicio, minInicio] = inicio.split(':').map(Number);
-    const [horaFim, minFim] = fim.split(':').map(Number);
-    
-    const inicioMin = horaInicio * 60 + minInicio;
-    const fimMin = horaFim * 60 + minFim;
-    
-    return currentTime >= inicioMin && currentTime <= fimMin;
-  };
-
   return (
     <Box>
       {receptoras.map((receptora) => {
         const isHighlighted = receptora.id === highlightedId;
-        const horarioHoje = getHorarioHoje(receptora);
-        const aberta = isReceptoraAberta(horarioHoje);
+        const enderecoPrincipal = receptora.addresses && receptora.addresses.length > 0 
+          ? receptora.addresses[0] 
+          : null;
 
         return (
           <Card
@@ -100,93 +69,57 @@ export function ReceptorasList({ receptoras, highlightedId, onItemClick }: Recep
             }}
           >
             <CardContent>
-              {/* Cabeçalho com Badge de Status */}
+              {/* Cabeçalho com Badge de Distância */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="h6" fontWeight={600} color="success.main">
-                    {receptora.nome}
+                    {receptora.name}
                   </Typography>
-                  {receptora.descricao && (
-                    <Typography variant="body2" color="text.secondary" mt={0.5}>
-                      {receptora.descricao}
-                    </Typography>
-                  )}
+                  <Typography variant="body2" color="text.secondary" mt={0.5}>
+                    {receptora.email}
+                  </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-end' }}>
-                  {receptora.distancia_km !== undefined && (
-                    <Chip
-                      label={`${receptora.distancia_km.toFixed(1)} km`}
-                      size="small"
-                      color="success"
-                      variant="outlined"
-                      sx={{ fontWeight: 600 }}
-                    />
-                  )}
-                  <Chip
-                    label={aberta ? 'Aberto' : 'Fechado'}
-                    color={aberta ? 'success' : 'error'}
-                    size="small"
-                    sx={{ fontWeight: 600 }}
-                  />
-                </Box>
+                <Chip
+                  label={`${receptora.distancia_km.toFixed(1)} km`}
+                  size="small"
+                  color="success"
+                  variant="outlined"
+                  sx={{ fontWeight: 600 }}
+                />
               </Box>
 
               <Divider sx={{ my: 1.5 }} />
 
               {/* Endereço */}
-              <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                <LocationOnIcon fontSize="small" color="action" />
-                <Box>
-                  <Typography variant="body2">
-                    {receptora.endereco.logradouro}, {receptora.endereco.numero}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {receptora.endereco.bairro} - CEP: {receptora.endereco.cep}
-                  </Typography>
-                </Box>
-              </Box>
-
-              {/* Horário hoje */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <AccessTimeIcon fontSize="small" color="action" />
-                <Typography 
-                  variant="body2" 
-                  color={!horarioHoje.aberto ? 'error' : aberta ? 'success.main' : 'text.secondary'}
-                  fontWeight={aberta ? 600 : 400}
-                >
-                  <strong>Hoje:</strong> {horarioHoje.texto}
-                  {aberta && ' 🟢'}
-                </Typography>
-              </Box>
-
-              {/* Telefone e Ações Rápidas */}
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                {receptora.telefone && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <PhoneIcon fontSize="small" color="action" />
+              {enderecoPrincipal && (
+                <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
+                  <LocationOnIcon fontSize="small" color="action" />
+                  <Box>
                     <Typography variant="body2">
-                      {receptora.telefone}
+                      {enderecoPrincipal.logradouro}, {enderecoPrincipal.numero}
                     </Typography>
+                    {enderecoPrincipal.complemento && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        {enderecoPrincipal.complemento}
+                      </Typography>
+                    )}
+                    {enderecoPrincipal.bairro && enderecoPrincipal.cep && (
+                      <Typography variant="caption" color="text.secondary">
+                        {enderecoPrincipal.bairro} - CEP: {enderecoPrincipal.cep}
+                      </Typography>
+                    )}
                   </Box>
-                )}
-                <Box sx={{ display: 'flex', gap: 0.5 }}>
-                  {receptora.telefone && (
-                    <Tooltip title="Ligar">
-                      <IconButton
-                        size="small"
-                        color="success"
-                        href={`tel:${receptora.telefone.replace(/\D/g, '')}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <PhoneIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
+                </Box>
+              )}
+
+              {/* Ações Rápidas */}
+              {enderecoPrincipal?.latitude && enderecoPrincipal?.longitude && (
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5, mb: 1.5 }}>
                   <Tooltip title="Ver rotas no Google Maps">
                     <IconButton
                       size="small"
                       color="primary"
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${receptora.endereco.latitude},${receptora.endereco.longitude}`}
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${enderecoPrincipal.latitude},${enderecoPrincipal.longitude}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
@@ -195,7 +128,7 @@ export function ReceptorasList({ receptoras, highlightedId, onItemClick }: Recep
                     </IconButton>
                   </Tooltip>
                 </Box>
-              </Box>
+              )}
 
               {/* Botão Realizar Entrega */}
               <Button
@@ -224,7 +157,7 @@ export function ReceptorasList({ receptoras, highlightedId, onItemClick }: Recep
                     color="default"
                     variant="outlined"
                   />
-                ) : receptora.materiais_aceitos.length === 0 ? (
+                ) : receptora.accepted_material.length === 0 ? (
                   <Chip
                     label="Nenhum material especificado"
                     size="small"
@@ -232,7 +165,7 @@ export function ReceptorasList({ receptoras, highlightedId, onItemClick }: Recep
                     variant="outlined"
                   />
                 ) : (
-                  receptora.materiais_aceitos
+                  receptora.accepted_material
                     .filter((categoriaId: string) => getCategoriaById(categoriaId) !== undefined)
                     .map((categoriaId: string) => {
                       const categoria = getCategoriaById(categoriaId);
@@ -248,15 +181,6 @@ export function ReceptorasList({ receptoras, highlightedId, onItemClick }: Recep
                     })
                 )}
               </Box>
-
-              {/* Observações */}
-              {receptora.observacoes && (
-                <Box sx={{ mt: 1.5, p: 1, bgcolor: 'info.50', borderRadius: 1, borderLeft: 3, borderColor: 'info.main' }}>
-                  <Typography variant="caption" color="text.secondary">
-                    ℹ️ {receptora.observacoes}
-                  </Typography>
-                </Box>
-              )}
             </CardContent>
           </Card>
         );
