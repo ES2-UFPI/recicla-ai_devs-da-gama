@@ -3,6 +3,111 @@ from typing import Optional, List
 from datetime import datetime
 
 
+class BuscarReceptorasRequest(BaseModel):
+    """
+    Schema para requisição de busca de receptoras próximas.
+    Usado pelo coletor para encontrar receptoras em um raio específico.
+    """
+    latitude: float = Field(
+        ...,
+        description="Latitude da localização atual do coletor",
+        ge=-90,
+        le=90,
+        example=-23.5505
+    )
+    longitude: float = Field(
+        ...,
+        description="Longitude da localização atual do coletor",
+        ge=-180,
+        le=180,
+        example=-46.6333
+    )
+    raio: float = Field(
+        ...,
+        description="Raio de busca em quilômetros",
+        gt=0,
+        le=100,
+        example=5.0
+    )
+    materiais_aceitos: Optional[List[str]] = Field(
+        None,
+        description="Filtrar receptoras que aceitem estes materiais (opcional)",
+        example=["plástico", "papel"]
+    )
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "latitude": -23.5505,
+                "longitude": -46.6333,
+                "raio": 5.0,
+                "materiais_aceitos": ["plástico", "papel"]
+            }
+        }
+    }
+
+
+class ReceptoraComDistancia(BaseModel):
+    """
+    Schema para resposta de receptora com distância calculada.
+    Inclui informações da receptora e a distância até o coletor.
+    """
+    id: str = Field(
+        ...,
+        description="ID da receptora"
+    )
+    name: str = Field(
+        ...,
+        description="Nome da receptora"
+    )
+    email: str = Field(
+        ...,
+        description="Email de contato da receptora"
+    )
+    phone: str = Field(
+        ...,
+        description="Telefone de contato da receptora"
+    )
+    accepted_material: List[str] = Field(
+        ...,
+        description="Lista de materiais aceitos pela receptora"
+    )
+    addresses: Optional[List[dict]] = Field(
+        None,
+        description="Lista de endereços da receptora"
+    )
+    distancia_km: float = Field(
+        ...,
+        description="Distância em quilômetros do coletor até a receptora",
+        ge=0
+    )
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "id": "507f1f77bcf86cd799439011",
+                "name": "Ecoponto Central",
+                "email": "ecoponto@example.com",
+                "phone": "(11) 98765-4321",
+                "accepted_material": ["plástico", "papel", "metal"],
+                "addresses": [
+                    {
+                        "id": 1,
+                        "apelido": "Principal",
+                        "cep": "12345-678",
+                        "logradouro": "Rua Verde",
+                        "numero": "100",
+                        "latitude": "-23.5505",
+                        "longitude": "-46.6333",
+                        "complemento": "Galpão 2"
+                    }
+                ],
+                "distancia_km": 2.5
+            }
+        }
+    }
+
+
 class EntregaCreate(BaseModel):
     """
     Schema para criação de uma entrega.

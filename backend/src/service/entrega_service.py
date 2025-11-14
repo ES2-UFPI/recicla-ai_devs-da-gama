@@ -6,10 +6,12 @@ Este service implementa:
 2. Atualização de status dos resíduos para ENTREGUE
 3. Remoção de resíduos do inventário do coletor
 4. Listagem de entregas com sumarização por categoria
+5. Busca de receptoras próximas com cálculo de distância
 """
 from typing import Dict, Any, List
 from datetime import datetime
 from collections import defaultdict
+from math import radians, sin, cos, sqrt, atan2
 from fastapi import HTTPException
 
 from src.infra.database.repositories import entrega_repo
@@ -20,6 +22,8 @@ from src.schemas.entrega_schema import (
     EntregaCreate,
     EntregaResponse,
     EntregaSumario,
+    BuscarReceptorasRequest,
+    ReceptoraComDistancia,
 )
 
 from src.infra.database.models.enums import StatusResiduo
@@ -263,3 +267,163 @@ class EntregaService:
         
         # Atualizar no banco
         await user_repo.update_user(coletor_id, {"inventory": inventory_atualizado})
+    
+    # ==================== MÉTODOS DE BUSCA DE RECEPTORAS ====================
+    
+    @staticmethod
+    def _calcular_distancia_haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """
+        Calcula a distância em quilômetros entre duas coordenadas geográficas.
+        Utiliza a fórmula de Haversine para calcular a distância great-circle.
+
+        Args:
+            lat1: Latitude do ponto 1 (graus)
+            lon1: Longitude do ponto 1 (graus)
+            lat2: Latitude do ponto 2 (graus)
+            lon2: Longitude do ponto 2 (graus)
+        
+        Returns:
+            float: Distância em quilômetros
+
+        Referência: https://en.wikipedia.org/wiki/Haversine_formula
+        """
+        # Raio da Terra em quilômetros
+        R = 6371.0
+        
+        # Converter de graus para radianos
+        lat1_rad = radians(lat1)
+        lon1_rad = radians(lon1)
+        lat2_rad = radians(lat2)
+        lon2_rad = radians(lon2)
+        
+        # Diferenças
+        dlat = lat2_rad - lat1_rad
+        dlon = lon2_rad - lon1_rad
+        
+        # Fórmula de Haversine
+        a = sin(dlat / 2)**2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlon / 2)**2
+        c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        
+        distancia = R * c
+        return distancia
+    
+    @staticmethod
+    async def buscar_receptoras_proximas(
+        filtros: BuscarReceptorasRequest,
+        current_user: Dict[str, Any]
+    ) -> List[ReceptoraComDistancia]:
+        """
+        Busca receptoras próximas dentro de um raio de localização.
+        
+        Algoritmo:
+        1. Valida que usuário é coletor
+        2. Busca todas as receptoras no banco de dados
+        3. Para cada receptora:
+           - Calcula distância usando Haversine baseado no primeiro endereço
+           - Filtra por raio especificado
+           - Opcionalmente filtra por materiais aceitos
+        4. Ordena por distância (mais próximas primeiro)
+        5. Retorna lista com informações da receptora + distância
+
+        Args:
+            filtros: Parâmetros de busca (lat, lon, raio, materiais_aceitos)
+            current_user: Usuário autenticado (deve ser role "coletor")
+        
+        Returns:
+            Lista de receptoras com distância calculada,
+            ordenadas da mais próxima para a mais distante
+            
+        Raises:
+            HTTPException: 
+                - 403 se usuário não for coletor
+        """
+        # Verificar se usuário é coletor
+        user_role = current_user.get("role_id")
+        if user_role != "coletor":
+            raise HTTPException(
+                status_code=403,
+                detail="Apenas coletores podem buscar receptoras próximas"
+            )
+        
+        # Buscar todas as receptoras do sistema
+        # Como não há método específico no user_repo, vamos usar o MongoDB diretamente
+        from src.infra.database.config.database import get_database
+        db = get_database()
+        users_collection = db["users"]
+        
+        # Query para buscar apenas usuários com role "receptor"
+        receptoras_cursor = users_collection.find({"role_id": "receptor"})
+        receptoras = await receptoras_cursor.to_list(length=None)
+        
+        if not receptoras:
+            return []
+        
+        # Calcular distância e filtrar por raio
+        receptoras_com_distancia = []
+        
+        for receptora in receptoras:
+            # Pegar endereços da receptora
+            addresses = receptora.get("addresses", [])
+            if not addresses:
+                continue  # Pular receptoras sem endereço
+            
+            # Usar o primeiro endereço para calcular distância
+            primeiro_endereco = addresses[0]
+            lat_receptora = primeiro_endereco.get("latitude")
+            lon_receptora = primeiro_endereco.get("longitude")
+            
+            # Validar se coordenadas existem
+            if not lat_receptora or not lon_receptora:
+                continue
+            
+            try:
+                lat_receptora = float(lat_receptora)
+                lon_receptora = float(lon_receptora)
+            except (ValueError, TypeError):
+                continue  # Coordenadas inválidas
+            
+            # Calcular distância
+            distancia = EntregaService._calcular_distancia_haversine(
+                filtros.latitude,
+                filtros.longitude,
+                lat_receptora,
+                lon_receptora
+            )
+            
+            # Filtrar por raio
+            if distancia > filtros.raio:
+                continue  # Fora do raio especificado
+            
+            # Filtrar por materiais aceitos (se especificado)
+            if filtros.materiais_aceitos:
+                materiais_receptora = receptora.get("accepted_material", [])
+                # Verificar se a receptora aceita pelo menos um dos materiais solicitados
+                if not any(material in materiais_receptora for material in filtros.materiais_aceitos):
+                    continue  # Não aceita nenhum dos materiais
+            
+            # Adicionar à lista com distância
+            receptoras_com_distancia.append({
+                "receptora": receptora,
+                "distancia_km": round(distancia, 2)
+            })
+        
+        # Ordenar por distância (mais próxima primeiro)
+        receptoras_com_distancia.sort(key=lambda x: x["distancia_km"])
+        
+        # Montar resposta
+        resultado = []
+        for item in receptoras_com_distancia:
+            receptora = item["receptora"]
+            resultado.append(
+                ReceptoraComDistancia(
+                    id=str(receptora.get("_id")),
+                    name=receptora.get("name", ""),
+                    email=receptora.get("email", ""),
+                    phone=receptora.get("phone", ""),
+                    accepted_material=receptora.get("accepted_material", []),
+                    addresses=receptora.get("addresses", []),
+                    distancia_km=item["distancia_km"]
+                )
+            )
+        
+        return resultado
