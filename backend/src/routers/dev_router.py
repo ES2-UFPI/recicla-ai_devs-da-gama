@@ -170,6 +170,89 @@ async def limpar_categorias():
         }
 
 
+@router.get("/seed/heavy")
+async def seed_heavy():
+    """
+    Executa seed pesado do banco de dados completo.
+    
+    ⚠️ Endpoint de desenvolvimento - use apenas em ambiente de dev/staging!
+    
+    Popula o banco com:
+    - Categorias padrão (5 tipos)
+    - 12 Produtores (pessoas físicas e empresas)
+    - 6 Coletores
+    - 4 Receptoras (ecopontos)
+    - ~60 Resíduos
+    - ~25 Agendamentos
+    - ~18 Coletas (em diferentes estados)
+    - ~12 Entregas
+    
+    Credenciais de acesso:
+    - Email: qualquer.usuario@reciclaai.com.br (ex: joao.silva@reciclaai.com.br)
+    - Senha: Senha@123
+    
+    Returns:
+        dict: Resumo da operação com quantidades criadas
+    """
+    import sys
+    from pathlib import Path
+    
+    # Importar o módulo de seed
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from scripts.seed_heavy import (
+        seed_categorias,
+        seed_produtores,
+        seed_coletores,
+        seed_receptoras,
+        seed_residuos,
+        seed_agendamentos,
+        seed_coletas,
+        seed_entregas
+    )
+    
+    try:
+        # Executar seeds em ordem
+        categoria_ids = await seed_categorias()
+        produtor_ids = await seed_produtores(quantidade=12)
+        coletor_ids = await seed_coletores(quantidade=6)
+        receptora_ids = await seed_receptoras(quantidade=4)
+        residuo_ids = await seed_residuos(produtor_ids, categoria_ids, quantidade_por_produtor=5)
+        agendamento_ids = await seed_agendamentos(produtor_ids, residuo_ids, quantidade=25)
+        coleta_ids = await seed_coletas(agendamento_ids, coletor_ids, quantidade=18)
+        entrega_ids = await seed_entregas(coleta_ids, receptora_ids, quantidade=12)
+        
+        return {
+            "ok": 1,
+            "resumo": {
+                "categorias": len(categoria_ids),
+                "produtores": len(produtor_ids),
+                "coletores": len(coletor_ids),
+                "receptoras": len(receptora_ids),
+                "residuos": len(residuo_ids),
+                "agendamentos": len(agendamento_ids),
+                "coletas": len(coleta_ids),
+                "entregas": len(entrega_ids)
+            },
+            "credenciais": {
+                "email": "qualquer.usuario@reciclaai.com.br",
+                "senha": "Senha@123",
+                "exemplos": [
+                    "joao.silva@reciclaai.com.br",
+                    "maria.santos@reciclaai.com.br",
+                    "marcos.coletor@reciclaai.com.br",
+                    "ecoponto.centro@reciclaai.com.br"
+                ]
+            },
+            "mensagem": "✅ Seed pesado concluído com sucesso!"
+        }
+    except Exception as e:
+        return {
+            "ok": 0,
+            "erro": str(e),
+            "mensagem": "❌ Erro ao executar seed pesado."
+        }
+
+
 @router.get("/info")
 async def info_dev():
     """
@@ -181,6 +264,7 @@ async def info_dev():
     return {
         "endpoints": {
             "GET /dev/seed/categorias": "Popula categorias padrão (Plástico, Vidro, Papel, Metal, Eletrônico)",
+            "GET /dev/seed/heavy": "🚀 Popula banco completo (12 produtores, 6 coletores, 4 receptoras, ~60 resíduos, etc)",
             "GET /dev/seed/limpar-categorias": "⚠️ Remove TODAS as categorias do banco",
             "GET /dev/info": "Exibe esta mensagem de ajuda"
         },

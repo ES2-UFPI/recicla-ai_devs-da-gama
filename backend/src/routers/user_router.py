@@ -49,8 +49,7 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
 	return UserPublic(
 		name=current_user["name"],
 		email=current_user["email"],
-		role_id=current_user["role_id"],
-		addresses=current_user.get("addresses", [])
+		role_id=current_user["role_id"]
 	)
 
 

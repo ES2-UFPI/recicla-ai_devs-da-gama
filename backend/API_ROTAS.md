@@ -61,6 +61,7 @@ O sistema implementa o **padrão Builder** para construção de usuários, garan
 - [Categorias](#categorias)
 - [Agendamentos](#agendamentos)
 - [Coletas](#coletas)
+- [Entregas](#entregas)
 - [Desenvolvimento](#desenvolvimento)
 
 ---
@@ -349,7 +350,7 @@ Cada builder valida campos obrigatórios específicos da role antes de persistir
   "role_id": "receptor",
   "cidade_id": "cidade_123",
   "estado_id": "estado_456",
-  "accepted_material": ["plástico", "papel", "metal", "vidro"],
+  "accepted_material": ["plástico_id", "papel_id", "metal_id", "vidro_id"],
   "addresses": [
     {
       "apelido": "Ponto de Coleta Principal",
@@ -2448,7 +2449,331 @@ Retorna o inventory detalhado do coletor autenticado com dados completos dos res
 
 ---
 
-## �🔧 Desenvolvimento
+## 📦 Entregas
+
+O módulo de Entregas permite que coletores registrem a entrega de resíduos coletados para receptoras (ecopontos). 
+
+**Fluxo do Sistema:**
+1. Produtor cria resíduos → status: **DISPONIVEL**
+2. Coletor aceita agendamento → resíduos vão para: **AGENDADO** → **RESERVADO**
+3. Coletor coleta fisicamente → resíduos vão para: **COLETADO** (adicionados ao `inventory`)
+4. Coletor entrega na receptora → resíduos vão para: **ENTREGUE** (removidos do `inventory`)
+
+### Criar Entrega
+**POST** `http://localhost:8000/entregas`
+
+Registra uma entrega de resíduos do coletor para uma receptora (ecoponto).
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Regras de Autorização:**
+- ✅ **Coletor:** Pode criar entregas para seus resíduos coletados
+- ❌ **Produtor/Receptor:** Bloqueado
+
+**Fluxo Automático:**
+1. Valida que coletor tem os resíduos no `inventory`
+2. Valida que resíduos estão com status **COLETADO**
+3. Valida que receptora existe e é do tipo correto
+4. Cria registro da entrega no banco
+5. Atualiza status dos resíduos para **ENTREGUE**
+6. Remove resíduos do `inventory` do coletor
+7. Registra categorias dos resíduos entregues
+
+**Corpo da Requisição:**
+```json
+{
+  "receptora_id": "60c72b2f9b1d4c3a4c8e4d50",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3e",
+    "60c72b2f9b1d4c3a4c8e4d3f"
+  ],
+  "observacoes": "Entrega realizada com sucesso"
+}
+```
+
+**Campos:**
+- `receptora_id`: ID da receptora (ecoponto) que receberá os resíduos (obrigatório)
+- `residuos_id`: Array com IDs dos resíduos a entregar (obrigatório, mínimo 1)
+- `observacoes`: Observações sobre a entrega (opcional)
+
+**Validações Automáticas:**
+- ✅ Lista de resíduos não pode estar vazia
+- ✅ Todos os resíduos devem existir
+- ✅ Todos os resíduos devem estar no `inventory` do coletor
+- ✅ Todos os resíduos devem ter status **COLETADO**
+- ✅ Receptora deve existir e ter `role_id: "receptor"`
+
+**Resposta de Sucesso (201):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d60",
+  "data_hora": "2025-11-13T15:30:00Z",
+  "receptora_id": "60c72b2f9b1d4c3a4c8e4d50",
+  "coletor_id": "60c72b2f9b1d4c3a4c8e4d40",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3e",
+    "60c72b2f9b1d4c3a4c8e4d3f"
+  ],
+  "categorias_residuos_entregues": [
+    "plastico",
+    "papel"
+  ],
+  "observacoes": "Entrega realizada com sucesso"
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é coletor:
+```json
+{
+  "detail": "Apenas coletores podem criar entregas"
+}
+```
+
+**400 Bad Request** - Resíduo não está no inventory:
+```json
+{
+  "detail": "Resíduo '60c72b2f9b1d4c3a4c8e4d3e' não está no inventário do coletor"
+}
+```
+
+**404 Not Found** - Receptora não encontrada:
+```json
+{
+  "detail": "Receptora '60c72b2f9b1d4c3a4c8e4d50' não encontrada"
+}
+```
+
+---
+
+### Listar Minhas Entregas
+**GET** `http://localhost:8000/entregas`
+
+Lista todas as entregas realizadas pelo coletor autenticado.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Parâmetros de Query (opcionais):**
+- `skip`: Número de registros a pular (padrão: 0)
+- `limit`: Número máximo de registros (padrão: 100, máx: 1000)
+
+**Exemplo:** `http://localhost:8000/entregas?skip=0&limit=10`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d60",
+    "data_hora": "2025-11-13T15:30:00Z",
+    "receptora_id": "60c72b2f9b1d4c3a4c8e4d50",
+    "coletor_id": "60c72b2f9b1d4c3a4c8e4d40",
+    "residuos_id": ["60c72b2f9b1d4c3a4c8e4d3e", "60c72b2f9b1d4c3a4c8e4d3f"],
+    "categorias_residuos_entregues": ["plastico", "papel"],
+    "observacoes": "Entrega realizada com sucesso"
+  }
+]
+```
+
+**Observações:**
+- Retorna apenas entregas do coletor autenticado
+- Ordenado por `data_hora` (mais recente primeiro)
+- Lista vazia `[]` se não houver entregas
+
+---
+
+### Obter Sumário de Entregas
+**GET** `http://localhost:8000/entregas/sumario`
+
+Retorna estatísticas agregadas das entregas agrupadas por categoria e tipo de medida.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Exemplo:** `http://localhost:8000/entregas/sumario`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "categoriaId": "plastico",
+    "tipo_medida": "kg",
+    "quantidade_total": 150.5
+  },
+  {
+    "categoriaId": "papel",
+    "tipo_medida": "unidade",
+    "quantidade_total": 75.0
+  }
+]
+```
+
+**Casos de Uso:**
+- 📊 Dashboard do coletor mostrando total reciclado por categoria
+- 🎖️ Sistema de badges baseado em quantidade entregue
+- 📈 Relatórios de impacto ambiental
+- 🏆 Ranking de coletores
+
+**Observações:**
+- Agrupa por `categoriaId` e `tipo_medida`
+- Soma todas as quantidades entregues pelo coletor
+- Útil para gamificação e estatísticas
+
+---
+
+### Buscar Receptoras Próximas
+**POST** `http://localhost:8000/entregas/buscar-receptoras`
+
+Busca receptoras (ecopontos) próximas da localização atual do coletor.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Descrição:**
+Permite que o coletor encontre receptoras disponíveis para entrega de resíduos dentro de um raio específico. Usa a fórmula de Haversine para calcular distâncias geográficas e retorna resultados ordenados por proximidade.
+
+**Algoritmo:**
+1. Valida que usuário é coletor
+2. Busca todas as receptoras no sistema
+3. Calcula distância usando fórmula de Haversine (baseada no primeiro endereço)
+4. Filtra por raio especificado
+5. Opcionalmente filtra por materiais aceitos
+6. Ordena por distância (mais próximas primeiro)
+
+**Corpo da Requisição:**
+```json
+{
+  "latitude": -23.5505,
+  "longitude": -46.6333,
+  "raio": 5.0,
+  "materiais_aceitos": ["plástico", "papel"]
+}
+```
+
+**Campos:**
+- `latitude`: Latitude da localização atual do coletor (obrigatório, entre -90 e 90)
+- `longitude`: Longitude da localização atual do coletor (obrigatório, entre -180 e 180)
+- `raio`: Raio de busca em quilômetros (obrigatório, máximo 100km)
+- `materiais_aceitos`: Lista de materiais para filtrar receptoras (opcional)
+
+**Validações Automáticas:**
+- ✅ Latitude deve estar entre -90 e 90 graus
+- ✅ Longitude deve estar entre -180 e 180 graus
+- ✅ Raio deve ser maior que 0 e no máximo 100km
+- ✅ Apenas coletores autenticados podem acessar
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d50",
+    "name": "Ecoponto Central",
+    "email": "ecoponto@example.com",
+    "phone": "(11) 98765-4321",
+    "accepted_material": ["plástico", "papel", "metal"],
+    "addresses": [
+      {
+        "id": 1,
+        "apelido": "Principal",
+        "cep": "12345-678",
+        "logradouro": "Rua Verde",
+        "numero": "100",
+        "latitude": "-23.5505",
+        "longitude": "-46.6333",
+        "complemento": "Galpão 2"
+      }
+    ],
+    "distancia_km": 2.5
+  },
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d51",
+    "name": "Ecoponto Sustentável",
+    "email": "sustentavel@example.com",
+    "phone": "(11) 91234-5678",
+    "accepted_material": ["plástico", "vidro", "papel"],
+    "addresses": [
+      {
+        "id": 1,
+        "apelido": "Sede",
+        "cep": "12345-679",
+        "logradouro": "Avenida Ecológica",
+        "numero": "200",
+        "latitude": "-23.5520",
+        "longitude": "-46.6340",
+        "complemento": null
+      }
+    ],
+    "distancia_km": 4.3
+  }
+]
+```
+
+**Resposta quando não há receptoras no raio (200):**
+```json
+[]
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é coletor:
+```json
+{
+  "detail": "Apenas coletores podem buscar receptoras próximas"
+}
+```
+
+**422 Unprocessable Entity** - Validação de dados falhou:
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "raio"],
+      "msg": "ensure this value is less than or equal to 100",
+      "type": "value_error.number.not_le"
+    }
+  ]
+}
+```
+
+**Casos de Uso:**
+- 📍 Coletor visualiza ecopontos próximos para planejar rota de entrega
+- 🔍 Filtrar receptoras que aceitam tipos específicos de materiais
+- 🗺️ Mapa interativo mostrando receptoras disponíveis
+- 📊 Otimização de logística de entrega
+
+**Observações:**
+- Distância é calculada usando fórmula de Haversine (great-circle distance)
+- Resultados ordenados por distância (mais próxima primeiro)
+- Filtro de materiais é opcional - se omitido, retorna todas as receptoras no raio
+- Usa o primeiro endereço cadastrado da receptora para calcular distância
+- Receptoras sem endereço ou com coordenadas inválidas são ignoradas
+- Máximo de 100km de raio para evitar sobrecarga
+
+**Exemplo de Integração com Mapa:**
+```javascript
+// Frontend React
+async function buscarReceptoras() {
+  const position = await navigator.geolocation.getCurrentPosition();
+  
+  const response = await fetch('http://localhost:8000/entregas/buscar-receptoras', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      raio: 10.0,
+      materiais_aceitos: ['plástico', 'papel']
+    })
+  });
+  
+  const receptoras = await response.json();
+  // Renderizar marcadores no mapa
+  receptoras.forEach(r => addMarker(r.addresses[0].latitude, r.addresses[0].longitude));
+}
+```
+
+---
+
+## Desenvolvimento
 
 ⚠️ **ATENÇÃO:** Estas rotas devem ser DESABILITADAS em produção!
 
