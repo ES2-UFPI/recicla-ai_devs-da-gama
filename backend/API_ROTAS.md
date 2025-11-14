@@ -350,7 +350,7 @@ Cada builder valida campos obrigatórios específicos da role antes de persistir
   "role_id": "receptor",
   "cidade_id": "cidade_123",
   "estado_id": "estado_456",
-  "accepted_material": ["plástico", "papel", "metal", "vidro"],
+  "accepted_material": ["plástico_id", "papel_id", "metal_id", "vidro_id"],
   "addresses": [
     {
       "apelido": "Ponto de Coleta Principal",
@@ -2617,6 +2617,159 @@ Retorna estatísticas agregadas das entregas agrupadas por categoria e tipo de m
 - Agrupa por `categoriaId` e `tipo_medida`
 - Soma todas as quantidades entregues pelo coletor
 - Útil para gamificação e estatísticas
+
+---
+
+### Buscar Receptoras Próximas
+**POST** `http://localhost:8000/entregas/buscar-receptoras`
+
+Busca receptoras (ecopontos) próximas da localização atual do coletor.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Descrição:**
+Permite que o coletor encontre receptoras disponíveis para entrega de resíduos dentro de um raio específico. Usa a fórmula de Haversine para calcular distâncias geográficas e retorna resultados ordenados por proximidade.
+
+**Algoritmo:**
+1. Valida que usuário é coletor
+2. Busca todas as receptoras no sistema
+3. Calcula distância usando fórmula de Haversine (baseada no primeiro endereço)
+4. Filtra por raio especificado
+5. Opcionalmente filtra por materiais aceitos
+6. Ordena por distância (mais próximas primeiro)
+
+**Corpo da Requisição:**
+```json
+{
+  "latitude": -23.5505,
+  "longitude": -46.6333,
+  "raio": 5.0,
+  "materiais_aceitos": ["plástico", "papel"]
+}
+```
+
+**Campos:**
+- `latitude`: Latitude da localização atual do coletor (obrigatório, entre -90 e 90)
+- `longitude`: Longitude da localização atual do coletor (obrigatório, entre -180 e 180)
+- `raio`: Raio de busca em quilômetros (obrigatório, máximo 100km)
+- `materiais_aceitos`: Lista de materiais para filtrar receptoras (opcional)
+
+**Validações Automáticas:**
+- ✅ Latitude deve estar entre -90 e 90 graus
+- ✅ Longitude deve estar entre -180 e 180 graus
+- ✅ Raio deve ser maior que 0 e no máximo 100km
+- ✅ Apenas coletores autenticados podem acessar
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d50",
+    "name": "Ecoponto Central",
+    "email": "ecoponto@example.com",
+    "phone": "(11) 98765-4321",
+    "accepted_material": ["plástico", "papel", "metal"],
+    "addresses": [
+      {
+        "id": 1,
+        "apelido": "Principal",
+        "cep": "12345-678",
+        "logradouro": "Rua Verde",
+        "numero": "100",
+        "latitude": "-23.5505",
+        "longitude": "-46.6333",
+        "complemento": "Galpão 2"
+      }
+    ],
+    "distancia_km": 2.5
+  },
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d51",
+    "name": "Ecoponto Sustentável",
+    "email": "sustentavel@example.com",
+    "phone": "(11) 91234-5678",
+    "accepted_material": ["plástico", "vidro", "papel"],
+    "addresses": [
+      {
+        "id": 1,
+        "apelido": "Sede",
+        "cep": "12345-679",
+        "logradouro": "Avenida Ecológica",
+        "numero": "200",
+        "latitude": "-23.5520",
+        "longitude": "-46.6340",
+        "complemento": null
+      }
+    ],
+    "distancia_km": 4.3
+  }
+]
+```
+
+**Resposta quando não há receptoras no raio (200):**
+```json
+[]
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é coletor:
+```json
+{
+  "detail": "Apenas coletores podem buscar receptoras próximas"
+}
+```
+
+**422 Unprocessable Entity** - Validação de dados falhou:
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "raio"],
+      "msg": "ensure this value is less than or equal to 100",
+      "type": "value_error.number.not_le"
+    }
+  ]
+}
+```
+
+**Casos de Uso:**
+- 📍 Coletor visualiza ecopontos próximos para planejar rota de entrega
+- 🔍 Filtrar receptoras que aceitam tipos específicos de materiais
+- 🗺️ Mapa interativo mostrando receptoras disponíveis
+- 📊 Otimização de logística de entrega
+
+**Observações:**
+- Distância é calculada usando fórmula de Haversine (great-circle distance)
+- Resultados ordenados por distância (mais próxima primeiro)
+- Filtro de materiais é opcional - se omitido, retorna todas as receptoras no raio
+- Usa o primeiro endereço cadastrado da receptora para calcular distância
+- Receptoras sem endereço ou com coordenadas inválidas são ignoradas
+- Máximo de 100km de raio para evitar sobrecarga
+
+**Exemplo de Integração com Mapa:**
+```javascript
+// Frontend React
+async function buscarReceptoras() {
+  const position = await navigator.geolocation.getCurrentPosition();
+  
+  const response = await fetch('http://localhost:8000/entregas/buscar-receptoras', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      raio: 10.0,
+      materiais_aceitos: ['plástico', 'papel']
+    })
+  });
+  
+  const receptoras = await response.json();
+  // Renderizar marcadores no mapa
+  receptoras.forEach(r => addMarker(r.addresses[0].latitude, r.addresses[0].longitude));
+}
+```
 
 ---
 

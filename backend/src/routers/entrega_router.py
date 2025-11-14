@@ -13,6 +13,8 @@ from src.schemas.entrega_schema import (
     EntregaCreate,
     EntregaResponse,
     EntregaSumario,
+    BuscarReceptorasRequest,
+    ReceptoraComDistancia,
 )
 from src.service.entrega_service import EntregaService
 from src.infra.security.dependencies import get_current_user
@@ -205,3 +207,54 @@ async def obter_sumario_entregas(
         )
     
     return await EntregaService.obter_sumario_entregas(coletor_id=coletor_id)
+
+
+@router.post(
+    "/buscar-receptoras",
+    response_model=List[ReceptoraComDistancia],
+    summary="Buscar receptoras próximas",
+    description="""
+    Busca receptoras (ecopontos) próximas da localização atual do coletor.
+    
+    Algoritmo:
+    - Calcula distância usando fórmula de Haversine
+    - Filtra por raio especificado
+    - Opcionalmente filtra por materiais aceitos
+    - Retorna ordenado por distância (mais próximas primeiro)
+    
+    Útil para o coletor encontrar onde pode fazer entregas de resíduos.
+    Apenas coletores autenticados podem acessar.
+    
+    Exemplo de uso:
+    ```json
+    {
+        "latitude": -23.5505,
+        "longitude": -46.6333,
+        "raio": 5.0,
+        "materiais_aceitos": ["plástico", "papel"]
+    }
+    ```
+    """,
+)
+async def buscar_receptoras_proximas(
+    body: BuscarReceptorasRequest,
+    current_user: dict = Depends(get_current_user),
+) -> List[ReceptoraComDistancia]:
+    """
+    Busca receptoras próximas dentro de um raio específico.
+    
+    Args:
+        body: Filtros de busca (latitude, longitude, raio, materiais_aceitos)
+        current_user: Usuário autenticado (injetado automaticamente)
+    
+    Returns:
+        List[ReceptoraComDistancia]: Lista de receptoras com distância calculada,
+        ordenadas da mais próxima para a mais distante
+    
+    Raises:
+        HTTPException 403: Se usuário não for coletor
+    """
+    return await EntregaService.buscar_receptoras_proximas(
+        filtros=body,
+        current_user=current_user
+    )
