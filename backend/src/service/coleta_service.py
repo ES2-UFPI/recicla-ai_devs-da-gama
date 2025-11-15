@@ -216,6 +216,23 @@ class ColetaService:
                 detalhes={"coleta_id": coleta_id, "acao": "coletar_residuo"},
             )
 
+        # Adicionar pontos dos resíduos para o Produtor
+        for residuo_id in residuos_ids:
+            residuo = await residue_repo.find_by_id(residuo_id)
+            
+            # Buscar produtor associado ao resíduo
+            produtor_id = residuo.get("produtorId")
+            produtor = await user_repo.find_by_id(produtor_id)
+            
+             nova_pontucacao = produtor.get("points") + int(residuo.get("valorEstimado") * 100)
+
+            user_repo.update_user(
+                user_id = produtor.get("id"),
+                updates = {
+                    "points": nova_pontucacao 
+                }
+            )
+
         # Adicionar resíduos coletados ao inventory do coletor
         await self._adicionar_residuos_ao_inventory(coletor_id, residuos_ids)
 
@@ -232,7 +249,10 @@ class ColetaService:
         return ColetaInDBSchema(**atual)
 
     async def rejeitar_residuo(
-        self,
+        self if not produtor:
+                continue
+
+          ,
         coleta_id: str,
         residuos_ids: List[str],
         coletor_id: str,
