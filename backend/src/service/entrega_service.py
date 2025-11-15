@@ -397,8 +397,26 @@ class EntregaService:
             # Filtrar por materiais aceitos (se especificado)
             if filtros.materiais_aceitos:
                 materiais_receptora = receptora.get("accepted_material", [])
+                
+                # Como materiais_aceitos vem com IDs de categorias, 
+                # mas accepted_material tem nomes, precisamos buscar os nomes das categorias
+                from src.infra.database.repositories import categoria_repo
+                
+                nomes_categorias_solicitadas = []
+                for cat_id in filtros.materiais_aceitos:
+                    try:
+                        categoria = await categoria_repo.buscar_por_id(cat_id)
+                        if categoria:
+                            nomes_categorias_solicitadas.append(categoria.get("tipo"))
+                    except Exception:
+                        continue  # ID inválido, ignora
+                
                 # Verificar se a receptora aceita pelo menos um dos materiais solicitados
-                if not any(material in materiais_receptora for material in filtros.materiais_aceitos):
+                # Comparação case-insensitive
+                materiais_receptora_lower = [m.lower() for m in materiais_receptora]
+                nomes_solicitados_lower = [n.lower() for n in nomes_categorias_solicitadas if n]
+                
+                if not any(nome in materiais_receptora_lower for nome in nomes_solicitados_lower):
                     continue  # Não aceita nenhum dos materiais
             
             # Adicionar à lista com distância

@@ -42,10 +42,17 @@ export const useCategorias = () => {
     return categorias.get(id);
   };
 
+  const getCategoriaByTipo = (tipo: string): Categoria | undefined => {
+    return Array.from(categorias.values()).find(
+      cat => cat.tipo.toLowerCase() === tipo.toLowerCase()
+    );
+  };
+
   return {
     categorias,
     loading,
     error,
     getCategoriaById,
+    getCategoriaByTipo,
   };
 };
