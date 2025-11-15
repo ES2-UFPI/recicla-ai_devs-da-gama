@@ -1,0 +1,105 @@
+name: Auto Close Parent (Native Sub-issues)
+
+on:
+  issues:
+    types: [closed]
+
+jobs:
+  close-parent:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      
+    steps:
+      - name: Check Parent Issue Status
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const closedIssueNumber = context.issue.number;
+
+            // 1. Precisamos do ID GraphQL da issue que acabou de fechar
+            const queryIssue = `
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  issue(number: $number) {
+                    id
+                    parentIssue {
+                      id
+                      number
+                      state
+                    }
+                  }
+                }
+              }`;
+
+            const issueData = await github.graphql(queryIssue, {
+              owner: owner,
+              repo: repo,
+              number: closedIssueNumber
+            });
+
+            const parentIssue = issueData.repository.issue.parentIssue;
+
+            // 2. Verifica se a issue fechada TINHA um pai
+            if (!parentIssue || parentIssue.state !== 'OPEN') {
+              console.log(`A issue ${closedIssueNumber} não tem um pai aberto. Saindo.`);
+              return;
+            }
+
+            const parentIssueId = parentIssue.id;
+            const parentIssueNumber = parentIssue.number;
+            console.log(`Issue ${closedIssueNumber} é filha de #${parentIssueNumber}. Verificando status do pai...`);
+
+            // 3. Busca o pai e TODOS os seus filhos para verificar o status
+            const queryParent = `
+              query($id: ID!) {
+                node(id: $id) {
+                  ... on Issue {
+                    childIssues {
+                      nodes {
+                        state
+                      }
+                      totalCount
+                    }
+                  }
+                }
+              }`;
+              
+            const parentData = await github.graphql(queryParent, {
+              id: parentIssueId
+            });
+
+            if (!parentData.node.childIssues || parentData.node.childIssues.totalCount === 0) {
+              console.log(`Pai #${parentIssueNumber} não tem filhos (estranho). Saindo.`);
+              return;
+            }
+
+            // 4. Verifica se TODOS os filhos estão fechados
+            const childIssues = parentData.node.childIssues.nodes;
+            const allChildrenClosed = childIssues.every(child => child.state === 'CLOSED');
+
+            if (allChildrenClosed) {
+              console.log(`Todos os ${childIssues.length} filhos de #${parentIssueNumber} estão fechados.`);
+              
+              // 5. Fecha a issue pai
+              await github.rest.issues.update({
+                owner: owner,
+                repo: repo,
+                issue_number: parentIssueNumber,
+                state: 'closed'
+              });
+
+              await github.rest.issues.createComment({
+                owner: owner,
+                repo: repo,
+                issue_number: parentIssueNumber,
+                body: `Todos as sub-issues foram concluídas. Esta issue foi fechada automaticamente.`
+              });
+              
+              console.log(`Issue pai #${parentIssueNumber} fechada com sucesso!`);
+            } else {
+              console.log(`Pai #${parentIssueNumber} ainda tem sub-issues abertas. Nada a fazer.`);
+            }
