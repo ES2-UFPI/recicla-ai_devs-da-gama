@@ -36,7 +36,7 @@ export function InteractiveMap({
   highlightedId,
   onMarkerClick,
 }: InteractiveMapProps) {
-  const { getCategoriaById } = useCategorias();
+  const { getCategoriaByTipo } = useCategorias();
   
   // Usa adapter para configurações do mapa
   const center: LatLngExpression = userLocation 
@@ -143,12 +143,13 @@ export function InteractiveMap({
                     Materiais aceitos:
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
-                    {receptora.accepted_material.map((categoriaId: string) => {
-                      const categoria = getCategoriaById(categoriaId);
+                    {receptora.accepted_material.map((materialNome: string) => {
+                      // Buscar categoria pelo nome (tipo) ao invés do ID
+                      const categoria = getCategoriaByTipo(materialNome);
                       return (
                         <Chip
-                          key={categoriaId}
-                          label={categoria?.tipo || 'Desconhecido'}
+                          key={materialNome}
+                          label={categoria?.tipo || materialNome}
                           size="small"
                           color="success"
                           variant="outlined"

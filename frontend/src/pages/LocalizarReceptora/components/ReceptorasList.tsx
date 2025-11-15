@@ -14,7 +14,7 @@ interface ReceptorasListProps {
 }
 
 export function ReceptorasList({ receptoras, highlightedId, onItemClick }: ReceptorasListProps) {
-  const { getCategoriaById, categorias } = useCategorias();
+  const { getCategoriaByTipo, categorias } = useCategorias();
   const navigate = useNavigate();
 
   if (receptoras.length === 0) {
@@ -166,19 +166,24 @@ export function ReceptorasList({ receptoras, highlightedId, onItemClick }: Recep
                   />
                 ) : (
                   receptora.accepted_material
-                    .filter((categoriaId: string) => getCategoriaById(categoriaId) !== undefined)
-                    .map((categoriaId: string) => {
-                      const categoria = getCategoriaById(categoriaId);
+                    .map((materialNome: string) => {
+                      // Buscar categoria pelo nome (tipo) ao invés do ID
+                      const categoria = getCategoriaByTipo(materialNome);
+                      if (!categoria) {
+                        console.warn(`⚠️ Categoria não encontrada para: "${materialNome}"`);
+                        return null;
+                      }
                       return (
                         <Chip
-                          key={categoriaId}
-                          label={categoria!.tipo}
+                          key={categoria.id}
+                          label={categoria.tipo}
                           size="small"
                           color="success"
                           variant="outlined"
                         />
                       );
                     })
+                    .filter(Boolean)
                 )}
               </Box>
             </CardContent>
