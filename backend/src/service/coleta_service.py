@@ -223,8 +223,10 @@ class ColetaService:
             # Buscar produtor associado ao resíduo
             produtor_id = residuo.get("produtorId")
             produtor = await user_repo.find_by_id(produtor_id)
-            
-             nova_pontucacao = produtor.get("points") + int(residuo.get("valorEstimado") * 100)
+            if not produtor:
+                continue
+
+            nova_pontucacao = produtor.get("points") + residuo.get("valorEstimado")
 
             user_repo.update_user(
                 user_id = produtor.get("id"),
@@ -249,10 +251,7 @@ class ColetaService:
         return ColetaInDBSchema(**atual)
 
     async def rejeitar_residuo(
-        self if not produtor:
-                continue
-
-          ,
+        self,
         coleta_id: str,
         residuos_ids: List[str],
         coletor_id: str,
