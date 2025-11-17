@@ -445,3 +445,49 @@ class EntregaService:
             )
         
         return resultado
+    
+    @staticmethod
+    async def obter_info_receptora(receptora_id: str):
+        """
+        Obtém informações completas de uma receptora para a página de Realizar Entrega.
+        
+        Retorna todos os dados necessários incluindo materiais aceitos,
+        endereços e informações de contato.
+        
+        Args:
+            receptora_id: ID da receptora
+        
+        Returns:
+            ReceptoraInfo: Informações completas da receptora
+            
+        Raises:
+            HTTPException 404: Se receptora não existir
+            HTTPException 400: Se ID não for de uma receptora
+        """
+        from src.schemas.entrega_schema import ReceptoraInfo
+        
+        # Buscar receptora pelo ID
+        receptora = await user_repo.find_by_id(receptora_id)
+        
+        if not receptora:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Receptora '{receptora_id}' não encontrada"
+            )
+        
+        # Validar que é uma receptora
+        if receptora.get("role_id") != "receptor":
+            raise HTTPException(
+                status_code=400,
+                detail="O ID fornecido não pertence a uma receptora"
+            )
+        
+        # Montar resposta com todos os campos necessários
+        return ReceptoraInfo(
+            id=str(receptora.get("_id")),
+            name=receptora.get("name", ""),
+            email=receptora.get("email", ""),
+            phone=receptora.get("phone", ""),
+            accepted_material=receptora.get("accepted_material", []),
+            addresses=receptora.get("addresses", [])
+        )
