@@ -70,26 +70,17 @@ export interface EntregaCreate {
 }
 
 /**
- * Informações do resíduo na entrega
- */
-export interface ResiduoEntrega {
-  id: string;
-  quantidade: number;
-  tipo_medida: string;
-  categoriaId: string;
-}
-
-/**
- * Resposta de uma entrega criada
+ * Resposta de uma entrega do backendkend
+ * Match com EntregaResponse do backend (entrega_schema.py)
  */
 export interface EntregaResponse {
-  id: string;
-  coletor_id: string;
+  id: string; // alias para _id
+  data_hora: string; // ISO datetime
   receptora_id: string;
-  residuos: ResiduoEntrega[];
+  coletor_id: string;
+  residuos_id: string[]; // Array de IDs dos resíduos
+  categorias_residuos_entregues: string[]; // Array de IDs de categorias
   observacoes?: string;
-  data_entrega: string;
-  created_at: string;
 }
 
 /**

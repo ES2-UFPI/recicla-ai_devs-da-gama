@@ -168,7 +168,12 @@ export default function Entregas() {
               ✅ Entregas Realizadas ({entregas.length})
             </Typography>
             {entregas.map((entrega) => {
-              const residuosAgrupados = agruparResiduosPorCategoria(entrega.residuos);
+              // Validar dados essenciais da entrega
+              if (!entrega || !entrega.id || !entrega.receptora) {
+                return null;
+              }
+
+              const residuosAgrupados = agruparResiduosPorCategoria(entrega.residuos || []);
 
               return (
                 <Card 
@@ -187,15 +192,10 @@ export default function Entregas() {
                 >
                   <CardContent>
                     {/* Cabeçalho do card */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="h6" fontWeight={600}>
-                          {entrega.receptora.nome}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          ID da Entrega: {entrega.id.slice(0, 8)}...
-                        </Typography>
-                      </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6" fontWeight={600}>
+                        {entrega.receptora?.nome || 'Receptora não identificada'}
+                      </Typography>
                       <Chip
                         icon={<CheckCircleIcon fontSize="small" />}
                         label="ENTREGUE"
@@ -215,15 +215,15 @@ export default function Entregas() {
                         <LocationOnIcon fontSize="small" color="action" />
                         <Box>
                           <Typography variant="body2">
-                            {entrega.receptora.endereco.logradouro}, {entrega.receptora.endereco.numero}
+                            {entrega.receptora?.endereco?.logradouro || 'Endereço não informado'}, {entrega.receptora?.endereco?.numero || 'S/N'}
                           </Typography>
-                          {entrega.receptora.endereco.complemento && (
+                          {entrega.receptora?.endereco?.complemento && (
                             <Typography variant="body2" color="text.secondary">
                               {entrega.receptora.endereco.complemento}
                             </Typography>
                           )}
                           <Typography variant="caption" color="text.secondary">
-                            CEP: {entrega.receptora.endereco.cep}
+                            CEP: {entrega.receptora?.endereco?.cep || 'N/A'}
                           </Typography>
                         </Box>
                       </Box>
@@ -305,7 +305,7 @@ export default function Entregas() {
                     {/* Informações adicionais */}
                     <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
                       <Typography variant="caption" color="text.secondary">
-                        Tipos de materiais aceitos pela receptora: {entrega.receptora.materiais_aceitos.join(', ')}
+                        Tipos de materiais aceitos pela receptora: {entrega.receptora?.materiais_aceitos?.join(', ') || 'Não especificado'}
                       </Typography>
                     </Box>
                   </CardContent>

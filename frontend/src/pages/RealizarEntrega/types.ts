@@ -30,6 +30,8 @@ export interface ReceptoraInfo {
     latitude?: string;
     longitude?: string;
     complemento?: string;
+    cidade?: string;
+    estado?: string;
   }>;
   distancia_km?: number;
 }export interface CategoriaAgrupada {
