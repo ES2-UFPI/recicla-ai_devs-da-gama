@@ -86,11 +86,11 @@ export default function RealizarEntrega() {
             <Button
               variant="contained"
               color="success"
-              onClick={() => navigate('/dashboard-coletor')}
+              onClick={() => navigate('/entregas')}
               size="large"
               sx={{ minWidth: 200 }}
             >
-              Voltar ao Dashboard
+              Voltar para suas Entregas
             </Button>
           </Box>
         </Container>
