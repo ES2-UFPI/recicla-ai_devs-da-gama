@@ -107,12 +107,20 @@ export function AgendamentosList({
                 <Typography variant="h6" color="primary" fontWeight={700}>
                   {agendamento.local.apelido || 'Ponto de Coleta'}
                 </Typography>
-                <Chip
-                  icon={<MyLocationIcon />}
-                  label={`${agendamento.distancia_km.toFixed(2)} km`}
-                  color="primary"
-                  size="small"
-                />
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Chip
+                    label={agendamento.coleta_integral ? 'Coleta Integral' : 'Coleta Parcial'}
+                    color={agendamento.coleta_integral ? 'warning' : 'success'}
+                    size="small"
+                    variant="outlined"
+                  />
+                  <Chip
+                    icon={<MyLocationIcon />}
+                    label={`${agendamento.distancia_km.toFixed(2)} km`}
+                    color="primary"
+                    size="small"
+                  />
+                </Stack>
               </Box>
 
               {/* Endereço */}
@@ -261,7 +269,7 @@ export function AgendamentosList({
                   },
                 }}
               >
-                Selecionar Resíduos para Coletar
+                {agendamento.coleta_integral ? 'Coleta Integral: Coletar Todos' : 'Selecionar Resíduos para Coletar'}
               </Button>
 
               {/* Link Google Maps */}
