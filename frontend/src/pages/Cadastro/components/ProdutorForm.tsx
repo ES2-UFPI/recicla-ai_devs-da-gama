@@ -13,7 +13,9 @@ import {
   FormLabel
 } from '@mui/material';
 import type { ProdutorData } from '../types';
+import type { Endereco } from '../../../types/endereco';
 import { BaseUserForm } from './BaseUserForm';
+import { EnderecoFormReceptor } from './EnderecoFormReceptor';
 import { validateCNPJ } from '../validation';
 
 interface ProdutorFormProps {
@@ -39,6 +41,16 @@ export function ProdutorForm({ onSubmit, loading, error, onBack }: ProdutorFormP
   const [tipoPessoa, setTipoPessoa] = useState<'fisica' | 'juridica'>('fisica');
   const [cnpj, setCnpj] = useState('');
   const [cnpjError, setCnpjError] = useState('');
+  const [endereco, setEndereco] = useState<Endereco>({
+    apelido: '',
+    cep: '',
+    logradouro: '',
+    numero: '',
+    latitude: '',
+    longitude: '',
+    complemento: '',
+  });
+  const [enderecoError, setEnderecoError] = useState('');
 
   const handleBaseDataChange = (data: Partial<typeof baseData>) => {
     setBaseData(prev => ({ ...prev, ...data }));
@@ -97,6 +109,12 @@ export function ProdutorForm({ onSubmit, loading, error, onBack }: ProdutorFormP
       return;
     }
 
+    // Validar endereço
+    if (!endereco.cep || !endereco.logradouro || !endereco.numero || !endereco.latitude || !endereco.longitude) {
+      setEnderecoError('Por favor, complete o endereço');
+      return;
+    }
+
     const produtorData: ProdutorData = {
       name: baseData.name,
       email: baseData.email,
@@ -105,7 +123,7 @@ export function ProdutorForm({ onSubmit, loading, error, onBack }: ProdutorFormP
       role_id: 'produtor',
       cidade_id: baseData.cidade_id,
       estado_id: baseData.estado_id,
-      addresses: [], // Endereços serão adicionados posteriormente
+      addresses: [endereco],
       is_business,
       ...(is_business && { cnpj }),
       points: 0,
@@ -194,34 +212,44 @@ export function ProdutorForm({ onSubmit, loading, error, onBack }: ProdutorFormP
             />
           </RadioGroup>
 
-          {tipoPessoa === 'juridica' && (
-            <Box sx={{ mt: 3 }}>
-              <TextField
-                label="CNPJ"
-                placeholder="00.000.000/0000-00"
-                value={cnpj}
-                onChange={(e) => handleCnpjChange(e.target.value)}
-                required
-                fullWidth
-                error={!!cnpjError}
-                helperText={cnpjError || 'Formato: 00.000.000/0000-00'}
-              />
-            </Box>
-          )}
+        {tipoPessoa === 'juridica' && (
+          <Box sx={{ mt: 3 }}>
+            <TextField
+              label="CNPJ"
+              placeholder="00.000.000/0000-00"
+              value={cnpj}
+              onChange={(e) => handleCnpjChange(e.target.value)}
+              required
+              fullWidth
+              error={!!cnpjError}
+              helperText={cnpjError || 'Formato: 00.000.000/0000-00'}
+            />
+          </Box>
+        )}
+        </Paper>
+
+        {/* Endereço (obrigatório para produtor) */}
+        <Paper sx={{ p: 3 }}>
+          <EnderecoFormReceptor
+            endereco={endereco}
+            onChange={(novoEndereco) => {
+              setEndereco(novoEndereco);
+              setEnderecoError('');
+            }}
+            error={enderecoError}
+          />
         </Paper>
 
         {/* Informação sobre endereços */}
         <Alert severity="info">
           <Typography variant="body2" fontWeight={600} gutterBottom>
-            📍 Sobre Endereços
+            📍 Endereço para Solicitações
           </Typography>
           <Typography variant="body2">
-            Você poderá adicionar seus endereços após o cadastro, na área de perfil.
-            Os endereços serão usados para solicitar coletas.
+            O endereço informado será usado para solicitar coletas de resíduos.
+            Você poderá adicionar mais endereços após o cadastro, na área de perfil.
           </Typography>
-        </Alert>
-
-        {/* Botão de submit */}
+        </Alert>        {/* Botão de submit */}
         <Button
           type="submit"
           variant="contained"
