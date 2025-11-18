@@ -45,6 +45,7 @@ export interface Agendamento {
   observacoes?: string;
   distancia_km: number;
   residuos: Residuo[];
+  coleta_integral: boolean;
 }
 
 interface BuscarAgendamentosParams {

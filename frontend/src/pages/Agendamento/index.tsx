@@ -88,6 +88,7 @@ export function Agendamento() {
   const [disponibilidade, setDisponibilidade] = useState<DisponibilidadeSlot[]>([]);
   const [observacoes, setObservacoes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [permitirParcial, setPermitirParcial] = useState(true); // UI controla coleta_integral
 
   // Carregar agendamentos e resíduos ao montar o componente
   useEffect(() => {
@@ -133,6 +134,9 @@ export function Agendamento() {
       setSelectedResiduosIds(agendamento.residuosId);
       setDisponibilidade(agendamento.disponibilidade);
       setObservacoes(agendamento.observacoes || '');
+      // coleta_integral True => não permite parcial
+      // permitirParcial deve ser o inverso
+      setPermitirParcial(!agendamento.coleta_integral);
     } else {
       resetForm();
     }
@@ -145,6 +149,7 @@ export function Agendamento() {
     setSelectedResiduosIds([]);
     setDisponibilidade([]);
     setObservacoes('');
+    setPermitirParcial(true);
   };
 
   const handleCloseDialog = () => {
@@ -185,6 +190,7 @@ export function Agendamento() {
         disponibilidade,
         address_id: selectedAddressId,
         observacoes: observacoes || undefined,
+        coleta_integral: !permitirParcial,
       };
 
       if (editingId) {
@@ -383,12 +389,20 @@ export function Agendamento() {
                         mb: 2,
                       }}
                     >
-                      <Chip
-                        label={statusLabelMap[agendamento.status] || agendamento.status || 'Desconhecido'}
-                        color={statusColorMap[agendamento.status] || 'default'}
-                        size="small"
-                        sx={{ fontWeight: 600 }}
-                      />
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          label={statusLabelMap[agendamento.status] || agendamento.status || 'Desconhecido'}
+                          color={statusColorMap[agendamento.status] || 'default'}
+                          size="small"
+                          sx={{ fontWeight: 600 }}
+                        />
+                        <Chip
+                          label={agendamento.coleta_integral ? 'Coleta Integral' : 'Coleta Parcial'}
+                          color={agendamento.coleta_integral ? 'warning' : 'success'}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Stack>
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         {/* Botão Editar - apenas para pendentes */}
                         {isEditable && (
@@ -581,6 +595,48 @@ export function Agendamento() {
                     : []
                 }
               />
+
+              <Box sx={{ height: '1px', bgcolor: 'divider', my: 2 }} />
+
+              {/* Coleta Parcial/Integral */}
+              <Box>
+                <Stack spacing={1}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Chip
+                      size="small"
+                      color={permitirParcial ? 'success' : 'warning'}
+                      label={permitirParcial ? 'Coleta Parcial Permitida' : 'Coleta Integral'}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {permitirParcial
+                        ? 'Coletores podem selecionar apenas parte dos resíduos.'
+                        : 'Coletores devem coletar TODOS os resíduos deste agendamento.'}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" alignItems="flex-start" spacing={1}>
+                    <Button
+                      variant={permitirParcial ? 'contained' : 'outlined'}
+                      size="small"
+                      onClick={() => setPermitirParcial(true)}
+                    >
+                      Permitir coleta parcial
+                    </Button>
+                    <Button
+                      variant={!permitirParcial ? 'contained' : 'outlined'}
+                      size="small"
+                      color="warning"
+                      onClick={() => setPermitirParcial(false)}
+                    >
+                      Exigir coleta integral
+                    </Button>
+                  </Stack>
+                  <Alert severity={permitirParcial ? 'info' : 'warning'}>
+                    {permitirParcial
+                      ? 'Com coleta parcial, diferentes coletores podem retirar resíduos em momentos distintos.'
+                      : 'Com coleta integral, apenas coletores que aceitarem TODOS os resíduos poderão recolher.'}
+                  </Alert>
+                </Stack>
+              </Box>
 
               <Box sx={{ height: '1px', bgcolor: 'divider', my: 2 }} />
 
