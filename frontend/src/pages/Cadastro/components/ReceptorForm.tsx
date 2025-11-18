@@ -5,22 +5,17 @@ import {
   Button,
   Stack,
   Alert,
-  Paper,
-  Chip,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  OutlinedInput,
-  CircularProgress
+  Paper
 } from '@mui/material';
-import { CheckCircleOutline } from '@mui/icons-material';
+// CheckCircleOutline removed - not used
+// categoriaColor agora é usado dentro do componente CategoriaCheckboxList
 import { EnderecoFormReceptor } from './EnderecoFormReceptor';
 import type { Endereco } from '../../../types/endereco';
 import type { ReceptorData } from '../types';
 import { BaseUserForm } from './BaseUserForm';
 import { categoriaService } from '../../../services/categoria.service';
 import type { Categoria } from '../../../types/categoria';
+import { CategoriaCheckboxList } from './CategoriaCheckboxList';
 
 interface ReceptorFormProps {
   onSubmit: (data: ReceptorData) => void;
@@ -147,69 +142,15 @@ export function ReceptorForm({ onSubmit, loading, error, onBack }: ReceptorFormP
 
         {/* Materiais Aceitos */}
         <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" fontWeight={600} gutterBottom>
-            Materiais Aceitos *
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Selecione os tipos de materiais recicláveis que você aceita
-          </Typography>
-
-          {loadingCategorias ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <CircularProgress size={20} />
-              <Typography variant="body2">Carregando categorias...</Typography>
-            </Box>
-          ) : (
-            <FormControl fullWidth required error={accepted_material.length === 0}>
-              <InputLabel>Selecione os materiais</InputLabel>
-              <Select
-                multiple
-                value={accepted_material}
-                onChange={(e) => setAcceptedMaterial(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
-                input={<OutlinedInput label="Selecione os materiais" />}
-                renderValue={(selected) => (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {selected.map((value) => {
-                      const categoria = categorias.find(c => c.id === value);
-                      return (
-                        <Chip 
-                          key={value} 
-                          label={categoria?.tipo || value}
-                          size="small"
-                          icon={<CheckCircleOutline />}
-                          sx={{ 
-                            backgroundColor: '#4caf50',
-                            color: 'white',
-                            '& .MuiChip-icon': { color: 'white' }
-                          }}
-                        />
-                      );
-                    })}
-                  </Box>
-                )}
-              >
-                {categorias.map((categoria) => (
-                  <MenuItem key={categoria.id} value={categoria.id}>
-                    <Chip
-                      label={categoria.tipo}
-                      size="small"
-                      sx={{
-                        backgroundColor: '#4caf50',
-                        color: 'white',
-                        mr: 1
-                      }}
-                    />
-                    {categoria.tipo}
-                  </MenuItem>
-                ))}
-              </Select>
-              {accepted_material.length === 0 && (
-                <Typography variant="caption" color="error" sx={{ mt: 1 }}>
-                  Selecione pelo menos um tipo de material
-                </Typography>
-              )}
-            </FormControl>
-          )}
+          <CategoriaCheckboxList
+            categorias={categorias}
+            selected={accepted_material}
+            onChange={setAcceptedMaterial}
+            loading={loadingCategorias}
+            required
+            label="Materiais Aceitos *"
+            helperText="Selecione os tipos de materiais recicláveis que você aceita"
+          />
         </Paper>
 
         {/* Endereço do Ponto de Coleta */}

@@ -18,8 +18,6 @@ export const categoriaColor: Record<string, string> = {
   plástico: '#F44336', // Vermelho (com acento)
   vidro: '#4CAF50', // Verde
   metal: '#FFC107', // Amarelo
-  organico: '#795548', // Marrom
-  orgânico: '#795548', // Marrom (com acento)
   eletronico: '#FF9800', // Laranja
   eletrônico: '#FF9800', // Laranja (com acento)
 };
