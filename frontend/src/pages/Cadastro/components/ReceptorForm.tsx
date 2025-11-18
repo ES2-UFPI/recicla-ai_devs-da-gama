@@ -6,7 +6,6 @@ import {
   Stack,
   Alert,
   Paper,
-  Divider,
   Chip,
   FormControl,
   InputLabel,
@@ -15,8 +14,8 @@ import {
   OutlinedInput,
   CircularProgress
 } from '@mui/material';
-import { Add as AddIcon, CheckCircleOutline } from '@mui/icons-material';
-import { EnderecoForm } from './EnderecoForm';
+import { CheckCircleOutline } from '@mui/icons-material';
+import { EnderecoFormReceptor } from './EnderecoFormReceptor';
 import type { Endereco } from '../../../types/endereco';
 import type { ReceptorData } from '../types';
 import { BaseUserForm } from './BaseUserForm';
@@ -30,16 +29,6 @@ interface ReceptorFormProps {
   onBack: () => void;
 }
 
-const emptyEndereco: Endereco = {
-  apelido: '',
-  cep: '',
-  logradouro: '',
-  numero: '',
-  latitude: '',
-  longitude: '',
-  complemento: '',
-};
-
 export function ReceptorForm({ onSubmit, loading, error, onBack }: ReceptorFormProps) {
   const [baseData, setBaseData] = useState({
     name: '',
@@ -52,7 +41,16 @@ export function ReceptorForm({ onSubmit, loading, error, onBack }: ReceptorFormP
   });
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [addresses, setAddresses] = useState<Endereco[]>([{ ...emptyEndereco }]);
+  const [endereco, setEndereco] = useState<Endereco>({
+    apelido: '',
+    cep: '',
+    logradouro: '',
+    numero: '',
+    latitude: '',
+    longitude: '',
+    complemento: '',
+  });
+  const [enderecoError, setEnderecoError] = useState('');
   const [accepted_material, setAcceptedMaterial] = useState<string[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loadingCategorias, setLoadingCategorias] = useState(true);
@@ -76,21 +74,6 @@ export function ReceptorForm({ onSubmit, loading, error, onBack }: ReceptorFormP
     setFieldErrors(prev => ({ ...prev, [field]: error }));
   };
 
-  const handleAddEndereco = () => {
-    setAddresses([...addresses, { ...emptyEndereco }]);
-  };
-
-  const handleRemoveEndereco = (index: number) => {
-    if (addresses.length === 1) return; // Manter pelo menos 1 endereço
-    setAddresses(addresses.filter((_, i) => i !== index));
-  };
-
-  const handleEnderecoChange = (index: number, endereco: Endereco) => {
-    const newAddresses = [...addresses];
-    newAddresses[index] = endereco;
-    setAddresses(newAddresses);
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -100,16 +83,9 @@ export function ReceptorForm({ onSubmit, loading, error, onBack }: ReceptorFormP
       return;
     }
 
-    // Validar endereços (obrigatório pelo menos 1)
-    if (addresses.length === 0) {
-      return;
-    }
-
-    const hasInvalidAddress = addresses.some(addr => 
-      !addr.cep || !addr.logradouro || !addr.numero || !addr.latitude || !addr.longitude
-    );
-
-    if (hasInvalidAddress) {
+    // Validar endereço
+    if (!endereco.cep || !endereco.logradouro || !endereco.numero || !endereco.latitude || !endereco.longitude) {
+      setEnderecoError('Por favor, complete o endereço do ponto de coleta');
       return;
     }
 
@@ -126,7 +102,7 @@ export function ReceptorForm({ onSubmit, loading, error, onBack }: ReceptorFormP
       role_id: 'receptor',
       cidade_id: baseData.cidade_id,
       estado_id: baseData.estado_id,
-      addresses,
+      addresses: [endereco],
       accepted_material,
     };
 
@@ -236,40 +212,16 @@ export function ReceptorForm({ onSubmit, loading, error, onBack }: ReceptorFormP
           )}
         </Paper>
 
-        {/* Endereços */}
+        {/* Endereço do Ponto de Coleta */}
         <Paper sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Box>
-              <Typography variant="h6" fontWeight={600}>
-                Endereços *
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Informe o(s) endereço(s) do seu ponto de coleta (mínimo 1)
-              </Typography>
-            </Box>
-            <Button
-              startIcon={<AddIcon />}
-              onClick={handleAddEndereco}
-              variant="outlined"
-              size="small"
-            >
-              Adicionar
-            </Button>
-          </Box>
-
-          <Stack spacing={2}>
-            {addresses.map((endereco, index) => (
-              <Box key={index}>
-                {index > 0 && <Divider sx={{ my: 2 }} />}
-                <EnderecoForm
-                  endereco={endereco}
-                  onChange={(newEndereco) => handleEnderecoChange(index, newEndereco)}
-                  onRemove={() => handleRemoveEndereco(index)}
-                  showRemove={addresses.length > 1}
-                />
-              </Box>
-            ))}
-          </Stack>
+          <EnderecoFormReceptor
+            endereco={endereco}
+            onChange={(novoEndereco) => {
+              setEndereco(novoEndereco);
+              setEnderecoError('');
+            }}
+            error={enderecoError}
+          />
         </Paper>
 
         {/* Informações adicionais */}

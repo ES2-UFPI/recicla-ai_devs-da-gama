@@ -5,12 +5,8 @@ import {
   Button,
   Stack,
   Alert,
-  Paper,
-  Divider
+  Paper
 } from '@mui/material';
-import { Add as AddIcon, InfoOutlined } from '@mui/icons-material';
-import { EnderecoForm } from './EnderecoForm';
-import type { Endereco } from '../../../types/endereco';
 import type { ColetorData } from '../types';
 import { BaseUserForm } from './BaseUserForm';
 
@@ -20,16 +16,6 @@ interface ColetorFormProps {
   error: string | null;
   onBack: () => void;
 }
-
-const emptyEndereco: Endereco = {
-  apelido: '',
-  cep: '',
-  logradouro: '',
-  numero: '',
-  latitude: '',
-  longitude: '',
-  complemento: '',
-};
 
 export function ColetorForm({ onSubmit, loading, error, onBack }: ColetorFormProps) {
   const [baseData, setBaseData] = useState({
@@ -43,7 +29,6 @@ export function ColetorForm({ onSubmit, loading, error, onBack }: ColetorFormPro
   });
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [addresses, setAddresses] = useState<Endereco[]>([]);
 
   const handleBaseDataChange = (data: Partial<typeof baseData>) => {
     setBaseData(prev => ({ ...prev, ...data }));
@@ -51,20 +36,6 @@ export function ColetorForm({ onSubmit, loading, error, onBack }: ColetorFormPro
 
   const handleFieldError = (field: string, error: string) => {
     setFieldErrors(prev => ({ ...prev, [field]: error }));
-  };
-
-  const handleAddEndereco = () => {
-    setAddresses([...addresses, { ...emptyEndereco }]);
-  };
-
-  const handleRemoveEndereco = (index: number) => {
-    setAddresses(addresses.filter((_, i) => i !== index));
-  };
-
-  const handleEnderecoChange = (index: number, endereco: Endereco) => {
-    const newAddresses = [...addresses];
-    newAddresses[index] = endereco;
-    setAddresses(newAddresses);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -84,8 +55,8 @@ export function ColetorForm({ onSubmit, loading, error, onBack }: ColetorFormPro
       role_id: 'coletor',
       cidade_id: baseData.cidade_id,
       estado_id: baseData.estado_id,
+      addresses: [], // Endereços serão adicionados posteriormente
       inventory: [],
-      ...(addresses.length > 0 && { addresses }),
     };
 
     onSubmit(coletorData);
@@ -127,50 +98,16 @@ export function ColetorForm({ onSubmit, loading, error, onBack }: ColetorFormPro
           />
         </Paper>
 
-        {/* Endereços (opcional) */}
-        <Paper sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Box>
-              <Typography variant="h6" fontWeight={600}>
-                Endereços (Opcional)
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                <InfoOutlined sx={{ fontSize: 16, color: 'info.main' }} />
-                <Typography variant="body2" color="text.secondary">
-                  Você pode adicionar endereços como base de operações ou pontos de referência
-                </Typography>
-              </Box>
-            </Box>
-            <Button
-              startIcon={<AddIcon />}
-              onClick={handleAddEndereco}
-              variant="outlined"
-              size="small"
-            >
-              Adicionar
-            </Button>
-          </Box>
-
-          {addresses.length === 0 ? (
-            <Alert severity="info" icon={<InfoOutlined />}>
-              Nenhum endereço cadastrado. Como coletor, você pode operar sem endereços fixos.
-            </Alert>
-          ) : (
-            <Stack spacing={2}>
-              {addresses.map((endereco, index) => (
-                <Box key={index}>
-                  {index > 0 && <Divider sx={{ my: 2 }} />}
-                  <EnderecoForm
-                    endereco={endereco}
-                    onChange={(newEndereco) => handleEnderecoChange(index, newEndereco)}
-                    onRemove={() => handleRemoveEndereco(index)}
-                    showRemove={true}
-                  />
-                </Box>
-              ))}
-            </Stack>
-          )}
-        </Paper>
+        {/* Informação sobre endereços */}
+        <Alert severity="info">
+          <Typography variant="body2" fontWeight={600} gutterBottom>
+            📍 Sobre Endereços
+          </Typography>
+          <Typography variant="body2">
+            Como coletor, você poderá adicionar seus endereços após o cadastro, na área de perfil.
+            Os endereços facilitam o planejamento das suas rotas de coleta.
+          </Typography>
+        </Alert>
 
         {/* Informações adicionais */}
         <Alert severity="success" icon={false}>
