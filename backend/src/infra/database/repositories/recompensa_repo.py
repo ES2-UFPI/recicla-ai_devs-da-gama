@@ -31,6 +31,14 @@ def _to_response_many(docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [d for d in map(_to_response, docs) if d is not None]
 
 
+def _to_object_id(id_str: str) -> Optional[ObjectId]:
+    """Converte string para ObjectId. Retorna None se inválido."""
+    try:
+        return ObjectId(id_str)
+    except Exception:
+        return None
+
+
 async def criar_recompensa(doc: Dict[str, Any]) -> str:
     """
     Cria nova recompensa.
@@ -55,9 +63,8 @@ async def buscar_por_id(recompensa_id: str) -> Optional[Dict[str, Any]]:
     Returns:
         Optional[Dict]: Recompensa encontrada ou None
     """
-    try:
-        _id = ObjectId(recompensa_id)
-    except Exception:
+    _id = _to_object_id(recompensa_id)
+    if not _id:
         return None
     doc = await _collection().find_one({"_id": _id})
     return _to_response(doc)
@@ -120,9 +127,8 @@ async def atualizar_recompensa(recompensa_id: str, updates: Dict[str, Any]) -> b
     Returns:
         bool: True se atualizou com sucesso
     """
-    try:
-        _id = ObjectId(recompensa_id)
-    except Exception:
+    _id = _to_object_id(recompensa_id)
+    if not _id:
         return False
     if not updates:
         return True
@@ -141,9 +147,8 @@ async def atualizar_estoque(recompensa_id: str, quantidade: int) -> bool:
     Returns:
         bool: True se atualizou com sucesso
     """
-    try:
-        _id = ObjectId(recompensa_id)
-    except Exception:
+    _id = _to_object_id(recompensa_id)
+    if not _id:
         return False
     
     result = await _collection().update_one(
@@ -165,9 +170,8 @@ async def decrementar_estoque(recompensa_id: str, quantidade: int = 1) -> bool:
     Returns:
         bool: True se decrementou com sucesso, False se não há estoque
     """
-    try:
-        _id = ObjectId(recompensa_id)
-    except Exception:
+    _id = _to_object_id(recompensa_id)
+    if not _id:
         return False
     
     # Atualiza apenas se houver estoque suficiente
@@ -188,9 +192,8 @@ async def ativar_recompensa(recompensa_id: str) -> bool:
     Returns:
         bool: True se ativou com sucesso
     """
-    try:
-        _id = ObjectId(recompensa_id)
-    except Exception:
+    _id = _to_object_id(recompensa_id)
+    if not _id:
         return False
     result = await _collection().update_one(
         {"_id": _id},
@@ -210,9 +213,8 @@ async def desativar_recompensa(recompensa_id: str) -> bool:
     Returns:
         bool: True se desativou com sucesso
     """
-    try:
-        _id = ObjectId(recompensa_id)
-    except Exception:
+    _id = _to_object_id(recompensa_id)
+    if not _id:
         return False
     result = await _collection().update_one(
         {"_id": _id},
@@ -232,9 +234,8 @@ async def deletar_recompensa(recompensa_id: str) -> bool:
     Returns:
         bool: True se deletou com sucesso
     """
-    try:
-        _id = ObjectId(recompensa_id)
-    except Exception:
+    _id = _to_object_id(recompensa_id)
+    if not _id:
         return False
     result = await _collection().delete_one({"_id": _id})
     return result.deleted_count > 0
