@@ -173,7 +173,7 @@ export function ProdutorForm({ onSubmit, loading, error, onBack }: ProdutorFormP
               control={<Radio />} 
               label={
                 <Box>
-                  <Typography variant="body1">Pessoa Física (CPF)</Typography>
+                  <Typography variant="body1">Sou pessoa física</Typography>
                   <Typography variant="caption" color="text.secondary">
                     Para indivíduos
                   </Typography>
@@ -185,7 +185,7 @@ export function ProdutorForm({ onSubmit, loading, error, onBack }: ProdutorFormP
               control={<Radio />} 
               label={
                 <Box>
-                  <Typography variant="body1">Pessoa Jurídica (CNPJ)</Typography>
+                  <Typography variant="body1">Sou pessoa jurídica (CNPJ)</Typography>
                   <Typography variant="caption" color="text.secondary">
                     Para empresas
                   </Typography>
