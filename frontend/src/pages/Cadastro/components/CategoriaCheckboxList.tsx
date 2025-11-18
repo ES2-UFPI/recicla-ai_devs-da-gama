@@ -4,7 +4,7 @@ import { categoriaColor } from '../../../utils/categoriaColor';
 
 type Props = {
   categorias: Categoria[];
-  selected: string[];
+  selected: string[]; // Nomes das categorias (ex: "Plástico", "Vidro")
   onChange: (next: string[]) => void;
   loading?: boolean;
   required?: boolean;
@@ -57,13 +57,12 @@ export function CategoriaCheckboxList({ categorias, selected, onChange, loading,
       {/* Tags coloridas dos materiais selecionados */}
       {selected.length > 0 && (
         <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-          {selected.map((id) => {
-            const cat = categorias.find((c) => c.id === id);
-            const color = cat ? getCategoriaColor(cat.tipo) : '#bdbdbd';
+          {selected.map((tipo) => {
+            const color = getCategoriaColor(tipo);
             const textColor = getContrastColor(color);
             return (
               <Box
-                key={id}
+                key={tipo}
                 sx={{
                   bgcolor: color,
                   color: textColor,
@@ -74,7 +73,7 @@ export function CategoriaCheckboxList({ categorias, selected, onChange, loading,
                   fontWeight: 600,
                 }}
               >
-                {cat?.tipo}
+                {tipo}
               </Box>
             );
           })}
@@ -84,7 +83,7 @@ export function CategoriaCheckboxList({ categorias, selected, onChange, loading,
       {/* Lista de checkboxes simples */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
         {categorias.map((categoria) => {
-          const isChecked = selected.includes(categoria.id);
+          const isChecked = selected.includes(categoria.tipo);
           return (
             <Box
               key={categoria.id}
@@ -103,8 +102,8 @@ export function CategoriaCheckboxList({ categorias, selected, onChange, loading,
               onClick={() => {
                 onChange(
                   isChecked
-                    ? selected.filter((i) => i !== categoria.id)
-                    : [...selected, categoria.id]
+                    ? selected.filter((t) => t !== categoria.tipo)
+                    : [...selected, categoria.tipo]
                 );
               }}
               role="button"
@@ -115,8 +114,8 @@ export function CategoriaCheckboxList({ categorias, selected, onChange, loading,
                 onChange={() => {
                   onChange(
                     isChecked
-                      ? selected.filter((i) => i !== categoria.id)
-                      : [...selected, categoria.id]
+                      ? selected.filter((t) => t !== categoria.tipo)
+                      : [...selected, categoria.tipo]
                   );
                 }}
                 size="medium"

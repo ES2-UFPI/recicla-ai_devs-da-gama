@@ -51,18 +51,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function register(data: RegisterData) {
     // O backend atual expõe criação de usuário em /users (não autentica automaticamente)
     // Mapear RegisterData -> UserCreate (backend): name, email, phone, password, role_id, cidade_id, estado_id
-    await api.post('/users', {
+    const payload: any = {
       name: data.name,
       email: data.email,
-      phone: data.telefone,
-      password: data.senha,
-      role_id: data.role,
-      cidade_id: data.cidade,
-      estado_id: data.estado,
-    });
+      phone: data.phone,
+      password: data.password,
+      role_id: data.role_id,
+      cidade_id: data.cidade_id,
+      estado_id: data.estado_id,
+    };
+
+    // Adicionar campos específicos de cada role
+    if (data.addresses) {
+      payload.addresses = data.addresses;
+    }
+    if (data.is_business !== undefined) {
+      payload.is_business = data.is_business;
+    }
+    if (data.cnpj) {
+      payload.cnpj = data.cnpj;
+    }
+    if (data.points !== undefined) {
+      payload.points = data.points;
+    }
+    if (data.ranking !== undefined) {
+      payload.ranking = data.ranking;
+    }
+    if (data.inventory !== undefined) {
+      payload.inventory = data.inventory;
+    }
+    if (data.accepted_material !== undefined) {
+      payload.accepted_material = data.accepted_material;
+    }
+
+    await api.post('/users', payload);
     // Após cadastro, opcionalmente fazer login automático
     try {
-      await login({ email: data.email, password: data.senha });
+      await login({ email: data.email, password: data.password });
     } catch {
       setUser(null);
     }
