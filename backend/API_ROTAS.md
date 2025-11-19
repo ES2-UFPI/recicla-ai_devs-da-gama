@@ -3253,6 +3253,147 @@ Reativa uma recompensa previamente desativada.
 
 ---
 
+### [PRODUTOR] Resgatar Recompensa
+**POST** `http://localhost:8000/recompensas/{recompensa_id}/resgatar`
+
+Executa o resgate de uma recompensa usando pontos do produtor autenticado.
+
+**Autenticação:** ✅ Requerida (role: produtor)
+
+**Exemplo:** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e/resgatar`
+
+**Fluxo de Execução:**
+1. ✅ Valida que recompensa existe, está ativa e tem estoque > 0
+2. ✅ Valida que produtor tem pontos suficientes
+3. ✅ Debita pontos do produtor (operação atômica)
+4. ✅ Decrementa estoque da recompensa (operação atômica)
+5. ✅ Salva registro permanente no histórico de resgates
+6. 🔄 Implementa rollback automático em caso de falha
+
+**Resposta de Sucesso (201 Created):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d40",
+  "recompensa_id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "produtor_id": "60c72b2f9b1d4c3a4c8e4d3f",
+  "pontos_gastos": 500,
+  "data_resgate": "2025-11-19T14:30:00Z"
+}
+```
+
+**Erros Comuns:**
+
+**400 Bad Request** - Pontos insuficientes:
+```json
+{
+  "detail": "Pontos insuficientes. Você tem 200 pontos, mas precisa de 500 pontos"
+}
+```
+
+**400 Bad Request** - Recompensa inativa:
+```json
+{
+  "detail": "Recompensa não está disponível para resgate"
+}
+```
+
+**400 Bad Request** - Sem estoque:
+```json
+{
+  "detail": "Recompensa sem estoque disponível"
+}
+```
+
+**404 Not Found** - Recompensa não encontrada:
+```json
+{
+  "detail": "Recompensa não encontrada"
+}
+```
+
+**404 Not Found** - Produtor não encontrado:
+```json
+{
+  "detail": "Produtor não encontrado"
+}
+```
+
+**500 Internal Server Error** - Erro ao debitar pontos:
+```json
+{
+  "detail": "Erro ao debitar pontos do produtor"
+}
+```
+
+**500 Internal Server Error** - Erro ao atualizar estoque (com rollback):
+```json
+{
+  "detail": "Erro ao atualizar estoque da recompensa"
+}
+```
+
+**Observações:**
+- ⚠️ **O resgate é DEFINITIVO** (não pode ser cancelado)
+- ✅ Os pontos são debitados imediatamente e de forma atômica
+- ✅ O estoque é decrementado automaticamente
+- ✅ O histórico fica registrado permanentemente
+- 🔄 Se falhar após debitar pontos, **rollback automático** devolve os pontos
+- 🔒 Cada produtor só pode resgatar com seus próprios pontos
+- 📊 Registro do resgate é usado para auditoria e estatísticas
+
+---
+
+### [PRODUTOR] Listar Meus Resgates
+**GET** `http://localhost:8000/recompensas/meus-resgates`
+
+Lista o histórico de resgates do produtor autenticado.
+
+**Autenticação:** ✅ Requerida (role: produtor)
+
+**Parâmetros de Query (opcionais):**
+- `skip`: Quantidade de registros a pular (padrão: 0)
+- `limit`: Quantidade máxima de registros (padrão: 100, máx: 100)
+
+**Exemplo:** `http://localhost:8000/recompensas/meus-resgates?skip=0&limit=10`
+
+**Resposta de Sucesso (200 OK):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d40",
+    "recompensa_id": "60c72b2f9b1d4c3a4c8e4d3e",
+    "produtor_id": "60c72b2f9b1d4c3a4c8e4d3f",
+    "pontos_gastos": 500,
+    "data_resgate": "2025-11-19T14:30:00Z"
+  },
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d41",
+    "recompensa_id": "60c72b2f9b1d4c3a4c8e4d3a",
+    "produtor_id": "60c72b2f9b1d4c3a4c8e4d3f",
+    "pontos_gastos": 200,
+    "data_resgate": "2025-11-15T10:15:00Z"
+  }
+]
+```
+
+**Erros Comuns:**
+
+**401 Unauthorized** - Usuário não autenticado:
+```json
+{
+  "detail": "Usuário não autenticado"
+}
+```
+
+**Observações:**
+- 📅 Lista ordenada por data **decrescente** (mais recente primeiro)
+- 🔒 Cada produtor visualiza apenas seus próprios resgates
+- 📊 Útil para comprovação de resgates e auditoria
+- ♾️ Histórico permanente (resgates nunca são deletados)
+- 📄 Suporta paginação para otimizar performance
+
+---
+
 ## Desenvolvimento
 
 ⚠️ **ATENÇÃO:** Estas rotas devem ser DESABILITADAS em produção!
