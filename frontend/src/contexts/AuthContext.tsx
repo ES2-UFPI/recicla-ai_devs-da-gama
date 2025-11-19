@@ -18,7 +18,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         // Tenta buscar usuário atual
         // O interceptor do axios tentará refresh automaticamente se o access_token estiver expirado
-        const { data } = await api.get<{ name: string; email: string; role_id: string }>('/auth/me');
+        const { data } = await api.get<UserMeResponse>('/auth/me');
         setUser(mapUserFromMe(data));
       } catch {
         // Se falhou mesmo após tentativa de refresh, usuário não está autenticado
@@ -40,7 +40,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       password: credentials.password,
     });
     // Cookie httpOnly é definido pelo backend. Buscar usuário atual.
-    const { data: me } = await api.get<{ name: string; email: string; role_id: string }>('/auth/me');
+    const { data: me } = await api.get<UserMeResponse>('/auth/me');
     setUser(mapUserFromMe(me));
     // ⚠️ IMPORTANTE: Não manipular isLoading aqui!
     // O componente de Login já gerencia seu próprio loading state.
@@ -124,17 +124,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
 }
 
 // Helpers
-function mapUserFromMe(me: { name: string; email: string; role_id: string }): User {
-  // Backend retorna apenas name, email, role_id no /auth/me atualmente.
-  // Preenchemos campos adicionais com valores vazios até que endpoints de perfil estejam disponíveis.
+interface UserMeResponse {
+  id: string;
+  name: string;
+  email: string;
+  role_id: string;
+  telefone?: string;
+  cidade_id?: string;
+  estado_id?: string;
+  points?: number;
+  ranking?: number;
+}
+
+function mapUserFromMe(me: UserMeResponse): User {
   return {
-    id: '',
+    id: me.id,
     name: me.name,
     email: me.email,
-    telefone: '',
+    telefone: me.telefone,
     role: mapRoleIdToRole(me.role_id),
-    estado: '',
-    cidade: '',
+    estado: me.estado_id || '',
+    cidade: me.cidade_id || '',
+    points: me.points,
+    ranking: me.ranking,
   };
 }
 

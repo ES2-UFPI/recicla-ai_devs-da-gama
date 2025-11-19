@@ -14,5 +14,7 @@ class RankingEntry(BaseModel):
 class RankingResponse(BaseModel):
     level: str = Field(..., description="Nível do ranking: global, estado, cidade")
     code: Optional[str] = Field(None, description="Código do nível (estado/cidade)")
+    cidade_nome: Optional[str] = Field(None, description="Nome da cidade (quando level=cidade)")
+    estado_nome: Optional[str] = Field(None, description="Nome do estado (quando level=estado)")
     total: int = Field(..., description="Número total de usuários considerados")
     top: List[RankingEntry] = Field(..., description="Top N usuários")
