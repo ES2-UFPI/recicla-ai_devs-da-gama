@@ -1033,7 +1033,7 @@ Lista todas as categorias ativas disponíveis para seleção.
 ### Listar Todas as Categorias (Admin)
 **GET** `http://localhost:8000/categorias/`
 
-Lista TODAS as categorias (ativas e inativas) - apenas administradores.
+Lista TODAS as categorias (ativas e inativas) - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -1087,7 +1087,7 @@ Retorna detalhes de uma categoria específica.
 ### Criar Categoria (Admin)
 **POST** `http://localhost:8000/categorias/`
 
-Cria uma nova categoria - apenas administradores.
+Cria uma nova categoria - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -1125,7 +1125,7 @@ Cria uma nova categoria - apenas administradores.
 ### Atualizar Categoria (Admin)
 **PUT** `http://localhost:8000/categorias/{categoria_id}`
 
-Atualiza dados de uma categoria - apenas administradores.
+Atualiza dados de uma categoria - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -1158,7 +1158,7 @@ Atualiza dados de uma categoria - apenas administradores.
 ### Atualizar Preço da Categoria (Admin)
 **PATCH** `http://localhost:8000/categorias/{categoria_id}/preco?novo_preco=3.50`
 
-Atualiza apenas o preço de uma categoria - apenas administradores.
+Atualiza apenas o preço de uma categoria - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -1184,7 +1184,7 @@ Atualiza apenas o preço de uma categoria - apenas administradores.
 ### Desativar Categoria (Admin)
 **DELETE** `http://localhost:8000/categorias/{categoria_id}`
 
-Desativa uma categoria (soft delete) - apenas administradores.
+Desativa uma categoria (soft delete) - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -1209,7 +1209,7 @@ Desativa uma categoria (soft delete) - apenas administradores.
 ### Reativar Categoria (Admin)
 **POST** `http://localhost:8000/categorias/{categoria_id}/reativar`
 
-Reativa uma categoria previamente desativada - apenas administradores.
+Reativa uma categoria previamente desativada - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -2888,7 +2888,7 @@ Retorna os detalhes completos de uma recompensa específica.
 
 ---
 
-### [ADMIN] Listar Todas as Recompensas
+### [GESTOR] Listar Todas as Recompensas
 **GET** `http://localhost:8000/recompensas/`
 
 Lista TODAS as recompensas do sistema (ativas e inativas).
@@ -2936,7 +2936,7 @@ Lista TODAS as recompensas do sistema (ativas e inativas).
 **403 Forbidden** - Usuário não é administrador:
 ```json
 {
-  "detail": "Acesso negado. Apenas administradores podem realizar esta ação."
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
 }
 ```
 
@@ -2947,7 +2947,7 @@ Lista TODAS as recompensas do sistema (ativas e inativas).
 
 ---
 
-### [ADMIN] Criar Nova Recompensa
+### [GESTOR] Criar Nova Recompensa
 **POST** `http://localhost:8000/recompensas/`
 
 Cria uma nova recompensa no sistema de gamificação.
@@ -3006,7 +3006,7 @@ Cria uma nova recompensa no sistema de gamificação.
 **403 Forbidden** - Usuário não é administrador:
 ```json
 {
-  "detail": "Acesso negado. Apenas administradores podem realizar esta ação."
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
 }
 ```
 
@@ -3030,7 +3030,7 @@ Cria uma nova recompensa no sistema de gamificação.
 
 ---
 
-### [ADMIN] Atualizar Recompensa
+### [GESTOR] Atualizar Recompensa
 **PUT** `http://localhost:8000/recompensas/{recompensa_id}`
 
 Atualiza os dados de uma recompensa existente.
@@ -3079,7 +3079,7 @@ Atualiza os dados de uma recompensa existente.
 **403 Forbidden** - Usuário não é administrador:
 ```json
 {
-  "detail": "Acesso negado. Apenas administradores podem realizar esta ação."
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
 }
 ```
 
@@ -3096,7 +3096,7 @@ Atualiza os dados de uma recompensa existente.
 
 ---
 
-### [ADMIN] Atualizar Estoque da Recompensa
+### [GESTOR] Atualizar Estoque da Recompensa
 **PATCH** `http://localhost:8000/recompensas/{recompensa_id}/estoque`
 
 Atualiza o estoque de uma recompensa (incremento ou decremento).
@@ -3131,7 +3131,7 @@ Atualiza o estoque de uma recompensa (incremento ou decremento).
 **403 Forbidden** - Usuário não é administrador:
 ```json
 {
-  "detail": "Acesso negado. Apenas administradores podem realizar esta ação."
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
 }
 ```
 
@@ -3154,7 +3154,7 @@ Atualiza o estoque de uma recompensa (incremento ou decremento).
 
 ---
 
-### [ADMIN] Desativar Recompensa
+### [GESTOR] Desativar Recompensa
 **DELETE** `http://localhost:8000/recompensas/{recompensa_id}`
 
 Desativa uma recompensa (soft delete).
@@ -3184,7 +3184,7 @@ Desativa uma recompensa (soft delete).
 **403 Forbidden** - Usuário não é administrador:
 ```json
 {
-  "detail": "Acesso negado. Apenas administradores podem realizar esta ação."
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
 }
 ```
 
@@ -3206,7 +3206,7 @@ Desativa uma recompensa (soft delete).
 
 ---
 
-### [ADMIN] Reativar Recompensa
+### [GESTOR] Reativar Recompensa
 **POST** `http://localhost:8000/recompensas/{recompensa_id}/reativar`
 
 Reativa uma recompensa previamente desativada.
@@ -3236,7 +3236,7 @@ Reativa uma recompensa previamente desativada.
 **403 Forbidden** - Usuário não é administrador:
 ```json
 {
-  "detail": "Acesso negado. Apenas administradores podem realizar esta ação."
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
 }
 ```
 
@@ -3373,6 +3373,6 @@ Todas as datas seguem o formato ISO 8601: `YYYY-MM-DDTHH:mm:ssZ`
 
 ---
 
-**Documentação gerada em:** 16 de outubro de 2025  
 **Versão da API:** 0.1.0  
 **Desenvolvido por:** Equipe Devs da Gama - ReciclaAI
+

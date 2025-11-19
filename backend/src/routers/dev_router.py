@@ -253,6 +253,88 @@ async def seed_heavy():
         }
 
 
+@router.get("/seed/gestor-recompensas")
+async def seed_gestor_recompensas():
+    """
+    Cria um usuário gestor de recompensas para gerenciar o catálogo de prêmios.
+    
+    ⚠️ Endpoint de desenvolvimento - use apenas em ambiente de dev/staging!
+    
+    Credenciais criadas:
+    - Email: gestor.recompensas@reciclaai.com.br
+    - Senha: GestorRecompensas@2024
+    - Role: gestor_recompensas
+    
+    Este usuário pode:
+    - Criar novas recompensas
+    - Atualizar recompensas existentes
+    - Ajustar estoque de recompensas
+    - Desativar/reativar recompensas
+    
+    Returns:
+        dict: Dados do usuário criado e credenciais de acesso
+    """
+    from src.infra.database.repositories import user_repo
+    from passlib.context import CryptContext
+    
+    pwd_ctx = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
+    
+    email = "gestor.recompensas@reciclaai.com.br"
+    
+    try:
+        # Verificar se já existe
+        existente = await user_repo.find_by_email(email)
+        
+        if existente:
+            return {
+                "ok": 1,
+                "mensagem": "✅ Gestor de recompensas já existe!",
+                "credenciais": {
+                    "email": email,
+                    "senha": "GestorRecompensas@2024",
+                    "role": "gestor_recompensas"
+                },
+                "ja_existia": True
+            }
+        
+        # Criar usuário gestor
+        user_data = {
+            "name": "Gestor de Recompensas",
+            "email": email,
+            "phone": "(86) 99999-9999",
+            "password_hash": pwd_ctx.hash("GestorRecompensas@2024"),
+            "role_id": "gestor_recompensas",
+            "cidade_id": "teresina",
+            "estado_id": "piaui",
+            "addresses": []
+        }
+        
+        user_id = await user_repo.create_user(user_data)
+        
+        return {
+            "ok": 1,
+            "mensagem": "✅ Gestor de recompensas criado com sucesso!",
+            "user_id": user_id,
+            "credenciais": {
+                "email": email,
+                "senha": "GestorRecompensas@2024",
+                "role": "gestor_recompensas"
+            },
+            "permissoes": [
+                "Criar recompensas",
+                "Atualizar recompensas",
+                "Ajustar estoque",
+                "Desativar/reativar recompensas"
+            ]
+        }
+    except Exception as e:
+        return {
+            "ok": 0,
+            "erro": str(e),
+            "mensagem": "❌ Erro ao criar gestor de recompensas."
+        }
+
+
 @router.get("/info")
 async def info_dev():
     """
@@ -264,6 +346,7 @@ async def info_dev():
     return {
         "endpoints": {
             "GET /dev/seed/categorias": "Popula categorias padrão (Plástico, Vidro, Papel, Metal, Eletrônico)",
+            "GET /dev/seed/gestor-recompensas": "🎁 Cria usuário gestor de recompensas (gestor.recompensas@reciclaai.com.br)",
             "GET /dev/seed/heavy": "🚀 Popula banco completo (12 produtores, 6 coletores, 4 receptoras, ~60 resíduos, etc)",
             "GET /dev/seed/limpar-categorias": "⚠️ Remove TODAS as categorias do banco",
             "GET /dev/info": "Exibe esta mensagem de ajuda"

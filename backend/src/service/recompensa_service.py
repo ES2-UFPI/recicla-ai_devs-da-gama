@@ -190,8 +190,13 @@ class RecompensaService:
             recompensa_criada = await service.criar_recompensa(nova_recompensa)
             ```
         """
+        from datetime import datetime
+        
         # Preparar documento para persistência
         recompensa_dict = dados.model_dump()
+        
+        # Adicionar data de cadastro automaticamente
+        recompensa_dict["data_cadastro"] = datetime.utcnow()
         
         # Criar recompensa no banco
         recompensa_id = await recompensa_repo.criar_recompensa(recompensa_dict)

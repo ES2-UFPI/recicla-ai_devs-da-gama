@@ -11,7 +11,7 @@ CONTROLE DE ACESSO:
   - GET /recompensas/ativas - Listar para visualizar opções de resgate
   - GET /recompensas/{id} - Ver detalhes de uma recompensa
   
-- Endpoints para ADMINISTRADORES:
+- Endpoints para GESTORES DE RECOMPENSAS:
   - GET /recompensas - Listar todas (ativas e inativas)
   - POST /recompensas - Criar nova recompensa
   - PUT /recompensas/{id} - Atualizar recompensa
@@ -37,7 +37,7 @@ router = APIRouter(
     tags=["Recompensas"],
     responses={
         401: {"description": "Não autenticado"},
-        403: {"description": "Sem permissão - Apenas administradores"},
+        403: {"description": "Sem permissão - Apenas gestores de recompensas"},
         404: {"description": "Recompensa não encontrada"}
     }
 )
@@ -46,17 +46,20 @@ router = APIRouter(
 recompensa_service = RecompensaService()
 
 
-def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
+def require_gestor_recompensas(current_user: dict = Depends(get_current_user)) -> dict:
     """
-    Dependency para validar se usuário é administrador.
+    Dependency para validar se usuário é gestor de recompensas.
+    
+    Gestor de recompensas é uma role específica responsável por gerenciar
+    o catálogo de recompensas do sistema de gamificação.
     
     Raises:
-        HTTPException 403: Se usuário não for admin
+        HTTPException 403: Se usuário não for gestor_recompensas
     """
-    if current_user.get("role_id") != "admin":
+    if current_user.get("role_id") != "gestor_recompensas":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado. Apenas administradores podem realizar esta ação."
+            detail="Acesso negado. Apenas gestores de recompensas podem realizar esta ação."
         )
     return current_user
 
@@ -167,20 +170,20 @@ async def obter_recompensa(
 @router.get(
     "/",
     response_model=List[RecompensaResponse],
-    summary="[ADMIN] Listar todas as recompensas",
+    summary="[GESTOR] Listar todas as recompensas",
     description="""
     Lista TODAS as recompensas (ativas e inativas).
     
-    **Apenas ADMINISTRADORES podem acessar.**
+    **Apenas GESTORES DE RECOMPENSAS podem acessar.**
     
-    Usado no painel administrativo para gerenciar recompensas.
+    Usado no painel de gestão para gerenciar recompensas.
     """,
-    dependencies=[Depends(require_admin)]
+    dependencies=[Depends(require_gestor_recompensas)]
 )
 async def listar_todas_recompensas(
     skip: int = Query(0, ge=0, description="Quantidade de registros a pular"),
     limit: int = Query(100, ge=1, le=100, description="Quantidade máxima de registros"),
-    _: dict = Depends(require_admin)
+    _: dict = Depends(require_gestor_recompensas)
 ) -> List[RecompensaResponse]:
     """
     Lista todas as recompensas do sistema.
@@ -195,11 +198,11 @@ async def listar_todas_recompensas(
     "/",
     response_model=RecompensaResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="[ADMIN] Criar nova recompensa",
+    summary="[GESTOR] Criar nova recompensa",
     description="""
     Cria uma nova recompensa no sistema de gamificação.
     
-    **Apenas ADMINISTRADORES podem criar recompensas.**
+    **Apenas GESTORES DE RECOMPENSAS podem criar recompensas.**
     
     Validações:
     - Nome não pode estar vazio (3-100 caracteres)
@@ -213,18 +216,18 @@ async def listar_todas_recompensas(
     - Criar promoções especiais
     - Cadastrar parcerias com empresas
     """,
-    dependencies=[Depends(require_admin)]
+    dependencies=[Depends(require_gestor_recompensas)]
 )
 async def criar_recompensa(
     dados: RecompensaCreate,
-    admin_user: dict = Depends(require_admin)
+    gestor_user: dict = Depends(require_gestor_recompensas)
 ) -> RecompensaResponse:
     """
     Cria nova recompensa.
     
     Args:
         dados: Dados da recompensa
-        admin_user: Usuário admin autenticado
+        gestor_user: Usuário gestor de recompensas autenticado
     
     Returns:
         RecompensaResponse: Recompensa criada
@@ -249,11 +252,11 @@ async def criar_recompensa(
 @router.put(
     "/{recompensa_id}",
     response_model=RecompensaResponse,
-    summary="[ADMIN] Atualizar recompensa",
+    summary="[GESTOR] Atualizar recompensa",
     description="""
     Atualiza os dados de uma recompensa existente.
     
-    **Apenas ADMINISTRADORES podem atualizar recompensas.**
+    **Apenas GESTORES DE RECOMPENSAS podem atualizar recompensas.**
     
     Campos que podem ser atualizados:
     - `nome`: Renomear a recompensa
@@ -267,12 +270,12 @@ async def criar_recompensa(
     
     **IMPORTANTE:** Alterar pontos necessários NÃO afeta resgates já realizados!
     """,
-    dependencies=[Depends(require_admin)]
+    dependencies=[Depends(require_gestor_recompensas)]
 )
 async def atualizar_recompensa(
     recompensa_id: str,
     dados: RecompensaUpdate,
-    admin_user: dict = Depends(require_admin)
+    gestor_user: dict = Depends(require_gestor_recompensas)
 ) -> RecompensaResponse:
     """
     Atualiza dados de uma recompensa.
@@ -280,7 +283,7 @@ async def atualizar_recompensa(
     Args:
         recompensa_id: ID da recompensa
         dados: Novos dados (campos opcionais)
-        admin_user: Usuário admin autenticado
+        gestor_user: Usuário gestor de recompensas autenticado
     
     Returns:
         RecompensaResponse: Recompensa atualizada
@@ -294,11 +297,11 @@ async def atualizar_recompensa(
 @router.patch(
     "/{recompensa_id}/estoque",
     response_model=RecompensaResponse,
-    summary="[ADMIN] Atualizar estoque da recompensa",
+    summary="[GESTOR] Atualizar estoque da recompensa",
     description="""
     Atualiza o estoque de uma recompensa (incremento ou decremento).
     
-    **Apenas ADMINISTRADORES podem atualizar estoque manualmente.**
+    **Apenas GESTORES DE RECOMPENSAS podem atualizar estoque manualmente.**
     
     Endpoint auxiliar para facilitar ajuste de estoque sem enviar todos os campos.
     
@@ -307,12 +310,12 @@ async def atualizar_recompensa(
     - Remover unidades (ajuste manual): quantidade negativa
     - Corrigir inconsistências de estoque
     """,
-    dependencies=[Depends(require_admin)]
+    dependencies=[Depends(require_gestor_recompensas)]
 )
 async def atualizar_estoque(
     recompensa_id: str,
     quantidade: int = Query(..., description="Quantidade a adicionar (positivo) ou remover (negativo)"),
-    admin_user: dict = Depends(require_admin)
+    gestor_user: dict = Depends(require_gestor_recompensas)
 ) -> RecompensaResponse:
     """
     Atualiza estoque de uma recompensa.
@@ -320,7 +323,7 @@ async def atualizar_estoque(
     Args:
         recompensa_id: ID da recompensa
         quantidade: Quantidade a incrementar/decrementar
-        admin_user: Usuário admin autenticado
+        gestor_user: Usuário gestor de recompensas autenticado
     
     Returns:
         RecompensaResponse: Recompensa com estoque atualizado
@@ -338,11 +341,11 @@ async def atualizar_estoque(
 @router.delete(
     "/{recompensa_id}",
     response_model=RecompensaResponse,
-    summary="[ADMIN] Desativar recompensa",
+    summary="[GESTOR] Desativar recompensa",
     description="""
     Desativa uma recompensa (soft delete).
     
-    **Apenas ADMINISTRADORES podem desativar recompensas.**
+    **Apenas GESTORES DE RECOMPENSAS podem desativar recompensas.**
     
     A recompensa NÃO é deletada do banco, apenas marcada como `ativo=False`.
     
@@ -354,18 +357,18 @@ async def atualizar_estoque(
     
     Recompensas inativas NÃO aparecem na lista de opções para produtores.
     """,
-    dependencies=[Depends(require_admin)]
+    dependencies=[Depends(require_gestor_recompensas)]
 )
 async def desativar_recompensa(
     recompensa_id: str,
-    admin_user: dict = Depends(require_admin)
+    gestor_user: dict = Depends(require_gestor_recompensas)
 ) -> RecompensaResponse:
     """
     Desativa uma recompensa (soft delete).
     
     Args:
         recompensa_id: ID da recompensa
-        admin_user: Usuário admin autenticado
+        gestor_user: Usuário gestor de recompensas autenticado
     
     Returns:
         RecompensaResponse: Recompensa desativada
@@ -379,27 +382,27 @@ async def desativar_recompensa(
 @router.post(
     "/{recompensa_id}/reativar",
     response_model=RecompensaResponse,
-    summary="[ADMIN] Reativar recompensa",
+    summary="[GESTOR] Reativar recompensa",
     description="""
     Reativa uma recompensa previamente desativada.
     
-    **Apenas ADMINISTRADORES podem reativar recompensas.**
+    **Apenas GESTORES DE RECOMPENSAS podem reativar recompensas.**
     
     Após reativação, a recompensa volta a aparecer na lista de opções
     para os produtores resgatarem.
     """,
-    dependencies=[Depends(require_admin)]
+    dependencies=[Depends(require_gestor_recompensas)]
 )
 async def reativar_recompensa(
     recompensa_id: str,
-    admin_user: dict = Depends(require_admin)
+    gestor_user: dict = Depends(require_gestor_recompensas)
 ) -> RecompensaResponse:
     """
     Reativa uma recompensa.
     
     Args:
         recompensa_id: ID da recompensa
-        admin_user: Usuário admin autenticado
+        gestor_user: Usuário gestor de recompensas autenticado
     
     Returns:
         RecompensaResponse: Recompensa reativada
@@ -408,3 +411,4 @@ async def reativar_recompensa(
         HTTPException 404: Recompensa não encontrada
     """
     return await recompensa_service.reativar_recompensa(recompensa_id)
+
