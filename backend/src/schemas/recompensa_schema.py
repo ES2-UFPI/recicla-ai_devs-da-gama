@@ -166,6 +166,7 @@ class RecompensaResponse(BaseModel):
     estoque: int = Field(..., description="Quantidade disponível em estoque")
     parceiro: Optional[str] = Field(None, description="Nome do parceiro/patrocinador")
     data_cadastro: datetime = Field(..., description="Data de cadastro da recompensa")
+    ativo: bool = Field(..., description="Se a recompensa está ativa e disponível para resgate")
     
     model_config = {
         "from_attributes": True,
@@ -179,7 +180,8 @@ class RecompensaResponse(BaseModel):
                 "foto_url": "https://example.com/vale50.jpg",
                 "estoque": 100,
                 "parceiro": "Supermercado Verde",
-                "data_cadastro": "2025-11-18T10:30:00Z"
+                "data_cadastro": "2025-11-18T10:30:00Z",
+                "ativo": True
             }
         }
     }
