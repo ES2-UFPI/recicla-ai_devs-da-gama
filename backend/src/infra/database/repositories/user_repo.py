@@ -144,3 +144,45 @@ async def remove_address(user_id: str, address_id: int) -> bool:
 		{"$pull": {"addresses": {"id": address_id}}}
 	)
 	return result.matched_count > 0 and result.modified_count > 0
+
+
+async def obter_pontos(user_id: str) -> Optional[int]:
+	"""
+	Retorna pontos atuais do usuário.
+	
+	Args:
+		user_id: ID do usuário
+	
+	Returns:
+		Pontos do usuário ou None se usuário não existe
+	"""
+	user = await find_by_id(user_id)
+	if not user:
+		return None
+	return user.get("points", 0)
+
+
+async def atualizar_pontos(user_id: str, pontos_delta: int) -> bool:
+	"""
+	Atualiza pontos do usuário (incremento/decremento atômico).
+	
+	Usa $inc do MongoDB para operação atômica thread-safe.
+	Evita race conditions em ambientes concorrentes.
+	
+	Args:
+		user_id: ID do usuário
+		pontos_delta: Quantidade a adicionar (+) ou remover (-)
+			Exemplos: +50 (ganhar pontos), -100 (gastar pontos)
+	
+	Returns:
+		True se atualizado com sucesso, False se usuário não existe
+	"""
+	_id = _to_object_id(user_id)
+	if not _id:
+		return False
+	
+	result = await _collection().update_one(
+		{"_id": _id},
+		{"$inc": {"points": pontos_delta}}
+	)
+	return result.matched_count > 0
