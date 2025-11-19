@@ -124,17 +124,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
 }
 
 // Helpers
-function mapUserFromMe(me: { name: string; email: string; role_id: string }): User {
-  // Backend retorna apenas name, email, role_id no /auth/me atualmente.
-  // Preenchemos campos adicionais com valores vazios até que endpoints de perfil estejam disponíveis.
+interface UserMeResponse {
+  id: string;
+  name: string;
+  email: string;
+  role_id: string;
+  telefone?: string;
+  cidade_id?: string;
+  estado_id?: string;
+  points?: number;
+  ranking?: number;
+}
+
+function mapUserFromMe(me: UserMeResponse): User {
   return {
-    id: '',
+    id: me.id,
     name: me.name,
     email: me.email,
-    telefone: '',
+    telefone: me.telefone,
     role: mapRoleIdToRole(me.role_id),
-    estado: '',
-    cidade: '',
+    estado: me.estado_id || '',
+    cidade: me.cidade_id || '',
+    points: me.points,
+    ranking: me.ranking,
   };
 }
 

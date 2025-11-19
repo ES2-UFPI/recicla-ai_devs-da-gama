@@ -24,65 +24,21 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PublicIcon from '@mui/icons-material/Public';
 import { Navbar } from '../../components/Navbar';
 import { useAuth } from '../../hooks/useAuth';
+import rankingService, { type RankingEntry } from '../../services/rankingService';
 
-// Interface para usuário no ranking
-interface RankingUser {
-  id: string;
-  name: string;
-  points: number;
-  ranking: number;
-  cidade?: string;
-  estado?: string;
+// Interface para usuário no ranking (estende RankingEntry da API)
+interface RankingUser extends RankingEntry {
+  ranking: number; // posição no ranking
 }
 
 // Tipo das abas de ranking
-type RankingTab = 'municipal' | 'estadual' | 'geral';
+type RankingTab = 'cidade' | 'estado' | 'global';
 
-// Mock data para testes (será substituído pela API real)
-const generateMockRanking = (type: RankingTab, currentUserId: string, currentUserPoints: number): RankingUser[] => {
-  const names = [
-    'Maria Silva', 'João Santos', 'Ana Paula', 'Carlos Eduardo', 'Juliana Costa',
-    'Pedro Alves', 'Beatriz Lima', 'Rafael Souza', 'Camila Oliveira', 'Lucas Pereira',
-    'Fernanda Martins', 'Gabriel Rocha', 'Patrícia Dias', 'Bruno Cardoso', 'Mariana Nunes'
-  ];
-  
-  const cidades = ['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano'];
-  const estados = ['PI', 'MA', 'CE', 'BA', 'PE'];
-  
-  // Gera um ranking com pontuações decrescentes
-  const basePoints = type === 'geral' ? 10000 : type === 'estadual' ? 5000 : 2000;
-  const decrement = type === 'geral' ? 500 : type === 'estadual' ? 300 : 150;
-  
-  const ranking: RankingUser[] = names.slice(0, 10).map((name, idx) => ({
-    id: `user_${idx + 1}`,
-    name,
-    points: basePoints - (idx * decrement),
-    ranking: idx + 1,
-    cidade: cidades[Math.floor(Math.random() * cidades.length)],
-    estado: estados[Math.floor(Math.random() * estados.length)],
-  }));
-  
-  // Adiciona o usuário atual se ele não estiver no top 10
-  // Para ranking geral, força o usuário a ficar fora do top 10 para demonstração
-  const userInTop10 = type !== 'geral' && currentUserPoints >= ranking[ranking.length - 1].points;
-  
-  if (!userInTop10) {
-    // Calcula posição do usuário
-    // Para ranking geral, sempre coloca fora do top 10 (posição 15-50)
-    const userPosition = type === 'geral' 
-      ? 21 // Posição fixa para demonstração no ranking geral
-      : 15 + Math.floor(Math.random() * 35);
-    ranking.push({
-      id: currentUserId,
-      name: 'Você',
-      points: currentUserPoints,
-      ranking: userPosition,
-      cidade: 'Teresina',
-      estado: 'PI',
-    });
-  }
-  
-  return ranking;
+// Mapeia tab para nível da API
+const tabToLevel: Record<RankingTab, 'cidade' | 'estado' | 'global'> = {
+  cidade: 'cidade',
+  estado: 'estado',
+  global: 'global',
 };
 
 export default function Ranking() {
@@ -91,44 +47,57 @@ export default function Ranking() {
   const { user } = useAuth();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
-  const [currentTab, setCurrentTab] = useState<RankingTab>('municipal');
+  const [currentTab, setCurrentTab] = useState<RankingTab>('cidade');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rankingData, setRankingData] = useState<RankingUser[]>([]);
+  const [userPosition, setUserPosition] = useState<number | null>(null);
+  const [rankingTitle, setRankingTitle] = useState<string>('Ranking Municipal');
   
-  // Mock: pontuação do usuário (será obtida do user.points na API real)
-  const userPoints = user?.points || 850;
-  
-  // Mock data para cada tipo de ranking
-  const [rankingData, setRankingData] = useState<{
-    municipal: RankingUser[];
-    estadual: RankingUser[];
-    geral: RankingUser[];
-  }>({
-    municipal: [],
-    estadual: [],
-    geral: [],
-  });
+  // Pontuação do usuário
+  const userPoints = user?.points || 0;
 
   useEffect(() => {
-    // Simula carregamento de dados da API
     const fetchRankingData = async () => {
+      if (!user?.id) return;
+      
       setLoading(true);
       setError(null);
       
       try {
-        // TODO: Substituir por chamada real à API
-        // const response = await api.get(`/ranking/${currentTab}`);
+        const level = tabToLevel[currentTab];
         
-        // Simula delay de rede
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Determina o code baseado no tipo de ranking
+        let code: string | undefined;
+        if (level === 'cidade') {
+          code = user.cidade; // cidade_id do usuário
+        } else if (level === 'estado') {
+          code = user.estado; // estado_id do usuário
+        }
         
-        // Mock data
-        const mockData = generateMockRanking(currentTab, user?.id || 'current_user', userPoints);
+        // Busca ranking e posição do usuário em paralelo
+        const [rankingResponse, position] = await Promise.all([
+          rankingService.getRanking(level, code, 10),
+          rankingService.getUserPosition(user.id, level, code),
+        ]);
         
-        setRankingData(prev => ({
-          ...prev,
-          [currentTab]: mockData,
+        // Atualiza título baseado na resposta da API
+        if (level === 'cidade' && rankingResponse.cidade_nome) {
+          setRankingTitle(`Ranking ${rankingResponse.cidade_nome}`);
+        } else if (level === 'estado' && rankingResponse.estado_nome) {
+          setRankingTitle(`Ranking ${rankingResponse.estado_nome}`);
+        } else {
+          setRankingTitle('Ranking Geral');
+        }
+        
+        // Transforma RankingEntry[] em RankingUser[]
+        const usersWithRanking: RankingUser[] = rankingResponse.top.map((entry) => ({
+          ...entry,
+          ranking: entry.position || 0,
         }));
+        
+        setRankingData(usersWithRanking);
+        setUserPosition(position);
       } catch (err) {
         console.error('Erro ao carregar ranking:', err);
         setError('Erro ao carregar dados do ranking. Tente novamente.');
@@ -138,24 +107,14 @@ export default function Ranking() {
     };
 
     fetchRankingData();
-  }, [currentTab, user?.id, userPoints]);
+  }, [currentTab, user?.id, user?.cidade, user?.estado]);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: RankingTab) => {
     setCurrentTab(newValue);
   };
 
-  const getCurrentRanking = () => rankingData[currentTab];
-  
-  const top10 = getCurrentRanking().filter(u => u.ranking <= 10);
-  const userPosition = getCurrentRanking().find(u => u.id === user?.id);
-  const userInTop10 = userPosition && userPosition.ranking <= 10;
-
-  // Obter nome da cidade/estado do usuário para exibir no título
-  const getRankingTitle = () => {
-    if (currentTab === 'municipal') return `Ranking ${user?.cidade || 'Municipal'}`;
-    if (currentTab === 'estadual') return `Ranking ${user?.estado || 'Estadual'}`;
-    return 'Ranking Geral';
-  };
+  const top10 = rankingData.filter(u => u.ranking <= 10);
+  const userInTop10 = userPosition !== null && userPosition <= 10;
 
   const getMedalIcon = (position: number) => {
     if (position === 1) return '🥇';
@@ -165,8 +124,8 @@ export default function Ranking() {
   };
 
   const getTabIcon = (tab: RankingTab) => {
-    if (tab === 'municipal') return <LocationOnIcon fontSize="small" />;
-    if (tab === 'estadual') return <LocationOnIcon fontSize="small" />;
+    if (tab === 'cidade') return <LocationOnIcon fontSize="small" />;
+    if (tab === 'estado') return <LocationOnIcon fontSize="small" />;
     return <PublicIcon fontSize="small" />;
   };
 
@@ -216,13 +175,13 @@ export default function Ranking() {
                 {userPoints.toLocaleString('pt-BR')}
               </Typography>
             </Box>
-            {userPosition && (
+            {userPosition !== null && userPosition > 0 && (
               <Box sx={{ textAlign: 'center' }}>
                 <Typography variant="caption" sx={{ opacity: 0.9 }}>
                   Sua Posição
                 </Typography>
                 <Typography variant="h4" fontWeight={700}>
-                  #{userPosition.ranking}
+                  #{userPosition}
                 </Typography>
               </Box>
             )}
@@ -249,20 +208,20 @@ export default function Ranking() {
           >
             <Tab
               label="Municipal"
-              value="municipal"
-              icon={getTabIcon('municipal')}
+              value="cidade"
+              icon={getTabIcon('cidade')}
               iconPosition="start"
             />
             <Tab
               label="Estadual"
-              value="estadual"
-              icon={getTabIcon('estadual')}
+              value="estado"
+              icon={getTabIcon('estado')}
               iconPosition="start"
             />
             <Tab
               label="Geral"
-              value="geral"
-              icon={getTabIcon('geral')}
+              value="global"
+              icon={getTabIcon('global')}
               iconPosition="start"
             />
           </Tabs>
@@ -286,7 +245,7 @@ export default function Ranking() {
                 fontWeight={700}
                 sx={{ mb: 2, color: 'primary.main' }}
               >
-                🏆 Top 10 - {getRankingTitle()}
+                🏆 Top 10 - {rankingTitle}
               </Typography>
               
               {top10.length === 0 ? (
@@ -296,12 +255,12 @@ export default function Ranking() {
               ) : (
                 <Stack spacing={1.5}>
                   {top10.map((rankingUser) => {
-                    const isCurrentUser = rankingUser.id === user?.id;
+                    const isCurrentUser = rankingUser.user_id === user?.id;
                     const medal = getMedalIcon(rankingUser.ranking);
                     
                     return (
                       <Card
-                        key={rankingUser.id}
+                        key={rankingUser.user_id}
                         sx={{
                           borderRadius: '0.75rem',
                           boxShadow: isCurrentUser ? '0 4px 16px rgba(56, 142, 60, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.1)',
@@ -353,7 +312,7 @@ export default function Ranking() {
                                   fontWeight: 600,
                                 }}
                               >
-                                {rankingUser.name[0].toUpperCase()}
+                                {rankingUser.name?.[0]?.toUpperCase() || 'U'}
                               </Avatar>
                               <Box sx={{ flex: 1, minWidth: 0 }}>
                                 <Typography
@@ -366,7 +325,7 @@ export default function Ranking() {
                                     whiteSpace: 'nowrap',
                                   }}
                                 >
-                                  {rankingUser.name}
+                                  {rankingUser.name || 'Usuário'}
                                   {isCurrentUser && (
                                     <Chip
                                       label="Você"
@@ -376,9 +335,9 @@ export default function Ranking() {
                                     />
                                   )}
                                 </Typography>
-                                {currentTab !== 'geral' && (
+                                {rankingUser.cidade_id && rankingUser.estado_id && (
                                   <Typography variant="caption" color="text.secondary">
-                                    {rankingUser.cidade} - {rankingUser.estado}
+                                    {rankingUser.cidade_id} - {rankingUser.estado_id}
                                   </Typography>
                                 )}
                               </Box>
@@ -409,7 +368,7 @@ export default function Ranking() {
             </Box>
 
             {/* Posição do Usuário (se não estiver no top 10) */}
-            {!userInTop10 && userPosition && (
+            {!userInTop10 && userPosition !== null && userPosition > 0 && (
               <Box sx={{ mb: 4 }}>
                 <Typography
                   variant="h6"
@@ -450,7 +409,7 @@ export default function Ranking() {
                           color: 'white',
                         }}
                       >
-                        #{userPosition.ranking}
+                        #{userPosition}
                       </Box>
 
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
@@ -468,9 +427,9 @@ export default function Ranking() {
                           <Typography variant="h6" fontWeight={600} color="primary.main">
                             {user?.name || 'Você'}
                           </Typography>
-                          {currentTab !== 'geral' && (
+                          {user?.cidade && user?.estado && (
                             <Typography variant="caption" color="text.secondary">
-                              {userPosition.cidade} - {userPosition.estado}
+                              {user.cidade} - {user.estado}
                             </Typography>
                           )}
                         </Box>
@@ -478,7 +437,7 @@ export default function Ranking() {
 
                       <Box sx={{ textAlign: 'right', minWidth: { xs: '100%', sm: 'auto' }, mt: { xs: 1, sm: 0 } }}>
                         <Typography variant="h6" fontWeight={700} color="success.main">
-                          {userPosition.points.toLocaleString('pt-BR')}
+                          {userPoints.toLocaleString('pt-BR')}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           pontos

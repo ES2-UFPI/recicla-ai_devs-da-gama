@@ -5,10 +5,10 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  telefone: string;
+  telefone?: string;
   role: 'produtor' | 'coletor' | 'receptor';
-  estado: string;
-  cidade: string;
+  estado: string; // estado_id retornado pela API
+  cidade: string; // cidade_id retornado pela API
   points?: number; // Pontuação do produtor (ranking)
   ranking?: number; // Posição no ranking geral
   // Adicione outros campos conforme o backend definir
