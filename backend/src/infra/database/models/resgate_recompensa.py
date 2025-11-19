@@ -12,9 +12,10 @@ from .base import PyObjectId
 
 class ResgateRecompensa(BaseModel):
     """
-    Registro de resgate.
+    Registro de resgate de recompensa.
     
-    Foco: Histórico simples e rastreabilidade básica.
+    Representa o histórico de trocas de pontos por recompensas.
+    Mantém rastreabilidade simples sem campos desnecessários.
     """
     id: Optional[PyObjectId] = Field(default=None, alias="_id")
     
@@ -23,7 +24,7 @@ class ResgateRecompensa(BaseModel):
     produtor_id: str = Field(..., description="ID do produtor que resgatou")
     
     # Snapshot mínimo
-    pontos_gastos: int = Field(..., description="Pontos debitados no momento do resgate")
+    pontos_gastos: int = Field(..., gt=0, description="Pontos debitados no momento do resgate")
     
     # Rastreabilidade temporal
     data_resgate: datetime = Field(default_factory=datetime.utcnow, description="Timestamp do resgate")

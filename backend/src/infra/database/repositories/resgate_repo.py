@@ -1,3 +1,7 @@
+"""
+Repositório de Resgates de Recompensa
+Gerencia operações de persistência para histórico de resgates
+"""
 from typing import Optional, Dict, Any, List
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorCollection
@@ -6,10 +10,15 @@ from src.infra.database.config.database import get_database
 
 
 def _collection() -> AsyncIOMotorCollection:
+    """Retorna a collection de resgates do MongoDB"""
     return get_database()["resgates"]
 
 
 def _to_response(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """
+    Converte documento do MongoDB para formato de resposta.
+    Serializa ObjectId para string e adiciona campo 'id' para compatibilidade com Pydantic.
+    """
     if not doc:
         return None
     _id = doc.get("_id")
@@ -18,6 +27,7 @@ def _to_response(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
 
 
 def _to_response_many(docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Converte múltiplos documentos para formato de resposta"""
     return [_to_response(d) for d in docs if d]
 
 
