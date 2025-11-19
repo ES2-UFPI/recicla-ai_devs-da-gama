@@ -13,6 +13,7 @@ import Inventario from '../pages/Inventario';
 import Entregas from '../pages/Entregas';
 import LocalizarReceptora from '../pages/LocalizarReceptora';
 import RealizarEntrega from '../pages/RealizarEntrega';
+import Ranking from '../pages/Ranking';
 
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
@@ -50,6 +51,14 @@ export function AppRoutes() {
         <ProtectedRoute>
           <RoleBasedRoute allowedRoles={['produtor']}>
             <Agendamento />
+          </RoleBasedRoute>
+        </ProtectedRoute>
+      } />
+      {/* Rota Ranking */}
+      <Route path="/ranking" element={
+        <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={['produtor']}>
+            <Ranking />
           </RoleBasedRoute>
         </ProtectedRoute>
       } />

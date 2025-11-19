@@ -8,8 +8,10 @@ export interface User {
   role: 'produtor' | 'coletor' | 'receptor';
   estado: string;
   cidade: string;
+  points?: number; // Pontuação do produtor (ranking)
+  ranking?: number; // Posição no ranking geral
   // Adicione outros campos conforme o backend definir
-  // Ex: avatar?: string; role?: string;
+  // Ex: avatar?: string;
 }
 
 export interface LoginCredentials {
