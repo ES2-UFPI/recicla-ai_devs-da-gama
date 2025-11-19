@@ -63,11 +63,15 @@ const generateMockRanking = (type: RankingTab, currentUserId: string, currentUse
   }));
   
   // Adiciona o usuário atual se ele não estiver no top 10
-  const userInTop10 = currentUserPoints >= ranking[ranking.length - 1].points;
+  // Para ranking geral, força o usuário a ficar fora do top 10 para demonstração
+  const userInTop10 = type !== 'geral' && currentUserPoints >= ranking[ranking.length - 1].points;
   
   if (!userInTop10) {
-    // Calcula posição do usuário (exemplo: entre 11 e 50)
-    const userPosition = 15 + Math.floor(Math.random() * 35);
+    // Calcula posição do usuário
+    // Para ranking geral, sempre coloca fora do top 10 (posição 15-50)
+    const userPosition = type === 'geral' 
+      ? 21 // Posição fixa para demonstração no ranking geral
+      : 15 + Math.floor(Math.random() * 35);
     ranking.push({
       id: currentUserId,
       name: 'Você',
@@ -146,6 +150,13 @@ export default function Ranking() {
   const userPosition = getCurrentRanking().find(u => u.id === user?.id);
   const userInTop10 = userPosition && userPosition.ranking <= 10;
 
+  // Obter nome da cidade/estado do usuário para exibir no título
+  const getRankingTitle = () => {
+    if (currentTab === 'municipal') return `Ranking ${user?.cidade || 'Municipal'}`;
+    if (currentTab === 'estadual') return `Ranking ${user?.estado || 'Estadual'}`;
+    return 'Ranking Geral';
+  };
+
   const getMedalIcon = (position: number) => {
     if (position === 1) return '🥇';
     if (position === 2) return '🥈';
@@ -197,7 +208,7 @@ export default function Ranking() {
               borderRadius: '1rem',
             }}
           >
-            <Box sx={{ textAlign: 'left' }}>
+            <Box sx={{ textAlign: 'center' }}>
               <Typography variant="caption" sx={{ opacity: 0.9 }}>
                 Sua Pontuação
               </Typography>
@@ -206,7 +217,7 @@ export default function Ranking() {
               </Typography>
             </Box>
             {userPosition && (
-              <Box sx={{ textAlign: 'right' }}>
+              <Box sx={{ textAlign: 'center' }}>
                 <Typography variant="caption" sx={{ opacity: 0.9 }}>
                   Sua Posição
                 </Typography>
@@ -275,7 +286,7 @@ export default function Ranking() {
                 fontWeight={700}
                 sx={{ mb: 2, color: 'primary.main' }}
               >
-                🏆 Top 10 - Ranking {currentTab === 'municipal' ? 'Municipal' : currentTab === 'estadual' ? 'Estadual' : 'Geral'}
+                🏆 Top 10 - {getRankingTitle()}
               </Typography>
               
               {top10.length === 0 ? (
@@ -283,7 +294,7 @@ export default function Ranking() {
                   Nenhum dado de ranking disponível no momento.
                 </Alert>
               ) : (
-                <Stack spacing={2}>
+                <Stack spacing={1.5}>
                   {top10.map((rankingUser) => {
                     const isCurrentUser = rankingUser.id === user?.id;
                     const medal = getMedalIcon(rankingUser.ranking);
@@ -304,7 +315,7 @@ export default function Ranking() {
                           },
                         }}
                       >
-                        <CardContent>
+                        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                           <Box
                             sx={{
                               display: 'flex',
@@ -321,11 +332,12 @@ export default function Ranking() {
                                 justifyContent: 'center',
                                 minWidth: { xs: '3rem', md: '3.5rem' },
                                 height: { xs: '3rem', md: '3.5rem' },
-                                bgcolor: rankingUser.ranking <= 3 ? 'warning.main' : 'grey.200',
+                                bgcolor: rankingUser.ranking === 1 ? '#FFD700' : rankingUser.ranking === 2 ? '#C0C0C0' : rankingUser.ranking === 3 ? '#CD7F32' : 'grey.200',
                                 borderRadius: '50%',
                                 fontWeight: 700,
                                 fontSize: { xs: '1.25rem', md: '1.5rem' },
                                 color: rankingUser.ranking <= 3 ? 'white' : 'text.primary',
+                                boxShadow: rankingUser.ranking <= 3 ? '0 2px 8px rgba(0, 0, 0, 0.2)' : 'none',
                               }}
                             >
                               {medal || `#${rankingUser.ranking}`}
