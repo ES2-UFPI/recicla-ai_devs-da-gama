@@ -26,4 +26,138 @@ class ResgateService:
     Service de Resgate de Recompensas.
     Centraliza toda a lógica de negócio relacionada ao resgate de recompensas.
     """
-    pass
+    
+    # Constantes
+    MAX_LIMIT = 100
+    DEFAULT_SKIP = 0
+    
+    async def resgatar_recompensa(self, recompensa_id: str, produtor_id: str) -> ResgateResponse:
+        """
+        Executa o resgate de uma recompensa por um produtor.
+        
+        Fluxo de execução:
+        1. Validar que recompensa existe, está ativa e tem estoque > 0
+        2. Validar que produtor tem pontos suficientes
+        3. Debitar pontos do produtor (operação atômica)
+        4. Decrementar estoque da recompensa
+        5. Salvar registro de resgate no histórico
+        6. Se falhar no passo 4: fazer rollback dos pontos
+        
+        Args:
+            recompensa_id: ID da recompensa a ser resgatada
+            produtor_id: ID do produtor que está resgatando
+            
+        Returns:
+            ResgateResponse: Dados do resgate concluído
+            
+        Raises:
+            HTTPException 404: Recompensa não encontrada ou produtor não encontrado
+            HTTPException 400: Recompensa inativa, sem estoque ou pontos insuficientes
+            HTTPException 500: Erro interno no processo de resgate
+            
+        Example:
+            ```python
+            resgate = await resgate_service.resgatar_recompensa(
+                recompensa_id="60c72b2f9b1d4c3a4c8e4d3e",
+                produtor_id="60c72b2f9b1d4c3a4c8e4d3f"
+            )
+            # ResgateResponse(id="...", pontos_gastos=500, data_resgate="2025-11-19T...")
+            ```
+        """
+        # 1. Buscar e validar recompensa
+        recompensa = await recompensa_repo.buscar_por_id(recompensa_id)
+        if not recompensa:
+            raise HTTPException(status_code=404, detail="Recompensa não encontrada")
+        
+        if not recompensa.get("ativo", False):
+            raise HTTPException(status_code=400, detail="Recompensa não está disponível para resgate")
+        
+        estoque_atual = recompensa.get("estoque", 0)
+        if estoque_atual <= 0:
+            raise HTTPException(status_code=400, detail="Recompensa sem estoque disponível")
+        
+        pontos_necessarios = recompensa.get("pontos_necessarios", 0)
+        
+        # 2. Validar pontos do produtor
+        pontos_produtor = await user_repo.obter_pontos(produtor_id)
+        if pontos_produtor is None:
+            raise HTTPException(status_code=404, detail="Produtor não encontrado")
+        
+        if pontos_produtor < pontos_necessarios:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Pontos insuficientes. Você tem {pontos_produtor} pontos, mas precisa de {pontos_necessarios} pontos"
+            )
+        
+        # 3. Debitar pontos do produtor (operação atômica com $inc)
+        pontos_debitados = await user_repo.atualizar_pontos(produtor_id, -pontos_necessarios)
+        if not pontos_debitados:
+            raise HTTPException(status_code=500, detail="Erro ao debitar pontos do produtor")
+        
+        # 4. Decrementar estoque da recompensa
+        estoque_atualizado = await recompensa_repo.decrementar_estoque(recompensa_id)
+        
+        # ROLLBACK: Se falhou ao decrementar estoque, devolver pontos
+        if not estoque_atualizado:
+            await user_repo.atualizar_pontos(produtor_id, pontos_necessarios)  # Rollback
+            raise HTTPException(status_code=500, detail="Erro ao atualizar estoque da recompensa")
+        
+        # 5. Salvar registro de resgate no histórico
+        resgate_doc = ResgateRecompensa(
+            recompensa_id=recompensa_id,
+            produtor_id=produtor_id,
+            pontos_gastos=pontos_necessarios,
+            data_resgate=datetime.utcnow()
+        )
+        
+        resgate_dict = resgate_doc.model_dump(by_alias=True, exclude_unset=True)
+        resgate_id = await criar_resgate(resgate_dict)
+        
+        # Retornar resposta com dados do resgate
+        return ResgateResponse(
+            id=resgate_id,
+            recompensa_id=recompensa_id,
+            produtor_id=produtor_id,
+            pontos_gastos=pontos_necessarios,
+            data_resgate=resgate_doc.data_resgate
+        )
+    
+    async def listar_meus_resgates(
+        self,
+        produtor_id: str,
+        skip: int = DEFAULT_SKIP,
+        limit: int = MAX_LIMIT
+    ) -> List[ResgateResponse]:
+        """
+        Lista histórico de resgates de um produtor.
+        
+        Retorna lista ordenada por data decrescente (mais recente primeiro).
+        
+        Args:
+            produtor_id: ID do produtor
+            skip: Número de registros a pular (paginação)
+            limit: Número máximo de registros a retornar
+            
+        Returns:
+            List[ResgateResponse]: Lista de resgates do produtor
+            
+        Example:
+            ```python
+            resgates = await resgate_service.listar_meus_resgates(produtor_id="123", limit=10)
+            # [
+            #   ResgateResponse(id="1", pontos_gastos=500, data_resgate="2025-11-19"),
+            #   ResgateResponse(id="2", pontos_gastos=200, data_resgate="2025-11-15"),
+            # ]
+            ```
+        """
+        # Validar paginação
+        if limit > self.MAX_LIMIT:
+            limit = self.MAX_LIMIT
+        if skip < 0:
+            skip = 0
+        
+        # Buscar resgates do produtor
+        resgates_db = await listar_por_produtor(produtor_id, limit=limit, skip=skip)
+        
+        # Converter para ResgateResponse
+        return [ResgateResponse(**r) for r in resgates_db]
