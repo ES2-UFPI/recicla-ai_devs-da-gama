@@ -28,11 +28,51 @@ class RecompensaService:
     Centraliza toda a lógica de negócio relacionada a recompensas do sistema de gamificação.
     """
     
+    # Constantes
+    MAX_LIMIT = 100
+    DEFAULT_SKIP = 0
+    
+    async def _buscar_e_validar_recompensa(self, recompensa_id: str) -> dict:
+        """
+        Método auxiliar para buscar e validar existência de recompensa.
+        
+        Args:
+            recompensa_id: ID da recompensa
+            
+        Returns:
+            dict: Dados da recompensa
+            
+        Raises:
+            HTTPException 404: Recompensa não encontrada
+        """
+        recompensa = await recompensa_repo.buscar_por_id(recompensa_id)
+        if not recompensa:
+            raise HTTPException(404, "Recompensa não encontrada")
+        return recompensa
+    
+    async def _buscar_recompensa_atualizada(self, recompensa_id: str) -> RecompensaResponse:
+        """
+        Método auxiliar para buscar recompensa atualizada após operação.
+        
+        Args:
+            recompensa_id: ID da recompensa
+            
+        Returns:
+            RecompensaResponse: Recompensa atualizada
+            
+        Raises:
+            HTTPException 500: Erro ao recuperar
+        """
+        recompensa = await recompensa_repo.buscar_por_id(recompensa_id)
+        if not recompensa:
+            raise HTTPException(500, "Erro ao recuperar recompensa atualizada")
+        return RecompensaResponse(**recompensa)
+    
     async def listar_recompensas_ativas(
         self,
         com_estoque: bool = False,
-        skip: int = 0,
-        limit: int = 100
+        skip: int = DEFAULT_SKIP,
+        limit: int = MAX_LIMIT
     ) -> List[RecompensaResponse]:
         """
         Lista todas as recompensas ativas disponíveis para resgate.
@@ -78,17 +118,14 @@ class RecompensaService:
         Raises:
             HTTPException 404: Recompensa não encontrada
         """
-        recompensa = await recompensa_repo.buscar_por_id(recompensa_id)
-        if not recompensa:
-            raise HTTPException(404, f"Recompensa '{recompensa_id}' não encontrada")
-        
+        recompensa = await self._buscar_e_validar_recompensa(recompensa_id)
         return RecompensaResponse(**recompensa)
     
     
     async def listar_todas_recompensas(
         self,
-        skip: int = 0,
-        limit: int = 100
+        skip: int = DEFAULT_SKIP,
+        limit: int = MAX_LIMIT
     ) -> List[RecompensaResponse]:
         """
         Lista TODAS as recompensas (ativas e inativas).
@@ -160,11 +197,7 @@ class RecompensaService:
         recompensa_id = await recompensa_repo.criar_recompensa(recompensa_dict)
         
         # Retornar recompensa criada
-        recompensa_criada = await recompensa_repo.buscar_por_id(recompensa_id)
-        if recompensa_criada:
-            return RecompensaResponse(**recompensa_criada)
-        
-        raise HTTPException(500, "Erro ao recuperar recompensa criada")
+        return await self._buscar_recompensa_atualizada(recompensa_id)
     
     
     async def atualizar_recompensa(
@@ -201,9 +234,7 @@ class RecompensaService:
             HTTPException 500: Erro ao atualizar
         """
         # Verificar se recompensa existe
-        recompensa = await recompensa_repo.buscar_por_id(recompensa_id)
-        if not recompensa:
-            raise HTTPException(404, "Recompensa não encontrada")
+        recompensa = await self._buscar_e_validar_recompensa(recompensa_id)
         
         # Preparar updates (apenas campos fornecidos)
         updates = dados.model_dump(exclude_unset=True)
@@ -218,11 +249,7 @@ class RecompensaService:
             raise HTTPException(500, "Erro ao atualizar recompensa")
         
         # Retornar atualizada
-        recompensa_atualizada = await recompensa_repo.buscar_por_id(recompensa_id)
-        if recompensa_atualizada:
-            return RecompensaResponse(**recompensa_atualizada)
-        
-        raise HTTPException(500, "Erro ao recuperar recompensa atualizada")
+        return await self._buscar_recompensa_atualizada(recompensa_id)
     
     
     async def atualizar_estoque(
@@ -256,9 +283,7 @@ class RecompensaService:
             ```
         """
         # Verificar se existe
-        recompensa = await recompensa_repo.buscar_por_id(recompensa_id)
-        if not recompensa:
-            raise HTTPException(404, "Recompensa não encontrada")
+        await self._buscar_e_validar_recompensa(recompensa_id)
         
         # Atualizar estoque
         success = await recompensa_repo.atualizar_estoque(recompensa_id, quantidade)
@@ -266,11 +291,7 @@ class RecompensaService:
             raise HTTPException(500, "Erro ao atualizar estoque")
         
         # Retornar atualizada
-        recompensa_atualizada = await recompensa_repo.buscar_por_id(recompensa_id)
-        if recompensa_atualizada:
-            return RecompensaResponse(**recompensa_atualizada)
-        
-        raise HTTPException(500, "Erro ao recuperar recompensa atualizada")
+        return await self._buscar_recompensa_atualizada(recompensa_id)
     
     
     async def desativar_recompensa(self, recompensa_id: str) -> RecompensaResponse:
@@ -297,9 +318,7 @@ class RecompensaService:
             HTTPException 404: Recompensa não encontrada
         """
         # Verificar se existe
-        recompensa = await recompensa_repo.buscar_por_id(recompensa_id)
-        if not recompensa:
-            raise HTTPException(404, "Recompensa não encontrada")
+        await self._buscar_e_validar_recompensa(recompensa_id)
         
         # Desativar (soft delete)
         success = await recompensa_repo.desativar_recompensa(recompensa_id)
@@ -307,11 +326,7 @@ class RecompensaService:
             raise HTTPException(500, "Erro ao desativar recompensa")
         
         # Retornar desativada
-        recompensa_desativada = await recompensa_repo.buscar_por_id(recompensa_id)
-        if recompensa_desativada:
-            return RecompensaResponse(**recompensa_desativada)
-        
-        raise HTTPException(500, "Erro ao recuperar recompensa desativada")
+        return await self._buscar_recompensa_atualizada(recompensa_id)
     
     
     async def reativar_recompensa(self, recompensa_id: str) -> RecompensaResponse:
@@ -330,9 +345,7 @@ class RecompensaService:
             HTTPException 404: Recompensa não encontrada
         """
         # Verificar se existe
-        recompensa = await recompensa_repo.buscar_por_id(recompensa_id)
-        if not recompensa:
-            raise HTTPException(404, "Recompensa não encontrada")
+        await self._buscar_e_validar_recompensa(recompensa_id)
         
         # Reativar
         success = await recompensa_repo.ativar_recompensa(recompensa_id)
@@ -340,8 +353,4 @@ class RecompensaService:
             raise HTTPException(500, "Erro ao reativar recompensa")
         
         # Retornar reativada
-        recompensa_reativada = await recompensa_repo.buscar_por_id(recompensa_id)
-        if recompensa_reativada:
-            return RecompensaResponse(**recompensa_reativada)
-        
-        raise HTTPException(500, "Erro ao recuperar recompensa reativada")
+        return await self._buscar_recompensa_atualizada(recompensa_id)
