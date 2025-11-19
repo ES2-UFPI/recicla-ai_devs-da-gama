@@ -47,9 +47,9 @@ export default function Perfil() {
   useEffect(() => {
     if (user) {
       setFormData({
-        telefone: user.telefone,
-        cidade: user.cidade,
-        estado: user.estado,
+        telefone: user.telefone || '',
+        cidade: user.cidade || '',
+        estado: user.estado || '',
       });
     }
   }, [user]);
@@ -111,9 +111,9 @@ export default function Perfil() {
   function handleCancelEdit() {
     if (user) {
       setFormData({
-        telefone: user.telefone,
-        cidade: user.cidade,
-        estado: user.estado,
+        telefone: user.telefone || '',
+        cidade: user.cidade || '',
+        estado: user.estado || '',
       });
     }
     setIsEditing(false);

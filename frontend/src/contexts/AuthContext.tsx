@@ -18,7 +18,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         // Tenta buscar usuário atual
         // O interceptor do axios tentará refresh automaticamente se o access_token estiver expirado
-        const { data } = await api.get<{ name: string; email: string; role_id: string }>('/auth/me');
+        const { data } = await api.get<UserMeResponse>('/auth/me');
         setUser(mapUserFromMe(data));
       } catch {
         // Se falhou mesmo após tentativa de refresh, usuário não está autenticado
@@ -40,7 +40,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       password: credentials.password,
     });
     // Cookie httpOnly é definido pelo backend. Buscar usuário atual.
-    const { data: me } = await api.get<{ name: string; email: string; role_id: string }>('/auth/me');
+    const { data: me } = await api.get<UserMeResponse>('/auth/me');
     setUser(mapUserFromMe(me));
     // ⚠️ IMPORTANTE: Não manipular isLoading aqui!
     // O componente de Login já gerencia seu próprio loading state.
