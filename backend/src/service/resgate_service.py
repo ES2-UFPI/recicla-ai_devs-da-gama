@@ -31,6 +31,121 @@ class ResgateService:
     MAX_LIMIT = 100
     DEFAULT_SKIP = 0
     
+    def _validar_paginacao(self, skip: int, limit: int) -> tuple[int, int]:
+        """
+        Valida e ajusta parâmetros de paginação.
+        
+        Args:
+            skip: Número de registros a pular
+            limit: Número máximo de registros
+            
+        Returns:
+            tuple[int, int]: (skip, limit) validados
+        """
+        if limit > self.MAX_LIMIT:
+            limit = self.MAX_LIMIT
+        if skip < 0:
+            skip = 0
+        return skip, limit
+    
+    async def _validar_recompensa_disponivel(self, recompensa_id: str) -> dict:
+        """
+        Valida se recompensa existe, está ativa e tem estoque.
+        
+        Args:
+            recompensa_id: ID da recompensa
+            
+        Returns:
+            dict: Dados da recompensa validada
+            
+        Raises:
+            HTTPException 404: Recompensa não encontrada
+            HTTPException 400: Recompensa inativa ou sem estoque
+        """
+        recompensa = await recompensa_repo.buscar_por_id(recompensa_id)
+        if not recompensa:
+            raise HTTPException(status_code=404, detail="Recompensa não encontrada")
+        
+        if not recompensa.get("ativo", False):
+            raise HTTPException(status_code=400, detail="Recompensa não está disponível para resgate")
+        
+        estoque_atual = recompensa.get("estoque", 0)
+        if estoque_atual <= 0:
+            raise HTTPException(status_code=400, detail="Recompensa sem estoque disponível")
+        
+        return recompensa
+    
+    async def _validar_pontos_produtor(self, produtor_id: str, pontos_necessarios: int) -> int:
+        """
+        Valida se produtor existe e tem pontos suficientes.
+        
+        Args:
+            produtor_id: ID do produtor
+            pontos_necessarios: Quantidade de pontos necessários
+            
+        Returns:
+            int: Pontos atuais do produtor
+            
+        Raises:
+            HTTPException 404: Produtor não encontrado
+            HTTPException 400: Pontos insuficientes
+        """
+        pontos_produtor = await user_repo.obter_pontos(produtor_id)
+        if pontos_produtor is None:
+            raise HTTPException(status_code=404, detail="Produtor não encontrado")
+        
+        if pontos_produtor < pontos_necessarios:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Pontos insuficientes. Você tem {pontos_produtor} pontos, mas precisa de {pontos_necessarios} pontos"
+            )
+        
+        return pontos_produtor
+    
+    async def _executar_transacao_resgate(
+        self, 
+        recompensa_id: str, 
+        produtor_id: str, 
+        pontos_necessarios: int
+    ) -> str:
+        """
+        Executa a transação de resgate com rollback em caso de falha.
+        
+        Args:
+            recompensa_id: ID da recompensa
+            produtor_id: ID do produtor
+            pontos_necessarios: Pontos a debitar
+            
+        Returns:
+            str: ID do resgate criado
+            
+        Raises:
+            HTTPException 500: Erro na transação
+        """
+        # Debitar pontos do produtor (operação atômica)
+        pontos_debitados = await user_repo.atualizar_pontos(produtor_id, -pontos_necessarios)
+        if not pontos_debitados:
+            raise HTTPException(status_code=500, detail="Erro ao debitar pontos do produtor")
+        
+        # Decrementar estoque da recompensa
+        estoque_atualizado = await recompensa_repo.decrementar_estoque(recompensa_id)
+        
+        # ROLLBACK: Se falhou ao decrementar estoque, devolver pontos
+        if not estoque_atualizado:
+            await user_repo.atualizar_pontos(produtor_id, pontos_necessarios)
+            raise HTTPException(status_code=500, detail="Erro ao atualizar estoque da recompensa")
+        
+        # Salvar registro de resgate no histórico
+        resgate_doc = ResgateRecompensa(
+            recompensa_id=recompensa_id,
+            produtor_id=produtor_id,
+            pontos_gastos=pontos_necessarios,
+            data_resgate=datetime.utcnow()
+        )
+        
+        resgate_dict = resgate_doc.model_dump(by_alias=True, exclude_unset=True)
+        return await criar_resgate(resgate_dict)
+    
     async def resgatar_recompensa(self, recompensa_id: str, produtor_id: str) -> ResgateResponse:
         """
         Executa o resgate de uma recompensa por um produtor.
@@ -38,10 +153,8 @@ class ResgateService:
         Fluxo de execução:
         1. Validar que recompensa existe, está ativa e tem estoque > 0
         2. Validar que produtor tem pontos suficientes
-        3. Debitar pontos do produtor (operação atômica)
-        4. Decrementar estoque da recompensa
-        5. Salvar registro de resgate no histórico
-        6. Se falhar no passo 4: fazer rollback dos pontos
+        3. Executar transação (debitar pontos + decrementar estoque + salvar histórico)
+        4. Rollback automático em caso de falha
         
         Args:
             recompensa_id: ID da recompensa a ser resgatada
@@ -64,62 +177,27 @@ class ResgateService:
             # ResgateResponse(id="...", pontos_gastos=500, data_resgate="2025-11-19T...")
             ```
         """
-        # 1. Buscar e validar recompensa
-        recompensa = await recompensa_repo.buscar_por_id(recompensa_id)
-        if not recompensa:
-            raise HTTPException(status_code=404, detail="Recompensa não encontrada")
-        
-        if not recompensa.get("ativo", False):
-            raise HTTPException(status_code=400, detail="Recompensa não está disponível para resgate")
-        
-        estoque_atual = recompensa.get("estoque", 0)
-        if estoque_atual <= 0:
-            raise HTTPException(status_code=400, detail="Recompensa sem estoque disponível")
-        
+        # 1. Validar recompensa disponível
+        recompensa = await self._validar_recompensa_disponivel(recompensa_id)
         pontos_necessarios = recompensa.get("pontos_necessarios", 0)
         
         # 2. Validar pontos do produtor
-        pontos_produtor = await user_repo.obter_pontos(produtor_id)
-        if pontos_produtor is None:
-            raise HTTPException(status_code=404, detail="Produtor não encontrado")
+        await self._validar_pontos_produtor(produtor_id, pontos_necessarios)
         
-        if pontos_produtor < pontos_necessarios:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Pontos insuficientes. Você tem {pontos_produtor} pontos, mas precisa de {pontos_necessarios} pontos"
-            )
-        
-        # 3. Debitar pontos do produtor (operação atômica com $inc)
-        pontos_debitados = await user_repo.atualizar_pontos(produtor_id, -pontos_necessarios)
-        if not pontos_debitados:
-            raise HTTPException(status_code=500, detail="Erro ao debitar pontos do produtor")
-        
-        # 4. Decrementar estoque da recompensa
-        estoque_atualizado = await recompensa_repo.decrementar_estoque(recompensa_id)
-        
-        # ROLLBACK: Se falhou ao decrementar estoque, devolver pontos
-        if not estoque_atualizado:
-            await user_repo.atualizar_pontos(produtor_id, pontos_necessarios)  # Rollback
-            raise HTTPException(status_code=500, detail="Erro ao atualizar estoque da recompensa")
-        
-        # 5. Salvar registro de resgate no histórico
-        resgate_doc = ResgateRecompensa(
-            recompensa_id=recompensa_id,
-            produtor_id=produtor_id,
-            pontos_gastos=pontos_necessarios,
-            data_resgate=datetime.utcnow()
+        # 3. Executar transação com rollback automático
+        resgate_id = await self._executar_transacao_resgate(
+            recompensa_id, 
+            produtor_id, 
+            pontos_necessarios
         )
         
-        resgate_dict = resgate_doc.model_dump(by_alias=True, exclude_unset=True)
-        resgate_id = await criar_resgate(resgate_dict)
-        
-        # Retornar resposta com dados do resgate
+        # 4. Retornar resposta com dados do resgate
         return ResgateResponse(
             id=resgate_id,
             recompensa_id=recompensa_id,
             produtor_id=produtor_id,
             pontos_gastos=pontos_necessarios,
-            data_resgate=resgate_doc.data_resgate
+            data_resgate=datetime.utcnow()
         )
     
     async def listar_meus_resgates(
@@ -151,10 +229,7 @@ class ResgateService:
             ```
         """
         # Validar paginação
-        if limit > self.MAX_LIMIT:
-            limit = self.MAX_LIMIT
-        if skip < 0:
-            skip = 0
+        skip, limit = self._validar_paginacao(skip, limit)
         
         # Buscar resgates do produtor
         resgates_db = await listar_por_produtor(produtor_id, limit=limit, skip=skip)
