@@ -62,6 +62,7 @@ O sistema implementa o **padrão Builder** para construção de usuários, garan
 - [Agendamentos](#agendamentos)
 - [Coletas](#coletas)
 - [Entregas](#entregas)
+- [Recompensas](#recompensas)
 - [Desenvolvimento](#desenvolvimento)
 
 ---
@@ -713,7 +714,7 @@ Remove um endereço do usuário.
 
 ---
 
-## ♻️ Resíduos
+## Resíduos
 
 ### Criar Resíduo
 **POST** `http://localhost:8000/residuos/`
@@ -996,7 +997,7 @@ Atualiza o status de um resíduo (usado principalmente pela logística).
 
 ---
 
-## 📦 Categorias
+## Categorias
 
 ### Listar Categorias Ativas (Público)
 **GET** `http://localhost:8000/categorias/ativas`
@@ -1032,7 +1033,7 @@ Lista todas as categorias ativas disponíveis para seleção.
 ### Listar Todas as Categorias (Admin)
 **GET** `http://localhost:8000/categorias/`
 
-Lista TODAS as categorias (ativas e inativas) - apenas administradores.
+Lista TODAS as categorias (ativas e inativas) - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -1086,7 +1087,7 @@ Retorna detalhes de uma categoria específica.
 ### Criar Categoria (Admin)
 **POST** `http://localhost:8000/categorias/`
 
-Cria uma nova categoria - apenas administradores.
+Cria uma nova categoria - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -1124,7 +1125,7 @@ Cria uma nova categoria - apenas administradores.
 ### Atualizar Categoria (Admin)
 **PUT** `http://localhost:8000/categorias/{categoria_id}`
 
-Atualiza dados de uma categoria - apenas administradores.
+Atualiza dados de uma categoria - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -1157,7 +1158,7 @@ Atualiza dados de uma categoria - apenas administradores.
 ### Atualizar Preço da Categoria (Admin)
 **PATCH** `http://localhost:8000/categorias/{categoria_id}/preco?novo_preco=3.50`
 
-Atualiza apenas o preço de uma categoria - apenas administradores.
+Atualiza apenas o preço de uma categoria - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -1183,7 +1184,7 @@ Atualiza apenas o preço de uma categoria - apenas administradores.
 ### Desativar Categoria (Admin)
 **DELETE** `http://localhost:8000/categorias/{categoria_id}`
 
-Desativa uma categoria (soft delete) - apenas administradores.
+Desativa uma categoria (soft delete) - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -1208,7 +1209,7 @@ Desativa uma categoria (soft delete) - apenas administradores.
 ### Reativar Categoria (Admin)
 **POST** `http://localhost:8000/categorias/{categoria_id}/reativar`
 
-Reativa uma categoria previamente desativada - apenas administradores.
+Reativa uma categoria previamente desativada - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -1228,7 +1229,7 @@ Reativa uma categoria previamente desativada - apenas administradores.
 
 ---
 
-## 📅 Agendamentos
+## Agendamentos
 
 ### Criar Agendamento
 **POST** `http://localhost:8000/schedules/`
@@ -1888,7 +1889,7 @@ No Content
 
 ---
 
-## � Coletas
+## Coletas
 
 Gerenciamento do fluxo completo de coleta de resíduos pelos coletores.
 
@@ -2449,7 +2450,7 @@ Retorna o inventory detalhado do coletor autenticado com dados completos dos res
 
 ---
 
-## 📦 Entregas
+## Entregas
 
 O módulo de Entregas permite que coletores registrem a entrega de resíduos coletados para receptoras (ecopontos). 
 
@@ -2773,6 +2774,485 @@ async function buscarReceptoras() {
 
 ---
 
+## Recompensas
+
+O módulo de Recompensas permite que produtores visualizem prêmios disponíveis para resgate usando seus pontos acumulados no sistema de gamificação. Administradores podem gerenciar o catálogo completo de recompensas.
+
+**Sistema de Pontos:**
+- Produtores ganham pontos ao reciclar materiais
+- Pontos são usados para resgatar recompensas
+- Recompensas têm estoque limitado
+- Soft delete mantém histórico de resgates
+
+### Listar Recompensas Ativas
+**GET** `http://localhost:8000/recompensas/ativas`
+
+Lista todas as recompensas disponíveis para resgate (ativas).
+
+**Autenticação:** ❌ Não requerida (endpoint público)
+
+**Parâmetros de Query (opcionais):**
+- `com_estoque`: Se `true`, retorna apenas recompensas com estoque > 0 (padrão: false)
+- `skip`: Quantidade de registros a pular (padrão: 0)
+- `limit`: Quantidade máxima de registros (padrão: 100, máx: 100)
+
+**Exemplo:** `http://localhost:8000/recompensas/ativas?com_estoque=true&limit=10`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d3e",
+    "nome": "Vale-compra R$ 50,00",
+    "tipo": "voucher",
+    "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+    "pontos_necessarios": 500,
+    "foto_url": "https://example.com/vale50.jpg",
+    "estoque": 100,
+    "parceiro": "Supermercado Verde",
+    "data_cadastro": "2025-11-18T10:30:00Z",
+    "ativo": true
+  },
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d3f",
+    "nome": "Ecobag Reutilizável",
+    "tipo": "produto",
+    "descricao": "Ecobag de algodão orgânico",
+    "pontos_necessarios": 200,
+    "foto_url": null,
+    "estoque": 50,
+    "parceiro": null,
+    "data_cadastro": "2025-11-18T11:00:00Z",
+    "ativo": true
+  }
+]
+```
+
+**Casos de Uso:**
+- 🎁 Mostrar catálogo de recompensas disponíveis
+- 📱 Exibir opções de resgate para produtores
+- 💰 Consultar pontos necessários para cada recompensa
+- 📊 Filtrar apenas recompensas em estoque
+
+**Observações:**
+- Endpoint público - não requer autenticação
+- Retorna apenas recompensas com `ativo=true`
+- Lista vazia `[]` se não houver recompensas ativas
+
+---
+
+### Obter Detalhes de uma Recompensa
+**GET** `http://localhost:8000/recompensas/{recompensa_id}`
+
+Retorna os detalhes completos de uma recompensa específica.
+
+**Autenticação:** ✅ Requerida
+
+**Regras de Autorização:**
+- ✅ **Qualquer usuário autenticado** pode acessar
+- Produtores usam para ver detalhes antes de resgatar
+
+**Exemplo:** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "nome": "Vale-compra R$ 50,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 500,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 100,
+  "parceiro": "Supermercado Verde",
+  "data_cadastro": "2025-11-18T10:30:00Z",
+  "ativo": true
+}
+```
+
+**Erros Comuns:**
+
+**401 Unauthorized** - Usuário não autenticado:
+```json
+{
+  "detail": "Não autenticado"
+}
+```
+
+**404 Not Found** - Recompensa não encontrada:
+```json
+{
+  "detail": "Recompensa não encontrada"
+}
+```
+
+---
+
+### [GESTOR] Listar Todas as Recompensas
+**GET** `http://localhost:8000/recompensas/`
+
+Lista TODAS as recompensas do sistema (ativas e inativas).
+
+**Autenticação:** ✅ Requerida (role: admin)
+
+**Parâmetros de Query (opcionais):**
+- `skip`: Quantidade de registros a pular (padrão: 0)
+- `limit`: Quantidade máxima de registros (padrão: 100, máx: 100)
+
+**Exemplo:** `http://localhost:8000/recompensas/?skip=0&limit=20`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d3e",
+    "nome": "Vale-compra R$ 50,00",
+    "tipo": "voucher",
+    "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+    "pontos_necessarios": 500,
+    "foto_url": "https://example.com/vale50.jpg",
+    "estoque": 100,
+    "parceiro": "Supermercado Verde",
+    "data_cadastro": "2025-11-18T10:30:00Z",
+    "ativo": true
+  },
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d3f",
+    "nome": "Desconto 20% - Produto Descontinuado",
+    "tipo": "desconto",
+    "descricao": "Cupom de desconto que foi descontinuado",
+    "pontos_necessarios": 300,
+    "foto_url": null,
+    "estoque": 0,
+    "parceiro": "Loja Antiga",
+    "data_cadastro": "2025-10-01T09:00:00Z",
+    "ativo": false
+  }
+]
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é administrador:
+```json
+{
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
+}
+```
+
+**Observações:**
+- Usado no painel administrativo para gerenciar recompensas
+- Retorna recompensas ativas E inativas
+- Permite visualizar todo o histórico de recompensas
+
+---
+
+### [GESTOR] Criar Nova Recompensa
+**POST** `http://localhost:8000/recompensas/`
+
+Cria uma nova recompensa no sistema de gamificação.
+
+**Autenticação:** ✅ Requerida (role: admin)
+
+**Corpo da Requisição:**
+```json
+{
+  "nome": "Vale-compra R$ 50,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 500,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 100,
+  "parceiro": "Supermercado Verde",
+  "ativo": true
+}
+```
+
+**Campos:**
+- `nome`: Nome da recompensa (obrigatório, 3-100 caracteres)
+- `tipo`: Tipo da recompensa (obrigatório) - valores: `produto`, `desconto`, `voucher`, `cupom`
+- `descricao`: Descrição detalhada (obrigatório, mínimo 10 caracteres)
+- `pontos_necessarios`: Pontos necessários para resgate (obrigatório, deve ser > 0)
+- `foto_url`: URL da foto da recompensa (opcional)
+- `estoque`: Quantidade disponível (opcional, padrão: 999, não pode ser negativo)
+- `parceiro`: Nome do parceiro que oferece a recompensa (opcional)
+- `ativo`: Se a recompensa está ativa (opcional, padrão: true)
+
+**Validações Automáticas:**
+- ✅ Nome não pode estar vazio (3-100 caracteres)
+- ✅ Tipo deve ser válido: `produto`, `desconto`, `voucher`, `cupom`
+- ✅ Descrição deve ter pelo menos 10 caracteres
+- ✅ Pontos necessários deve ser maior que zero
+- ✅ Estoque não pode ser negativo
+
+**Resposta de Sucesso (201):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "nome": "Vale-compra R$ 50,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 500,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 100,
+  "parceiro": "Supermercado Verde",
+  "data_cadastro": "2025-11-18T10:30:00Z",
+  "ativo": true
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é administrador:
+```json
+{
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
+}
+```
+
+**422 Unprocessable Entity** - Validação falhou:
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "pontos_necessarios"],
+      "msg": "ensure this value is greater than 0",
+      "type": "value_error.number.not_gt"
+    }
+  ]
+}
+```
+
+**Casos de Uso:**
+- 🎁 Adicionar nova recompensa para produtores resgatarem
+- 🎉 Criar promoções especiais
+- 🤝 Cadastrar parcerias com empresas
+
+---
+
+### [GESTOR] Atualizar Recompensa
+**PUT** `http://localhost:8000/recompensas/{recompensa_id}`
+
+Atualiza os dados de uma recompensa existente.
+
+**Autenticação:** ✅ Requerida (role: admin)
+
+**Exemplo:** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e`
+
+**Corpo da Requisição:**
+```json
+{
+  "nome": "Vale-compra R$ 100,00",
+  "pontos_necessarios": 1000,
+  "estoque": 50
+}
+```
+
+**Campos Atualizáveis (todos opcionais):**
+- `nome`: Renomear a recompensa (3-100 caracteres)
+- `tipo`: Alterar tipo (`produto`, `desconto`, `voucher`, `cupom`)
+- `descricao`: Alterar descrição (mínimo 10 caracteres)
+- `pontos_necessarios`: Ajustar pontos necessários (> 0)
+- `foto_url`: Atualizar foto
+- `estoque`: Ajustar estoque (não pode ser negativo)
+- `parceiro`: Atualizar parceiro
+- `ativo`: Ativar/desativar
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "nome": "Vale-compra R$ 100,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 1000,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 50,
+  "parceiro": "Supermercado Verde",
+  "data_cadastro": "2025-11-18T10:30:00Z",
+  "ativo": true
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é administrador:
+```json
+{
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
+}
+```
+
+**404 Not Found** - Recompensa não encontrada:
+```json
+{
+  "detail": "Recompensa não encontrada"
+}
+```
+
+**Observações:**
+- ⚠️ Alterar pontos necessários NÃO afeta resgates já realizados
+- Apenas campos enviados são atualizados (partial update)
+
+---
+
+### [GESTOR] Atualizar Estoque da Recompensa
+**PATCH** `http://localhost:8000/recompensas/{recompensa_id}/estoque`
+
+Atualiza o estoque de uma recompensa (incremento ou decremento).
+
+**Autenticação:** ✅ Requerida (role: admin)
+
+**Parâmetros de Query:**
+- `quantidade`: Quantidade a adicionar (positivo) ou remover (negativo) - obrigatório
+
+**Exemplo (adicionar estoque):** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e/estoque?quantidade=50`
+
+**Exemplo (remover estoque):** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e/estoque?quantidade=-10`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "nome": "Vale-compra R$ 50,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 500,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 150,
+  "parceiro": "Supermercado Verde",
+  "data_cadastro": "2025-11-18T10:30:00Z",
+  "ativo": true
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é administrador:
+```json
+{
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
+}
+```
+
+**404 Not Found** - Recompensa não encontrada:
+```json
+{
+  "detail": "Recompensa não encontrada"
+}
+```
+
+**Casos de Uso:**
+- 📦 Adicionar mais unidades ao estoque
+- 🔧 Remover unidades (ajuste manual)
+- ✅ Corrigir inconsistências de estoque
+
+**Observações:**
+- Endpoint auxiliar para facilitar ajuste de estoque sem enviar todos os campos
+- Quantidade positiva: incrementa estoque
+- Quantidade negativa: decrementa estoque
+
+---
+
+### [GESTOR] Desativar Recompensa
+**DELETE** `http://localhost:8000/recompensas/{recompensa_id}`
+
+Desativa uma recompensa (soft delete).
+
+**Autenticação:** ✅ Requerida (role: admin)
+
+**Exemplo:** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "nome": "Vale-compra R$ 50,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 500,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 100,
+  "parceiro": "Supermercado Verde",
+  "data_cadastro": "2025-11-18T10:30:00Z",
+  "ativo": false
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é administrador:
+```json
+{
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
+}
+```
+
+**404 Not Found** - Recompensa não encontrada:
+```json
+{
+  "detail": "Recompensa não encontrada"
+}
+```
+
+**Observações - Benefícios do Soft Delete:**
+- 🗂️ Resgates antigos mantêm referência à recompensa
+- 📊 Histórico permanece consistente
+- ♻️ Recompensa pode ser reativada no futuro
+- 📈 Estatísticas não são afetadas
+- ❌ Recompensas inativas NÃO aparecem na lista pública
+
+**IMPORTANTE:** A recompensa NÃO é deletada do banco, apenas marcada como `ativo=false`.
+
+---
+
+### [GESTOR] Reativar Recompensa
+**POST** `http://localhost:8000/recompensas/{recompensa_id}/reativar`
+
+Reativa uma recompensa previamente desativada.
+
+**Autenticação:** ✅ Requerida (role: admin)
+
+**Exemplo:** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e/reativar`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "nome": "Vale-compra R$ 50,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 500,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 100,
+  "parceiro": "Supermercado Verde",
+  "data_cadastro": "2025-11-18T10:30:00Z",
+  "ativo": true
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é administrador:
+```json
+{
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
+}
+```
+
+**404 Not Found** - Recompensa não encontrada:
+```json
+{
+  "detail": "Recompensa não encontrada"
+}
+```
+
+**Observações:**
+- Após reativação, a recompensa volta a aparecer na lista pública (`/recompensas/ativas`)
+- Produtores podem resgatar a recompensa novamente
+
+---
+
 ## Desenvolvimento
 
 ⚠️ **ATENÇÃO:** Estas rotas devem ser DESABILITADAS em produção!
@@ -2893,6 +3373,6 @@ Todas as datas seguem o formato ISO 8601: `YYYY-MM-DDTHH:mm:ssZ`
 
 ---
 
-**Documentação gerada em:** 16 de outubro de 2025  
 **Versão da API:** 0.1.0  
 **Desenvolvido por:** Equipe Devs da Gama - ReciclaAI
+
