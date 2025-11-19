@@ -1,7 +1,7 @@
 """
 Router de Recompensas - Endpoints REST para operações com recompensas do sistema de gamificação.
 
-Este router expõe as funcionalidades do RecompensaService através de endpoints HTTP.
+Este router expõe as funcionalidades do RecompensaService e ResgateService através de endpoints HTTP.
 
 CONTROLE DE ACESSO:
 - Endpoints públicos (sem autenticação):
@@ -10,6 +10,8 @@ CONTROLE DE ACESSO:
 - Endpoints para PRODUTORES autenticados:
   - GET /recompensas/ativas - Listar para visualizar opções de resgate
   - GET /recompensas/{id} - Ver detalhes de uma recompensa
+  - POST /recompensas/{id}/resgatar - Resgatar recompensa usando pontos
+  - GET /recompensas/meus-resgates - Listar histórico de resgates
   
 - Endpoints para GESTORES DE RECOMPENSAS:
   - GET /recompensas - Listar todas (ativas e inativas)
@@ -28,7 +30,9 @@ from src.schemas.recompensa_schema import (
     RecompensaCreate,
     RecompensaUpdate
 )
+from src.schemas.resgate_schema import ResgateResponse
 from src.service.recompensa_service import RecompensaService
+from src.service.resgate_service import ResgateService
 from src.infra.security.dependencies import get_current_user
 
 # Inicializar router e service
@@ -44,6 +48,7 @@ router = APIRouter(
 
 # Instância do service
 recompensa_service = RecompensaService()
+resgate_service = ResgateService()
 
 
 def require_gestor_recompensas(current_user: dict = Depends(get_current_user)) -> dict:
@@ -132,6 +137,71 @@ async def listar_recompensas_ativas(
         skip=skip,
         limit=limit
     )
+
+
+@router.get(
+    "/meus-resgates",
+    response_model=List[ResgateResponse],
+    summary="[PRODUTOR] Listar meus resgates",
+    description="""
+    Lista o histórico de resgates do produtor autenticado.
+    
+    **Apenas PRODUTORES autenticados podem acessar seu próprio histórico.**
+    
+    Retorna lista ordenada por data decrescente (mais recente primeiro).
+    
+    Útil para:
+    - Visualizar histórico de resgates realizados
+    - Verificar pontos gastos em cada resgate
+    - Consultar datas de resgates anteriores
+    - Comprovação de resgates para auditoria
+    
+    Paginação:
+    - `skip`: Número de registros a pular (padrão: 0)
+    - `limit`: Número máximo de registros (padrão: 100, máx: 100)
+    """
+)
+async def listar_meus_resgates(
+    skip: int = Query(0, ge=0, description="Quantidade de registros a pular"),
+    limit: int = Query(100, ge=1, le=100, description="Quantidade máxima de registros"),
+    current_user: dict = Depends(get_current_user)
+) -> List[ResgateResponse]:
+    """
+    Lista histórico de resgates do produtor.
+    
+    Args:
+        skip: Número de registros a pular (paginação)
+        limit: Número máximo de registros a retornar
+        current_user: Usuário produtor autenticado
+    
+    Returns:
+        List[ResgateResponse]: Lista de resgates ordenada por data (mais recente primeiro)
+        
+    Example Response:
+        ```json
+        [
+          {
+            "id": "60c72b2f9b1d4c3a4c8e4d40",
+            "recompensa_id": "60c72b2f9b1d4c3a4c8e4d3e",
+            "produtor_id": "60c72b2f9b1d4c3a4c8e4d3f",
+            "pontos_gastos": 500,
+            "data_resgate": "2025-11-19T14:30:00Z"
+          },
+          {
+            "id": "60c72b2f9b1d4c3a4c8e4d41",
+            "recompensa_id": "60c72b2f9b1d4c3a4c8e4d3a",
+            "produtor_id": "60c72b2f9b1d4c3a4c8e4d3f",
+            "pontos_gastos": 200,
+            "data_resgate": "2025-11-15T10:15:00Z"
+          }
+        ]
+        ```
+    """
+    produtor_id = current_user.get("id")
+    if not produtor_id:
+        raise HTTPException(status_code=401, detail="Usuário não autenticado")
+    
+    return await resgate_service.listar_meus_resgates(produtor_id, skip=skip, limit=limit)
 
 
 @router.get(
@@ -411,4 +481,77 @@ async def reativar_recompensa(
         HTTPException 404: Recompensa não encontrada
     """
     return await recompensa_service.reativar_recompensa(recompensa_id)
+
+
+# ============ ENDPOINTS DE RESGATE ============
+
+@router.post(
+    "/{recompensa_id}/resgatar",
+    response_model=ResgateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="[PRODUTOR] Resgatar recompensa",
+    description="""
+    Executa o resgate de uma recompensa usando pontos do produtor.
+    
+    **Apenas PRODUTORES autenticados podem resgatar recompensas.**
+    
+    Fluxo de execução:
+    1. Valida que a recompensa existe, está ativa e tem estoque
+    2. Valida que o produtor tem pontos suficientes
+    3. Debita os pontos do produtor (operação atômica)
+    4. Decrementa o estoque da recompensa (operação atômica)
+    5. Cria registro permanente no histórico de resgates
+    6. Implementa rollback automático em caso de falha
+    
+    **IMPORTANTE:**
+    - O resgate é DEFINITIVO (não pode ser cancelado)
+    - Os pontos são debitados imediatamente
+    - O estoque é decrementado automaticamente
+    - O histórico fica registrado permanentemente
+    
+    Validações:
+    - Recompensa deve existir e estar ativa
+    - Recompensa deve ter estoque disponível (> 0)
+    - Produtor deve ter pontos suficientes
+    
+    Em caso de erro:
+    - Se falhar após debitar pontos, faz rollback automático
+    - HTTPException com código apropriado e mensagem detalhada
+    """
+)
+async def resgatar_recompensa(
+    recompensa_id: str,
+    current_user: dict = Depends(get_current_user)
+) -> ResgateResponse:
+    """
+    Resgata uma recompensa usando pontos do produtor.
+    
+    Args:
+        recompensa_id: ID da recompensa a ser resgatada
+        current_user: Usuário produtor autenticado
+    
+    Returns:
+        ResgateResponse: Dados do resgate concluído
+    
+    Raises:
+        HTTPException 404: Recompensa não encontrada ou produtor não encontrado
+        HTTPException 400: Recompensa inativa, sem estoque ou pontos insuficientes
+        HTTPException 500: Erro interno no processo de resgate
+        
+    Example Response:
+        ```json
+        {
+          "id": "60c72b2f9b1d4c3a4c8e4d40",
+          "recompensa_id": "60c72b2f9b1d4c3a4c8e4d3e",
+          "produtor_id": "60c72b2f9b1d4c3a4c8e4d3f",
+          "pontos_gastos": 500,
+          "data_resgate": "2025-11-19T14:30:00Z"
+        }
+        ```
+    """
+    produtor_id = current_user.get("id")
+    if not produtor_id:
+        raise HTTPException(status_code=401, detail="Usuário não autenticado")
+    
+    return await resgate_service.resgatar_recompensa(recompensa_id, produtor_id)
 
