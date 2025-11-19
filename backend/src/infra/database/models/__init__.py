@@ -10,6 +10,7 @@ from .categoria import CategoriaResiduo
 from .residue import Residue
 from .historico import HistoricoResiduo
 from .scheduling import Scheduling
+from .resgate_recompensa import ResgateRecompensa
 
 __all__ = [
     # Base
@@ -26,4 +27,5 @@ __all__ = [
     "Residue",
     "HistoricoResiduo",
     "Scheduling",
+    "ResgateRecompensa",
 ]
