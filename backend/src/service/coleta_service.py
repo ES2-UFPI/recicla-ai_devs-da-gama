@@ -8,6 +8,8 @@ from src.infra.database.repositories import (
     scheduling_repo,
     user_repo,
 )
+import asyncio
+from src.service.ranking_service import RankingService
 
 from src.schemas.coleta_schema import (
     ColetaInDBSchema,
@@ -215,6 +217,54 @@ class ColetaService:
                 usuario_id=coletor_id,
                 detalhes={"coleta_id": coleta_id, "acao": "coletar_residuo"},
             )
+
+        # Adicionar pontos dos resíduos para o Produtor
+        produtores_atualizados = set()
+        for residuo_id in residuos_ids:
+            residuo = await residue_repo.find_by_id(residuo_id)
+            
+            # Buscar produtor associado ao resíduo
+            produtor_id = residuo.get("produtorId")
+            produtor = await user_repo.find_by_id(produtor_id)
+            if not produtor:
+                continue
+
+            nova_pontucacao = produtor.get("points") + residuo.get("valorEstimado")
+
+            await user_repo.update_user(
+                user_id = produtor.get("id"),
+                updates = {
+                    "points": nova_pontucacao 
+                }
+            )
+            # Memorizar produtor para atualizar rankings após loop
+            produtores_atualizados.add(produtor.get("id"))
+            
+        # Atualizar rankings dos produtores que tiveram pontos alterados.
+        # Vamos atualizar o ranking global e também o ranking por estado/cidade
+        # para cada produtor afetado.
+        if produtores_atualizados:
+            # Evita atualizações duplicadas: global apenas uma vez
+            tasks = []
+            # Atualizar ranking global uma vez
+            tasks.append(RankingService.refresh_ranking(level="global"))
+
+            # Recarregar ranking por região para cada produtor (estado e cidade)
+            for pid in produtores_atualizados:
+                produtor = await user_repo.find_by_id(pid)
+                if not produtor:
+                    continue
+                estado = produtor.get("estado_id")
+                cidade = produtor.get("cidade_id")
+                # Atualizar ranking estadual (se existir)
+                if estado:
+                    tasks.append(RankingService.refresh_ranking(level="estado", code=estado))
+                # Atualizar ranking por cidade (se existir)
+                if cidade:
+                    tasks.append(RankingService.refresh_ranking(level="cidade", code=cidade))
+
+            # Executa atualizações de forma concorrente
+            await asyncio.gather(*tasks)
 
         # Adicionar resíduos coletados ao inventory do coletor
         await self._adicionar_residuos_ao_inventory(coletor_id, residuos_ids)

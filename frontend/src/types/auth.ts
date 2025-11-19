@@ -1,4 +1,5 @@
 // Tipos relacionados à autenticação
+import type { Endereco } from './endereco';
 
 export interface User {
   id: string;
@@ -20,15 +21,28 @@ export interface LoginCredentials {
 }
 
 // Dados enviados para o backend ao cadastrar usuário
+// Suporta os 3 tipos de usuário (builder pattern)
 export interface RegisterData {
   name: string;
   email: string;
-  senha: string;
-  telefone: string;
-  role: string;
-  cidade: string;
-  estado: string;
-  // Não incluir campos de UI como confirmacaoSenha aqui
+  phone: string;
+  password: string;
+  role_id: 'produtor' | 'coletor' | 'receptor';
+  cidade_id: string;
+  estado_id: string;
+  
+  // Campos específicos de Produtor
+  addresses?: Endereco[];
+  is_business?: boolean;
+  cnpj?: string;
+  points?: number;
+  ranking?: number;
+  
+  // Campo específico de Coletor
+  inventory?: string[];
+  
+  // Campo específico de Receptor
+  accepted_material?: string[];
 }
 
 export interface AuthResponse {

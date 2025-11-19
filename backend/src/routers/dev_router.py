@@ -253,6 +253,165 @@ async def seed_heavy():
         }
 
 
+@router.get("/seed/gestor-recompensas")
+async def seed_gestor_recompensas():
+    """
+    Cria um usuário gestor de recompensas para gerenciar o catálogo de prêmios.
+    
+    ⚠️ Endpoint de desenvolvimento - use apenas em ambiente de dev/staging!
+    
+    Credenciais criadas:
+    - Email: gestor.recompensas@reciclaai.com.br
+    - Senha: GestorRecompensas@2024
+    - Role: gestor_recompensas
+    
+    Este usuário pode:
+    - Criar novas recompensas
+    - Atualizar recompensas existentes
+    - Ajustar estoque de recompensas
+    - Desativar/reativar recompensas
+    
+    Returns:
+        dict: Dados do usuário criado e credenciais de acesso
+    """
+    from src.infra.database.repositories import user_repo
+    from passlib.context import CryptContext
+    
+    pwd_ctx = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
+    
+    email = "gestor.recompensas@reciclaai.com.br"
+    
+    try:
+        # Verificar se já existe
+        existente = await user_repo.find_by_email(email)
+        
+        if existente:
+            return {
+                "ok": 1,
+                "mensagem": "✅ Gestor de recompensas já existe!",
+                "credenciais": {
+                    "email": email,
+                    "senha": "GestorRecompensas@2024",
+                    "role": "gestor_recompensas"
+                },
+                "ja_existia": True
+            }
+        
+        # Criar usuário gestor
+        user_data = {
+            "name": "Gestor de Recompensas",
+            "email": email,
+            "phone": "(86) 99999-9999",
+            "password_hash": pwd_ctx.hash("GestorRecompensas@2024"),
+            "role_id": "gestor_recompensas",
+            "cidade_id": "teresina",
+            "estado_id": "piaui",
+            "addresses": []
+        }
+        
+        user_id = await user_repo.create_user(user_data)
+        
+        return {
+            "ok": 1,
+            "mensagem": "✅ Gestor de recompensas criado com sucesso!",
+            "user_id": user_id,
+            "credenciais": {
+                "email": email,
+                "senha": "GestorRecompensas@2024",
+                "role": "gestor_recompensas"
+            },
+            "permissoes": [
+                "Criar recompensas",
+                "Atualizar recompensas",
+                "Ajustar estoque",
+                "Desativar/reativar recompensas"
+            ]
+        }
+    except Exception as e:
+        return {
+            "ok": 0,
+            "erro": str(e),
+            "mensagem": "❌ Erro ao criar gestor de recompensas."
+        }
+
+
+@router.get("/seed/recompensas")
+async def seed_recompensas():
+    """
+    Popula o banco com recompensas diversas para o sistema de gamificação.
+    
+    ⚠️ Endpoint de desenvolvimento - use apenas em ambiente de dev/staging!
+    
+    Cria recompensas variadas:
+    - Produtos físicos (ecobags, garrafas, kits, mudas, livros)
+    - Vouchers e vales-compra (R$ 25, R$ 50, R$ 100, cinema, restaurante)
+    - Descontos (produtos orgânicos, limpeza ecológica, cursos)
+    - Cupons de serviços (visitas, workshops, plantio de árvores)
+    - Recompensas especiais/sazonais
+    - Algumas inativas (para testes)
+    
+    Total: ~25 recompensas variadas
+    
+    Returns:
+        dict: Resumo da operação com recompensas criadas
+    """
+    import sys
+    from pathlib import Path
+    
+    # Importar o módulo de seed
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from scripts.seed_recompensas import seed_recompensas as executar_seed
+    
+    try:
+        recompensa_ids = await executar_seed(limpar_antes=False)
+        
+        return {
+            "ok": 1,
+            "total_criadas": len(recompensa_ids),
+            "recompensa_ids": recompensa_ids,
+            "mensagem": f"✅ {len(recompensa_ids)} recompensas cadastradas com sucesso!"
+        }
+    except Exception as e:
+        return {
+            "ok": 0,
+            "erro": str(e),
+            "mensagem": "❌ Erro ao criar recompensas."
+        }
+
+
+@router.get("/seed/limpar-recompensas")
+async def limpar_recompensas():
+    """
+    Remove TODAS as recompensas do banco de dados.
+    
+    ⚠️⚠️⚠️ PERIGO: Este endpoint deleta todos os dados de recompensas!
+    Use apenas em ambiente de desenvolvimento para resetar o banco.
+    
+    Returns:
+        dict: Número de recompensas deletadas
+    """
+    import sys
+    from pathlib import Path
+    
+    # Importar o módulo de seed
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from scripts.seed_recompensas import limpar_recompensas as executar_limpeza
+    
+    try:
+        deletadas = await executar_limpeza()
+        return {
+            "ok": 1,
+            "deletadas": deletadas,
+            "mensagem": f"🗑️ {deletadas} recompensas removidas do banco."
+        }
+    except Exception as e:
+        return {
+            "ok": 0,
+            "erro": str(e),
+            "mensagem": "❌ Erro ao limpar recompensas."
+        }
+
+
 @router.get("/info")
 async def info_dev():
     """
@@ -264,11 +423,15 @@ async def info_dev():
     return {
         "endpoints": {
             "GET /dev/seed/categorias": "Popula categorias padrão (Plástico, Vidro, Papel, Metal, Eletrônico)",
+            "GET /dev/seed/recompensas": "🎁 Popula ~25 recompensas variadas (produtos, vouchers, descontos, cupons)",
+            "GET /dev/seed/gestor-recompensas": "👤 Cria usuário gestor de recompensas (gestor.recompensas@reciclaai.com.br)",
             "GET /dev/seed/heavy": "🚀 Popula banco completo (12 produtores, 6 coletores, 4 receptoras, ~60 resíduos, etc)",
             "GET /dev/seed/limpar-categorias": "⚠️ Remove TODAS as categorias do banco",
+            "GET /dev/seed/limpar-recompensas": "⚠️ Remove TODAS as recompensas do banco",
             "GET /dev/info": "Exibe esta mensagem de ajuda"
         },
         "aviso": "⚠️ Estes endpoints são apenas para DESENVOLVIMENTO. Desabilite em produção!",
         "categorias_padrao": [cat["tipo"] for cat in CATEGORIAS_PADRAO],
-        "total_categorias": len(CATEGORIAS_PADRAO)
+        "total_categorias": len(CATEGORIAS_PADRAO),
+        "total_recompensas": 25
     }

@@ -15,6 +15,7 @@ from src.schemas.entrega_schema import (
     EntregaSumario,
     BuscarReceptorasRequest,
     ReceptoraComDistancia,
+    ReceptoraInfo,
 )
 from src.service.entrega_service import EntregaService
 from src.infra.security.dependencies import get_current_user
@@ -258,3 +259,46 @@ async def buscar_receptoras_proximas(
         filtros=body,
         current_user=current_user
     )
+
+@router.get(
+    "/receptora-info/{receptora_id}",
+    response_model=ReceptoraInfo,
+    summary="Obter informações completas da receptora",
+    description="""
+    Retorna informações completas de uma receptora específica para a página de Realizar Entrega.
+    
+    Inclui:
+    - Dados básicos (nome, email, telefone)
+    - Materiais aceitos
+    - Endereços
+    
+    Endpoint dedicado para fornecer todos os dados necessários na tela de entrega.
+    Apenas coletores autenticados podem acessar.
+    """
+)
+async def obter_info_receptora(
+    receptora_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> ReceptoraInfo:
+    """
+    Obtém informações completas de uma receptora para realizar entrega.
+    
+    Args:
+        receptora_id: ID da receptora
+        current_user: Usuário autenticado (injetado automaticamente)
+    
+    Returns:
+        ReceptoraInfo: Informações completas da receptora
+    
+    Raises:
+        HTTPException 403: Se usuário não for coletor
+        HTTPException 404: Se receptora não existir
+    """
+    # Validar que apenas coletores podem acessar
+    if current_user.get("role_id") != "coletor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas coletores podem acessar informações de receptoras"
+        )
+    
+    return await EntregaService.obter_info_receptora(receptora_id)

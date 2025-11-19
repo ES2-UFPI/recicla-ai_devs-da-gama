@@ -217,3 +217,57 @@ class EntregaSumario(BaseModel):
             }
         }
     }
+
+class ReceptoraInfo(BaseModel):
+    """
+    Schema completo de informações da receptora para a página de Realizar Entrega.
+    Retorna todos os dados necessários incluindo materiais aceitos e contato.
+    """
+    id: str = Field(
+        ...,
+        description="ID da receptora"
+    )
+    name: str = Field(
+        ...,
+        description="Nome da receptora"
+    )
+    email: str = Field(
+        ...,
+        description="Email de contato da receptora"
+    )
+    phone: str = Field(
+        ...,
+        description="Telefone de contato da receptora"
+    )
+    accepted_material: List[str] = Field(
+        ...,
+        description="Lista de materiais aceitos pela receptora"
+    )
+    addresses: Optional[List[dict]] = Field(
+        None,
+        description="Lista de endereços da receptora"
+    )
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "id": "507f1f77bcf86cd799439011",
+                "name": "Ecoponto Central",
+                "email": "ecoponto@example.com",
+                "phone": "(11) 98765-4321",
+                "accepted_material": ["Plástico", "Papel", "Metal"],
+                "addresses": [
+                    {
+                        "id": 1,
+                        "apelido": "Principal",
+                        "cep": "12345-678",
+                        "logradouro": "Rua Verde",
+                        "numero": "100",
+                        "latitude": "-23.5505",
+                        "longitude": "-46.6333",
+                        "complemento": "Galpão 2"
+                    }
+                ]
+            }
+        }
+    }

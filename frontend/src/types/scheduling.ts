@@ -23,6 +23,7 @@ export interface Scheduling {
   local: LocalEndereco;
   status: 'pendente' | 'aceito' | 'cancelado' | 'coletado';
   observacoes?: string;
+  coleta_integral: boolean; // True = integral (sem coleta parcial), False = permite coleta parcial
 }
 
 export interface SchedulingCreate {
@@ -30,6 +31,7 @@ export interface SchedulingCreate {
   disponibilidade: DisponibilidadeSlot[];
   address_id: number;
   observacoes?: string;
+  coleta_integral?: boolean; // enviar explicitamente conforme checkbox
 }
 
 export interface SchedulingUpdate {
@@ -37,4 +39,5 @@ export interface SchedulingUpdate {
   disponibilidade?: DisponibilidadeSlot[];
   address_id?: number;
   observacoes?: string;
+  coleta_integral?: boolean;
 }
