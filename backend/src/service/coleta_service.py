@@ -222,23 +222,37 @@ class ColetaService:
         produtores_atualizados = set()
         for residuo_id in residuos_ids:
             residuo = await residue_repo.find_by_id(residuo_id)
+            if not residuo:
+                continue
             
             # Buscar produtor associado ao resíduo
             produtor_id = residuo.get("produtorId")
-            produtor = await user_repo.find_by_id(produtor_id)
-            if not produtor:
+            if not produtor_id:
                 continue
 
-            nova_pontucacao = produtor.get("points") + residuo.get("valorEstimado")
-
-            await user_repo.update_user(
-                user_id = produtor.get("id"),
-                updates = {
-                    "points": nova_pontucacao 
-                }
+            pontos_residuo = residuo.get("valorEstimado", 0)
+            
+            # Atualizar points (saldo atual - pode aumentar/diminuir)
+            sucesso_points = await user_repo.atualizar_pontos(
+                user_id=produtor_id,
+                pontos_delta=pontos_residuo
             )
-            # Memorizar produtor para atualizar rankings após loop
-            produtores_atualizados.add(produtor.get("id"))
+            
+            # Atualizar ranking (acumulador - só aumenta, nunca decresce)
+            # Buscar ranking atual do produtor
+            produtor = await user_repo.find_by_id(produtor_id)
+            if produtor:
+                ranking_atual = produtor.get("ranking", 0)
+                novo_ranking = ranking_atual + pontos_residuo
+                
+                sucesso_ranking = await user_repo.update_ranking(
+                    user_id=produtor_id,
+                    new_ranking=novo_ranking
+                )
+                
+                if sucesso_points and sucesso_ranking:
+                    # Memorizar produtor para atualizar rankings após loop
+                    produtores_atualizados.add(produtor_id)
             
         # Atualizar rankings dos produtores que tiveram pontos alterados.
         # Vamos atualizar o ranking global e também o ranking por estado/cidade

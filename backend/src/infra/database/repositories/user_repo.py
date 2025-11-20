@@ -186,3 +186,24 @@ async def atualizar_pontos(user_id: str, pontos_delta: int) -> bool:
 		{"$inc": {"points": pontos_delta}}
 	)
 	return result.matched_count > 0
+
+async def update_ranking(user_id: str, new_ranking: int) -> bool:
+	"""
+	Atualiza o campo 'ranking' do usuário.
+	
+	Args:
+		user_id: ID do usuário
+		new_ranking: Novo valor de ranking a ser definido
+	
+	Returns:
+		True se atualizado com sucesso, False se usuário não existe
+	"""
+	_id = _to_object_id(user_id)
+	if not _id:
+		return False
+	
+	result = await _collection().update_one(
+		{"_id": _id},
+		{"$set": {"ranking": new_ranking}}
+	)
+	return result.matched_count > 0
