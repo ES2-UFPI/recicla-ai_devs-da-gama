@@ -54,7 +54,7 @@ async def set_ranking(level: str = "global", code: Optional[str] = None, limit: 
         "code": code,
         "generated_at": datetime.utcnow(),
         "limit": limit,
-        "top": [{"user_id": u.get("_id") or u.get("id"), "points": int(u.get("points", 0))} for u in users],
+        "top": [{"user_id": u.get("_id") or u.get("id"), "ranking": int(u.get("ranking", 0))} for u in users],
     }
 
     # Upsert into rankings collection
