@@ -48,6 +48,16 @@ const tipoIcons: Record<Exclude<TipoRecompensa, 'todos'>, React.ReactElement> = 
   cupom: <LocalOfferIcon fontSize="small" />,
 };
 
+const tipoLabels: Record<TipoRecompensa, string> = {
+  produto: 'Produto',
+  desconto: 'Desconto',
+  voucher: 'Voucher',
+  cupom: 'Cupom',
+  todos: 'Todos',
+};
+
+const FALLBACK_IMAGE = '/reciclaAi-logo.png';
+
 export default function Recompensas() {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -71,7 +81,21 @@ export default function Recompensas() {
   const [recompensaSelecionada, setRecompensaSelecionada] = useState<Recompensa | null>(null);
   const [resgatando, setResgatando] = useState(false);
 
+  // Controle de imagens com erro
+  const [imagensComErro, setImagensComErro] = useState<Set<string>>(new Set());
+
   const userPoints = user?.points || 0;
+
+  const handleImageError = (recompensaId: string) => {
+    setImagensComErro((prev) => new Set(prev).add(recompensaId));
+  };
+
+  const getImageUrl = (recompensa: Recompensa) => {
+    if (imagensComErro.has(recompensa.id) || !recompensa.foto_url) {
+      return FALLBACK_IMAGE;
+    }
+    return recompensa.foto_url;
+  };
 
   // Carregar recompensas
   useEffect(() => {
@@ -303,15 +327,16 @@ export default function Recompensas() {
                       <CardMedia
                         component="img"
                         height="200"
-                        image={recompensa.foto_url || 'https://via.placeholder.com/400x300?text=Sem+Imagem'}
+                        image={getImageUrl(recompensa)}
                         alt={recompensa.nome}
+                        onError={() => handleImageError(recompensa.id)}
                         sx={{ objectFit: 'cover' }}
                       />
                       <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                         <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
                           <Chip
                             icon={tipoIcons[recompensa.tipo]}
-                            label={recompensa.tipo}
+                            label={tipoLabels[recompensa.tipo]}
                             size="small"
                             color="primary"
                             variant="outlined"
@@ -446,8 +471,9 @@ export default function Recompensas() {
                   <Grid size={{ xs: 12, md: 5 }}>
                     <Box
                       component="img"
-                      src={recompensaSelecionada.foto_url || 'https://via.placeholder.com/400x500?text=Sem+Imagem'}
+                      src={getImageUrl(recompensaSelecionada)}
                       alt={recompensaSelecionada.nome}
+                      onError={() => handleImageError(recompensaSelecionada.id)}
                       sx={{
                         width: '100%',
                         height: { xs: 250, md: '100%' },
@@ -462,7 +488,7 @@ export default function Recompensas() {
                       <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
                         <Chip
                           icon={tipoIcons[recompensaSelecionada.tipo]}
-                          label={recompensaSelecionada.tipo}
+                          label={tipoLabels[recompensaSelecionada.tipo]}
                           color="primary"
                         />
                         {recompensaSelecionada.estoque < 10 && (
