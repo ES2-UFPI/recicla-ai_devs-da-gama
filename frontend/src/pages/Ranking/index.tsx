@@ -26,10 +26,8 @@ import { Navbar } from '../../components/Navbar';
 import { useAuth } from '../../hooks/useAuth';
 import rankingService, { type RankingEntry } from '../../services/rankingService';
 
-// Interface para usuário no ranking (estende RankingEntry da API)
-interface RankingUser extends RankingEntry {
-  ranking: number; // posição no ranking
-}
+// Usar diretamente RankingEntry da API
+type RankingUser = RankingEntry;
 
 // Tipo das abas de ranking
 type RankingTab = 'cidade' | 'estado' | 'global';
@@ -54,8 +52,8 @@ export default function Ranking() {
   const [userPosition, setUserPosition] = useState<number | null>(null);
   const [rankingTitle, setRankingTitle] = useState<string>('Ranking Municipal');
   
-  // Pontuação do usuário
-  const userPoints = user?.points || 0;
+  // Pontuação de ranking do usuário
+  const userRanking = user?.ranking || 0;
 
   useEffect(() => {
     const fetchRankingData = async () => {
@@ -90,11 +88,8 @@ export default function Ranking() {
           setRankingTitle('Ranking Geral');
         }
         
-        // Transforma RankingEntry[] em RankingUser[]
-        const usersWithRanking: RankingUser[] = rankingResponse.top.map((entry) => ({
-          ...entry,
-          ranking: entry.position || 0,
-        }));
+        // Usar diretamente os dados da API
+        const usersWithRanking: RankingUser[] = rankingResponse.top;
         
         setRankingData(usersWithRanking);
         setUserPosition(position);
@@ -113,7 +108,7 @@ export default function Ranking() {
     setCurrentTab(newValue);
   };
 
-  const top10 = rankingData.filter(u => u.ranking <= 10);
+  const top10 = rankingData.filter(u => (u.position || 0) <= 10);
   const userInTop10 = userPosition !== null && userPosition <= 10;
 
   const getMedalIcon = (position: number) => {
@@ -172,7 +167,7 @@ export default function Ranking() {
                 Sua Pontuação
               </Typography>
               <Typography variant="h4" fontWeight={700}>
-                {userPoints.toLocaleString('pt-BR')}
+                {userRanking.toLocaleString('pt-BR')}
               </Typography>
             </Box>
             {userPosition !== null && userPosition > 0 && (
@@ -291,15 +286,15 @@ export default function Ranking() {
                                 justifyContent: 'center',
                                 minWidth: { xs: '3rem', md: '3.5rem' },
                                 height: { xs: '3rem', md: '3.5rem' },
-                                bgcolor: rankingUser.ranking === 1 ? '#FFD700' : rankingUser.ranking === 2 ? '#C0C0C0' : rankingUser.ranking === 3 ? '#CD7F32' : 'grey.200',
+                                bgcolor: rankingUser.position === 1 ? '#FFD700' : rankingUser.position === 2 ? '#C0C0C0' : rankingUser.position === 3 ? '#CD7F32' : 'grey.200',
                                 borderRadius: '50%',
                                 fontWeight: 700,
                                 fontSize: { xs: '1.25rem', md: '1.5rem' },
-                                color: rankingUser.ranking <= 3 ? 'white' : 'text.primary',
-                                boxShadow: rankingUser.ranking <= 3 ? '0 2px 8px rgba(0, 0, 0, 0.2)' : 'none',
+                                color: (rankingUser.position || 0) <= 3 ? 'white' : 'text.primary',
+                                boxShadow: (rankingUser.position || 0) <= 3 ? '0 2px 8px rgba(0, 0, 0, 0.2)' : 'none',
                               }}
                             >
-                              {medal || `#${rankingUser.ranking}`}
+                              {medal || `#${rankingUser.position}`}
                             </Box>
 
                             {/* Avatar e Nome */}
@@ -343,7 +338,7 @@ export default function Ranking() {
                               </Box>
                             </Box>
 
-                            {/* Pontos */}
+                            {/* Pontos de Ranking */}
                             <Box
                               sx={{
                                 textAlign: 'right',
@@ -352,7 +347,7 @@ export default function Ranking() {
                               }}
                             >
                               <Typography variant="h6" fontWeight={700} color="success.main">
-                                {rankingUser.points.toLocaleString('pt-BR')}
+                                {rankingUser.ranking.toLocaleString('pt-BR')}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
                                 pontos
@@ -437,7 +432,7 @@ export default function Ranking() {
 
                       <Box sx={{ textAlign: 'right', minWidth: { xs: '100%', sm: 'auto' }, mt: { xs: 1, sm: 0 } }}>
                         <Typography variant="h6" fontWeight={700} color="success.main">
-                          {userPoints.toLocaleString('pt-BR')}
+                          {userRanking.toLocaleString('pt-BR')}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           pontos

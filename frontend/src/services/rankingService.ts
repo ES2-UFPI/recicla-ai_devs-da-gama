@@ -8,7 +8,7 @@ export interface RankingEntry {
   name: string | null;
   cidade_id: string | null;
   estado_id: string | null;
-  points: number;
+  ranking: number;
   position: number | null;
 }
 
