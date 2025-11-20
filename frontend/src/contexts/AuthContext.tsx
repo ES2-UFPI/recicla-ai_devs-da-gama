@@ -107,6 +107,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  // Recarregar dados do usuário (útil após operações que alteram pontos)
+  async function refreshUser() {
+    try {
+      const { data } = await api.get<UserMeResponse>('/auth/me');
+      setUser(mapUserFromMe(data));
+    } catch (error) {
+      console.error('Erro ao recarregar dados do usuário:', error);
+    }
+  }
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
@@ -114,6 +124,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     register,
     logout,
+    refreshUser,
   };
 
   return (
