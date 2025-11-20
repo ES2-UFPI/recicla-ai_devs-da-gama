@@ -204,50 +204,69 @@ export default function Recompensas() {
     <>
       <Navbar />
       <Container maxWidth="xl" sx={{ py: { xs: 3, md: 4 } }}>
-        {/* Cabeçalho com Saldo de Pontos */}
-        <Box sx={{ mb: 4, textAlign: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
-            <RedeemIcon
-              sx={{
-                fontSize: { xs: '2rem', md: '2.5rem' },
-                color: theme.palette.primary.main,
-              }}
-            />
-            <Typography
-              variant={isMobile ? 'h4' : 'h3'}
-              sx={{
-                fontWeight: 700,
-                color: theme.palette.text.primary,
-              }}
-            >
-              Recompensas
-            </Typography>
-          </Box>
-
-          {/* Saldo de Pontos */}
-          <Paper
-            elevation={3}
-            sx={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 1.5,
-              px: 3,
-              py: 1.5,
-              bgcolor: 'primary.main',
-              color: 'white',
-              borderRadius: '1rem',
-            }}
-          >
-            <StarsIcon sx={{ fontSize: '2rem' }} />
-            <Box sx={{ textAlign: 'left' }}>
-              <Typography variant="caption" sx={{ opacity: 0.9, display: 'block' }}>
-                Seu Saldo
-              </Typography>
-              <Typography variant="h5" fontWeight={700}>
-                {userPoints.toLocaleString('pt-BR')} pontos
+        {/* Cabeçalho com Título, Saldo e Botão de Histórico */}
+        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
+          {/* Esquerda: Título e Saldo */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <RedeemIcon
+                sx={{
+                  fontSize: { xs: '2rem', md: '2.5rem' },
+                  color: theme.palette.primary.main,
+                }}
+              />
+              <Typography
+                variant={isMobile ? 'h5' : 'h4'}
+                sx={{
+                  fontWeight: 700,
+                  color: theme.palette.text.primary,
+                }}
+              >
+                Recompensas
               </Typography>
             </Box>
-          </Paper>
+
+            {/* Saldo de Pontos */}
+            <Paper
+              elevation={2}
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 2,
+                py: 1,
+                bgcolor: 'primary.main',
+                color: 'white',
+                borderRadius: '0.75rem',
+              }}
+            >
+              <StarsIcon sx={{ fontSize: '1.5rem' }} />
+              <Box>
+                <Typography variant="caption" sx={{ opacity: 0.9, display: 'block' }}>
+                  Saldo
+                </Typography>
+                <Typography variant="h6" fontWeight={700}>
+                  {userPoints.toLocaleString('pt-BR')}
+                </Typography>
+              </Box>
+            </Paper>
+          </Box>
+
+          {/* Direita: Botão Ver Histórico */}
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={() => navigate('/recompensas/historico')}
+            sx={{
+              borderRadius: '0.5rem',
+              textTransform: 'none',
+              fontWeight: 600,
+              px: { xs: 2, md: 3 },
+              height: { xs: 'auto', md: '48px' },
+            }}
+          >
+            Ver Histórico de Resgates
+          </Button>
         </Box>
 
         {/* Mensagens */}

@@ -19,6 +19,7 @@ export interface ResgateResponse {
   recompensa_id: string;
   pontos_gastos: number;
   data_resgate: string;
+  recompensa?: Recompensa;
 }
 
 class RecompensaService {
