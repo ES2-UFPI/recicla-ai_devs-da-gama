@@ -52,6 +52,8 @@ const tipoLabels: Record<string, string> = {
   cupom: 'Cupom',
 };
 
+const FALLBACK_IMAGE = '/reciclaAi-logo.png';
+
 export default function HistoricoResgateRecompensa() {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -66,6 +68,9 @@ export default function HistoricoResgateRecompensa() {
 
   // Modal de detalhes
   const [recompensaSelecionada, setRecompensaSelecionada] = useState<Recompensa | null>(null);
+  
+  // Controle de imagens com erro
+  const [imagensComErro, setImagensComErro] = useState<Set<string>>(new Set());
 
   // Carregar histórico de resgates
   useEffect(() => {
@@ -114,14 +119,25 @@ export default function HistoricoResgateRecompensa() {
   };
 
   const formatarData = (data: string) => {
+    // Converte de UTC para timezone local do usuário
     return new Date(data).toLocaleString('pt-BR', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      timeZone: 'America/Sao_Paulo',
     });
+  };
+
+  const handleImageError = (recompensaId: string) => {
+    setImagensComErro((prev) => new Set(prev).add(recompensaId));
+  };
+
+  const getImageUrl = (recompensa: Recompensa) => {
+    if (imagensComErro.has(recompensa.id) || !recompensa.foto_url) {
+      return FALLBACK_IMAGE;
+    }
+    return recompensa.foto_url;
   };
 
   const handleAbrirDetalhes = async (recompensaId: string) => {
@@ -357,8 +373,9 @@ export default function HistoricoResgateRecompensa() {
                   <Grid size={{ xs: 12, md: 5 }}>
                     <Box
                       component="img"
-                      src={recompensaSelecionada.foto_url || '/reciclaAi-logo.png'}
+                      src={getImageUrl(recompensaSelecionada)}
                       alt={recompensaSelecionada.nome}
+                      onError={() => handleImageError(recompensaSelecionada.id)}
                       sx={{
                         width: '100%',
                         height: { xs: 250, md: '100%' },
@@ -404,7 +421,7 @@ export default function HistoricoResgateRecompensa() {
                         elevation={0}
                         sx={{
                           p: 2,
-                          bgcolor: 'info.light',
+                          bgcolor: 'grey.100',
                           borderRadius: '0.75rem',
                           mb: 2,
                         }}
