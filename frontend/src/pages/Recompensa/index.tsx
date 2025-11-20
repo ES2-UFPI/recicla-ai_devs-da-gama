@@ -61,14 +61,13 @@ const FALLBACK_IMAGE = '/reciclaAi-logo.png';
 export default function Recompensas() {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [recompensas, setRecompensas] = useState<Recompensa[]>([]);
   const [recompensasFiltradas, setRecompensasFiltradas] = useState<Recompensa[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Filtros e ordenação
   const [tipoFiltro, setTipoFiltro] = useState<TipoRecompensa>('todos');
@@ -80,6 +79,10 @@ export default function Recompensas() {
   // Modal de detalhes
   const [recompensaSelecionada, setRecompensaSelecionada] = useState<Recompensa | null>(null);
   const [resgatando, setResgatando] = useState(false);
+  
+  // Modal de sucesso
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [resgateInfo, setResgateInfo] = useState<{ nome: string; pontos: number } | null>(null);
 
   // Controle de imagens com erro
   const [imagensComErro, setImagensComErro] = useState<Set<string>>(new Set());
@@ -163,20 +166,26 @@ export default function Recompensas() {
 
     setResgatando(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
       await recompensaService.resgatarRecompensa(recompensaSelecionada.id);
-      setSuccessMessage('Recompensa resgatada com sucesso!');
+      
+      // Guardar informações do resgate para o diálogo de sucesso
+      setResgateInfo({
+        nome: recompensaSelecionada.nome,
+        pontos: recompensaSelecionada.pontos_necessarios
+      });
+      
+      // Recarregar pontos do usuário
+      await refreshUser();
       
       // Recarregar recompensas
       const data = await recompensaService.getRecompensasAtivas({ com_estoque: true });
       setRecompensas(data);
       
+      // Fechar modal de detalhes e abrir modal de sucesso
       handleFecharModal();
-      
-      // Auto-esconder mensagem após 5 segundos
-      setTimeout(() => setSuccessMessage(null), 5000);
+      setShowSuccessDialog(true);
     } catch (err) {
       console.error('Erro ao resgatar recompensa:', err);
       const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail 
@@ -242,11 +251,6 @@ export default function Recompensas() {
         </Box>
 
         {/* Mensagens */}
-        {successMessage && (
-          <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccessMessage(null)}>
-            {successMessage}
-          </Alert>
-        )}
         {error && (
           <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
             {error}
@@ -599,6 +603,104 @@ export default function Recompensas() {
               </DialogActions>
             </>
           )}
+        </Dialog>
+
+        {/* Modal de Sucesso */}
+        <Dialog
+          open={showSuccessDialog}
+          onClose={() => setShowSuccessDialog(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: '1rem',
+              textAlign: 'center',
+            },
+          }}
+        >
+          <DialogContent sx={{ py: 4 }}>
+            <Box
+              sx={{
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                bgcolor: 'success.main',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 24px',
+              }}
+            >
+              <RedeemIcon sx={{ fontSize: '3rem', color: 'white' }} />
+            </Box>
+
+            <Typography variant="h4" fontWeight={700} color="success.main" sx={{ mb: 2 }}>
+              Resgate Realizado!
+            </Typography>
+
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              Parabéns! Você resgatou com sucesso:
+            </Typography>
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                bgcolor: 'grey.100',
+                borderRadius: '0.75rem',
+                mb: 3,
+              }}
+            >
+              <Typography variant="h6" fontWeight={600} sx={{ mb: 1 }}>
+                {resgateInfo?.nome}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                <StarsIcon color="warning" />
+                <Typography variant="body1" color="text.secondary">
+                  <strong>{resgateInfo?.pontos.toLocaleString('pt-BR')}</strong> pontos gastos
+                </Typography>
+              </Box>
+            </Paper>
+
+            <Box
+              sx={{
+                p: 2,
+                bgcolor: 'primary.50',
+                borderRadius: '0.75rem',
+                mb: 2,
+              }}
+            >
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                Seu novo saldo
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                <StarsIcon color="primary" sx={{ fontSize: '1.5rem' }} />
+                <Typography variant="h5" fontWeight={700} color="primary.main">
+                  {userPoints.toLocaleString('pt-BR')} pontos
+                </Typography>
+              </Box>
+            </Box>
+
+            <Typography variant="body2" color="text.secondary">
+              Continue reciclando para ganhar mais pontos e resgatar novas recompensas!
+            </Typography>
+          </DialogContent>
+
+          <DialogActions sx={{ p: 3, pt: 0, justifyContent: 'center' }}>
+            <Button
+              onClick={() => setShowSuccessDialog(false)}
+              variant="contained"
+              size="large"
+              sx={{
+                borderRadius: '0.5rem',
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 4,
+              }}
+            >
+              Continuar
+            </Button>
+          </DialogActions>
         </Dialog>
       </Container>
     </>
