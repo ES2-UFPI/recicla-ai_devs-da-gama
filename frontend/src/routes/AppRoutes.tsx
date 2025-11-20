@@ -14,6 +14,7 @@ import Entregas from '../pages/Entregas';
 import LocalizarReceptora from '../pages/LocalizarReceptora';
 import RealizarEntrega from '../pages/RealizarEntrega';
 import Ranking from '../pages/Ranking';
+import Recompensas from '../pages/Recompensa';
 
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
@@ -59,6 +60,14 @@ export function AppRoutes() {
         <ProtectedRoute>
           <RoleBasedRoute allowedRoles={['produtor']}>
             <Ranking />
+          </RoleBasedRoute>
+        </ProtectedRoute>
+      } />
+      {/* Rota Recompensas */}
+      <Route path="/recompensas" element={
+        <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={['produtor']}>
+            <Recompensas />
           </RoleBasedRoute>
         </ProtectedRoute>
       } />
