@@ -24,11 +24,11 @@ class RankingService:
         elif level == "cidade" and code:
             filter_query["cidade_id"] = code
 
-        # Buscar usuários ordenados por pontos no repositório
-        users = await ranking_repo.get_users_sorted_by_points(filter_query=filter_query, limit=limit)
+        # Buscar usuários ordenados por ranking no repositório
+        users = await ranking_repo.get_users_sorted_by_ranking(filter_query=filter_query, limit=limit)
 
         # map to RankingEntry - converte ObjectId para string
-        top = [RankingEntry(user_id=str(u.get("_id") or u.get("id")), name=u.get("name"), cidade_id=u.get("cidade_id"), estado_id=u.get("estado_id"), points=int(u.get("points", 0)), position=i + 1) for i, u in enumerate(users)]
+        top = [RankingEntry(user_id=str(u.get("_id") or u.get("id")), name=u.get("name"), cidade_id=u.get("cidade_id"), estado_id=u.get("estado_id"), ranking=int(u.get("ranking", 0)), position=i + 1) for i, u in enumerate(users)]
 
         # Extrair nomes de cidade/estado do primeiro usuário (todos terão os mesmos valores no filtro)
         cidade_nome = None
@@ -52,7 +52,7 @@ class RankingService:
         elif level == "cidade" and code:
             filter_query["cidade_id"] = code
 
-        users = await ranking_repo.get_users_sorted_by_points(filter_query=filter_query, limit=None)
+        users = await ranking_repo.get_users_sorted_by_ranking(filter_query=filter_query, limit=None)
 
         for idx, u in enumerate(users):
             if str(u.get("_id") or u.get("id")) == str(user_id):
@@ -65,7 +65,7 @@ class RankingService:
         """Calcula e salva o ranking no banco, retornando o RankingResponse."""
         doc = await ranking_repo.set_ranking(level=level, code=code, limit=limit)
         # convert top - converte ObjectId para string
-        top = [RankingEntry(user_id=str(t.get("user_id")), points=int(t.get("points", 0)), position=i + 1) for i, t in enumerate(doc.get("top", []))]
+        top = [RankingEntry(user_id=str(t.get("user_id")), ranking=int(t.get("ranking", 0)), position=i + 1) for i, t in enumerate(doc.get("top", []))]
         return RankingResponse(level=level, code=code, cidade_nome=None, estado_nome=None, total=len(top), top=top)
 
     @staticmethod

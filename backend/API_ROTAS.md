@@ -63,6 +63,7 @@ O sistema implementa o **padrão Builder** para construção de usuários, garan
 - [Coletas](#coletas)
 - [Entregas](#entregas)
 - [Recompensas](#recompensas)
+- [Ranking](#rankings)
 - [Desenvolvimento](#desenvolvimento)
 
 ---
@@ -3391,6 +3392,200 @@ Lista o histórico de resgates do produtor autenticado.
 - 📊 Útil para comprovação de resgates e auditoria
 - ♾️ Histórico permanente (resgates nunca são deletados)
 - 📄 Suporta paginação para otimizar performance
+
+---
+
+## Rankings
+
+O módulo de Rankings permite visualizar a classificação dos produtores baseada em seus pontos acumulados de reciclagem. Os rankings são calculados com base no campo `ranking` (que só aumenta e nunca decresce), diferente do campo `points` (saldo atual que pode variar).
+
+**Sistema de Pontuação:**
+- **`points`:** Saldo atual do produtor (aumenta ao reciclar, diminui ao resgatar recompensas)
+- **`ranking`:** Pontuação acumulada para classificação (apenas aumenta, nunca diminui)
+- Rankings são atualizados automaticamente quando resíduos são coletados
+- Suporta rankings por nível: global, estadual e municipal
+
+### Obter Ranking
+**GET** `http://localhost:8000/rankings/`
+
+Retorna o ranking de produtores baseado no nível especificado (global, estado ou cidade).
+
+**Autenticação:** ❌ Não requerida (endpoint público)
+
+**Parâmetros de Query:**
+- `level`: Nível do ranking (padrão: "global")
+  - `global` - Ranking de todos os produtores
+  - `estado` - Ranking por estado (requer parâmetro `code`)
+  - `cidade` - Ranking por cidade (requer parâmetro `code`)
+- `code`: Código do estado ou cidade quando `level` é "estado" ou "cidade" (opcional)
+- `limit`: Quantidade de posições no top ranking (padrão: 10)
+
+**Exemplo (Ranking Global):** `http://localhost:8000/rankings/?level=global&limit=20`
+
+**Exemplo (Ranking Estadual):** `http://localhost:8000/rankings/?level=estado&code=PI&limit=10`
+
+**Exemplo (Ranking Municipal):** `http://localhost:8000/rankings/?level=cidade&code=2211001&limit=10`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "level": "global",
+  "code": null,
+  "top_users": [
+    {
+      "user_id": "60c72b2f9b1d4c3a4c8e4d3e",
+      "name": "João Silva",
+      "ranking": 15000,
+      "position": 1
+    },
+    {
+      "user_id": "60c72b2f9b1d4c3a4c8e4d3f",
+      "name": "Maria Santos",
+      "ranking": 12500,
+      "position": 2
+    },
+    {
+      "user_id": "60c72b2f9b1d4c3a4c8e4d40",
+      "name": "Carlos Oliveira",
+      "ranking": 10200,
+      "position": 3
+    }
+  ],
+  "total_users": 3,
+  "last_updated": "2025-11-20T14:30:00Z"
+}
+```
+
+**Resposta quando ranking está vazio (200):**
+```json
+{
+  "level": "global",
+  "code": null,
+  "top_users": [],
+  "total_users": 0,
+  "last_updated": "2025-11-20T14:30:00Z"
+}
+```
+
+**Casos de Uso:**
+- 🏆 Exibir top produtores recicladores
+- 📊 Dashboard com rankings regionais
+- 🎮 Gamificação e engajamento de usuários
+- 📈 Estatísticas de reciclagem por região
+
+**Observações:**
+- Endpoint público - não requer autenticação
+- Rankings são cacheados para melhor performance
+- Usa o campo `ranking` (pontuação acumulada) para ordenação
+- `code` é obrigatório quando `level` é "estado" ou "cidade"
+- Rankings estaduais usam código UF (ex: "PI", "SP", "RJ")
+- Rankings municipais usam código IBGE (ex: "2211001" para Teresina/PI)
+
+---
+
+### Recalcular Ranking (Admin)
+**POST** `http://localhost:8000/rankings/refresh`
+
+Recalcula e atualiza o cache do ranking para o nível especificado. Endpoint administrativo ou para uso por jobs/cron.
+
+**Autenticação:** ❌ Não requerida (mas recomendado adicionar autenticação em produção)
+
+**Parâmetros de Query:**
+- `level`: Nível do ranking a recalcular (padrão: "global")
+  - `global` - Recalcula ranking global
+  - `estado` - Recalcula ranking estadual (requer `code`)
+  - `cidade` - Recalcula ranking municipal (requer `code`)
+- `code`: Código do estado ou cidade quando aplicável (opcional)
+- `limit`: Quantidade de posições no top ranking (padrão: 10)
+
+**Exemplo (Recalcular Global):** `http://localhost:8000/rankings/refresh?level=global`
+
+**Exemplo (Recalcular Estadual):** `http://localhost:8000/rankings/refresh?level=estado&code=PI`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "level": "global",
+  "code": null,
+  "top_users": [
+    {
+      "user_id": "60c72b2f9b1d4c3a4c8e4d3e",
+      "name": "João Silva",
+      "ranking": 15000,
+      "position": 1
+    },
+    {
+      "user_id": "60c72b2f9b1d4c3a4c8e4d3f",
+      "name": "Maria Santos",
+      "ranking": 12500,
+      "position": 2
+    }
+  ],
+  "total_users": 2,
+  "last_updated": "2025-11-20T14:35:00Z"
+}
+```
+
+**Casos de Uso:**
+- 🔄 Atualização manual de rankings
+- ⏰ Jobs agendados (cron) para recalcular periodicamente
+- 🔧 Manutenção e correção de inconsistências
+- 🚀 Forçar atualização após migração de dados
+
+**Observações:**
+- Recalcula rankings baseado nos valores atuais do campo `ranking` dos usuários
+- Atualiza cache automaticamente
+- **Recomendação:** Adicionar autenticação admin em produção
+- **Performance:** Pode ser lento com muitos usuários - executar em background
+
+---
+
+### Obter Posição do Usuário no Ranking
+**GET** `http://localhost:8000/rankings/position/{user_id}`
+
+Retorna a posição específica de um usuário em um determinado ranking.
+
+**Autenticação:** ❌ Não requerida (endpoint público)
+
+**Parâmetros de Path:**
+- `user_id`: ID do usuário (obrigatório)
+
+**Parâmetros de Query:**
+- `level`: Nível do ranking (padrão: "global")
+  - `global` - Posição no ranking global
+  - `estado` - Posição no ranking estadual (requer `code`)
+  - `cidade` - Posição no ranking municipal (requer `code`)
+- `code`: Código do estado ou cidade quando aplicável (opcional)
+
+**Exemplo (Posição Global):** `http://localhost:8000/rankings/position/60c72b2f9b1d4c3a4c8e4d3e?level=global`
+
+**Exemplo (Posição Estadual):** `http://localhost:8000/rankings/position/60c72b2f9b1d4c3a4c8e4d3e?level=estado&code=PI`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "position": 5
+}
+```
+
+**Resposta quando usuário não está no ranking (200):**
+```json
+{
+  "position": -1
+}
+```
+
+**Casos de Uso:**
+- 👤 Mostrar posição do usuário logado no perfil
+- 📊 Dashboard personalizado com posição atual
+- 🎯 Gamificação - "Você está em 5º lugar!"
+- 📈 Acompanhamento de progresso no ranking
+
+**Observações:**
+- Retorna `-1` se usuário não estiver no ranking
+- Usa ranking cacheado para melhor performance
+- Baseado no campo `ranking` (pontuação acumulada)
+- Útil para exibir posição individual sem carregar todo o ranking
 
 ---
 

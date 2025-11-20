@@ -12,14 +12,14 @@ def _rankings_collection():
     return get_database()["rankings"]
 
 
-async def get_users_sorted_by_points(filter_query: Optional[Dict[str, Any]] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
-    """Retorna uma lista de usuários ordenados por 'points' decrescente.
+async def get_users_sorted_by_ranking(filter_query: Optional[Dict[str, Any]] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    """Retorna uma lista de usuários ordenados por 'ranking' decrescente.
 
     filter_query: dicionário opcional com filtros como {'cidade_id': 'teresina'} ou {'estado_id': 'pi'}
     limit: se fornecido, retorna somente os N primeiros
     """
     q = filter_query or {}
-    cursor = _users_collection().find(q).sort("points", -1)
+    cursor = _users_collection().find(q).sort("ranking", -1)
     if limit and isinstance(limit, int):
         cursor = cursor.limit(limit)
 
@@ -47,7 +47,7 @@ async def set_ranking(level: str = "global", code: Optional[str] = None, limit: 
     elif level == "cidade":
         filter_query = {"cidade_id": code}
 
-    users = await get_users_sorted_by_points(filter_query=filter_query, limit=limit)
+    users = await get_users_sorted_by_ranking(filter_query=filter_query, limit=limit)
 
     ranking_doc = {
         "level": level,

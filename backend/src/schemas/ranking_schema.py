@@ -7,7 +7,7 @@ class RankingEntry(BaseModel):
     name: Optional[str] = Field(None, description="Nome do usuário")
     cidade_id: Optional[str] = Field(None, description="ID da cidade")
     estado_id: Optional[str] = Field(None, description="ID do estado")
-    points: int = Field(..., description="Pontos do usuário")
+    ranking: int = Field(..., description="Pontos de ranking do usuário")
     position: Optional[int] = Field(None, description="Posição no ranking")
 
 
