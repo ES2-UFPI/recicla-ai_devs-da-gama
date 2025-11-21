@@ -196,9 +196,45 @@ class UserService:
 			# Formatar resultado como lista
 			result = [{"categoria": k, "quantidade": v} for k, v in category_sums.items()]
 			return {"by_category": result}
-		# Caso seja receptora, ainda não há relatório implementado — retornar estrutura vazia
+		# Caso seja receptora, buscar todas as entregas recebidas e coletar os resíduos
 		if role == "receptor":
-			return {"by_category": []}
+			# Buscar entregas onde esta usuária é a receptora
+			entregas = await entrega_repo.find_by_receptora_id(user_id, limit=10000, skip=0)
+
+			# Agregar todos os ids de resíduos das entregas
+			residuos_ids = []
+			for entrega in entregas:
+				ids = entrega.get("residuos_id") or entrega.get("residuos") or []
+				for rid in ids:
+					if rid not in residuos_ids:
+						residuos_ids.append(rid)
+
+			# Buscar documentos completos dos resíduos
+			residuos = []
+			for rid in residuos_ids:
+				res = await residue_repo.find_by_id(rid)
+				if res:
+					residuos.append(res)
+
+			# Agrupar por tipo de categoria e somar quantidade (como no caso do produtor)
+			category_sums: Dict[str, float] = {}
+			for r in residuos:
+				categoria_id = r.get("categoriaId")
+				categoria_doc = None
+				if categoria_id:
+					categoria_doc = await categoria_repo.buscar_por_id(str(categoria_id))
+				cat_tipo = categoria_doc.get("tipo") if categoria_doc else str(categoria_id)
+				quant = r.get("quantidade", 0) or 0
+				try:
+					quant = float(quant)
+				except Exception:
+					quant = 0.0
+				category_sums[cat_tipo] = category_sums.get(cat_tipo, 0.0) + quant
+
+			result = [{"categoria": k, "quantidade": v} for k, v in category_sums.items()]
+
+			# Retornar agregado por categoria e lista de resíduos
+			return {"by_category": result, "residuos": residuos}
 
 	@staticmethod
 	async def update_user(user_id: str, payload: UserUpdate) -> UserPublic:
