@@ -177,8 +177,8 @@ class UserService:
 			filters = {"produtorId": user_id, "status": {"$in": ["COLETADO", "ENTREGUE"]}}
 			residues = await residue_repo.list_residues(filters=filters, limit=1000)
 
-			# Agrupar por tipo de categoria e somar quantidade
-			category_sums: Dict[str, float] = {}
+			# Agrupar por tipo de categoria e tipo_medida, somando quantidade
+			category_sums: Dict[tuple, float] = {}
 			for r in residues:
 				categoria_id = r.get("categoriaId")
 				# Buscar categoria para obter o campo 'tipo'
@@ -186,15 +186,17 @@ class UserService:
 				if categoria_id:
 					categoria_doc = await categoria_repo.buscar_por_id(str(categoria_id))
 				cat_tipo = categoria_doc.get("tipo") if categoria_doc else str(categoria_id)
+				tipo_medida = r.get("tipo_medida", "kg")
 				quant = r.get("quantidade", 0) or 0
 				try:
 					quant = float(quant)
 				except Exception:
 					quant = 0.0
-				category_sums[cat_tipo] = category_sums.get(cat_tipo, 0.0) + quant
+				key = (cat_tipo, tipo_medida)
+				category_sums[key] = category_sums.get(key, 0.0) + quant
 
 			# Formatar resultado como lista
-			result = [{"categoria": k, "quantidade": v} for k, v in category_sums.items()]
+			result = [{"categoria": k[0], "tipo_medida": k[1], "quantidade": v} for k, v in category_sums.items()]
 			return {"by_category": result}
 		# Caso seja receptora, buscar todas as entregas recebidas e coletar os resíduos
 		if role == "receptor":
@@ -216,22 +218,24 @@ class UserService:
 				if res:
 					residuos.append(res)
 
-			# Agrupar por tipo de categoria e somar quantidade (como no caso do produtor)
-			category_sums: Dict[str, float] = {}
+			# Agrupar por tipo de categoria e tipo_medida, somando quantidade (como no caso do produtor)
+			category_sums: Dict[tuple, float] = {}
 			for r in residuos:
 				categoria_id = r.get("categoriaId")
 				categoria_doc = None
 				if categoria_id:
 					categoria_doc = await categoria_repo.buscar_por_id(str(categoria_id))
 				cat_tipo = categoria_doc.get("tipo") if categoria_doc else str(categoria_id)
+				tipo_medida = r.get("tipo_medida", "kg")
 				quant = r.get("quantidade", 0) or 0
 				try:
 					quant = float(quant)
 				except Exception:
 					quant = 0.0
-				category_sums[cat_tipo] = category_sums.get(cat_tipo, 0.0) + quant
+				key = (cat_tipo, tipo_medida)
+				category_sums[key] = category_sums.get(key, 0.0) + quant
 
-			result = [{"categoria": k, "quantidade": v} for k, v in category_sums.items()]
+			result = [{"categoria": k[0], "tipo_medida": k[1], "quantidade": v} for k, v in category_sums.items()]
 
 			# Retornar agregado por categoria e lista de resíduos
 			return {"by_category": result, "residuos": residuos}

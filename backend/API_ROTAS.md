@@ -592,96 +592,63 @@ Atualiza dados do usuário autenticado utilizando **User Builders**.
 
 ---
 
-### Obter Relatório do Usuário (Produtor)
+### Obter Relatório do Usuário
 **GET** `http://localhost:8000/users/me/report`
 
-Gera relatório resumido do usuário autenticado (produtor), retornando resíduos agrupados por categoria e quantidade total.
+Gera relatório resumido do usuário autenticado, retornando resíduos agrupados por categoria e quantidade total.
 
 **Autenticação:** ✅ Requerida
 
 **Regras:**
 - Disponível para usuários com `role_id: "produtor"` ou `role_id: "receptor"`
-- Produtores: retorna resíduos com status COLETADO ou ENTREGUE, agregados por categoria
-- Receptoras: retorna resíduos recebidos via entregas, agregados por categoria
+- **Produtores:** retorna resíduos próprios com status COLETADO ou ENTREGUE, agregados por categoria
+- **Receptoras:** retorna resíduos recebidos via entregas, agregados por categoria
 
 **Resposta de Sucesso (200) - Produtor:**
 ```json
 {
   "by_category": [
     {
-      "categoria": "plastico",
+      "categoria": "Plástico",
+      "tipo_medida": "kg",
       "quantidade": 125.5
     },
     {
-      "categoria": "papel",
+      "categoria": "Papel",
+      "tipo_medida": "unidade",
       "quantidade": 42.0
     },
     {
-      "categoria": "metal",
+      "categoria": "Metal",
+      "tipo_medida": "kg",
       "quantidade": 18.0
     }
   ]
 }
 ```
 
-**Resposta de Sucesso (200) - Receptor:**
+**Resposta de Sucesso (200) - Receptora:**
 ```json
 {
   "by_category": [
     {
-      "categoria": "plastico",
+      "categoria": "Plástico",
+      "tipo_medida": "kg",
       "quantidade": 200.0
     },
     {
-      "categoria": "vidro",
-      "quantidade": 75.5
-    }
-  ]
-}
-```
-
-**Resposta de Erro (403):**
-```json
-{
-  "detail": "Relatório disponível apenas para produtores ou receptoras."
-}
-```
-
-**Observações:**
-- Para produtores: busca resíduos onde `produtorId` corresponde ao usuário autenticado e `status` é COLETADO ou ENTREGUE
-- Para receptoras: busca todas as entregas recebidas e agrega os resíduos por categoria
-- Quantidades são somadas por tipo de categoria (campo `tipo` da categoria)
-- Limite de 1000 resíduos por consulta
-
----
-
-### Obter Relatório do Usuário (Receptor)
-**GET** `http://localhost:8000/users/me/report/receptor`
-
-Gera relatório resumido do usuário autenticado (receptora), retornando resíduos recebidos agrupados por categoria e quantidade total. Esta é uma rota alternativa específica para receptoras.
-
-**Autenticação:** ✅ Requerida
-
-**Regras:**
-- Disponível para usuários com `role_id: "produtor"` ou `role_id: "receptor"`
-- Funcionalidade idêntica a `/users/me/report`, mantida por compatibilidade
-- Receptoras: retorna resíduos recebidos via entregas, agregados por categoria
-- Produtores: retorna resíduos com status COLETADO ou ENTREGUE, agregados por categoria
-
-**Resposta de Sucesso (200):**
-```json
-{
-  "by_category": [
-    {
-      "categoria": "plastico",
-      "quantidade": 200.0
-    },
-    {
-      "categoria": "vidro",
+      "categoria": "Vidro",
+      "tipo_medida": "unidade",
       "quantidade": 75.5
     },
     {
-      "categoria": "papel",
+      "categoria": "Vidro",
+      "tipo_medida": "kg",
+      "quantidade": 30.0
+    },
+    {
+      "categoria": "Papel",
+      "tipo_medida": "kg",
       "quantidade": 110.0
     }
   ]
@@ -696,10 +663,12 @@ Gera relatório resumido do usuário autenticado (receptora), retornando resídu
 ```
 
 **Observações:**
-- Esta rota chama o mesmo serviço que `/users/me/report`
-- Mantida para fins de compatibilidade e especificidade de naming
-- Para receptoras: agrega resíduos de todas as entregas recebidas
-- Quantidades somadas por tipo de categoria
+- **Para produtores:** busca resíduos onde `produtorId` corresponde ao usuário autenticado e `status` é COLETADO ou ENTREGUE
+- **Para receptoras:** busca todas as entregas recebidas (`receptora_id`) e agrega os resíduos por categoria
+- Quantidades são somadas por **tipo de categoria** E **tipo_medida** (não mistura kg com unidades)
+- Cada combinação única de `categoria + tipo_medida` gera uma entrada separada na lista
+- Limite de 1000 resíduos/entregas por consulta
+- O relatório se adapta automaticamente ao role do usuário autenticado
 
 ---
 
