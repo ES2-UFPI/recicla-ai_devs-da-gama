@@ -592,6 +592,117 @@ Atualiza dados do usuário autenticado utilizando **User Builders**.
 
 ---
 
+### Obter Relatório do Usuário (Produtor)
+**GET** `http://localhost:8000/users/me/report`
+
+Gera relatório resumido do usuário autenticado (produtor), retornando resíduos agrupados por categoria e quantidade total.
+
+**Autenticação:** ✅ Requerida
+
+**Regras:**
+- Disponível para usuários com `role_id: "produtor"` ou `role_id: "receptor"`
+- Produtores: retorna resíduos com status COLETADO ou ENTREGUE, agregados por categoria
+- Receptoras: retorna resíduos recebidos via entregas, agregados por categoria
+
+**Resposta de Sucesso (200) - Produtor:**
+```json
+{
+  "by_category": [
+    {
+      "categoria": "plastico",
+      "quantidade": 125.5
+    },
+    {
+      "categoria": "papel",
+      "quantidade": 42.0
+    },
+    {
+      "categoria": "metal",
+      "quantidade": 18.0
+    }
+  ]
+}
+```
+
+**Resposta de Sucesso (200) - Receptor:**
+```json
+{
+  "by_category": [
+    {
+      "categoria": "plastico",
+      "quantidade": 200.0
+    },
+    {
+      "categoria": "vidro",
+      "quantidade": 75.5
+    }
+  ]
+}
+```
+
+**Resposta de Erro (403):**
+```json
+{
+  "detail": "Relatório disponível apenas para produtores ou receptoras."
+}
+```
+
+**Observações:**
+- Para produtores: busca resíduos onde `produtorId` corresponde ao usuário autenticado e `status` é COLETADO ou ENTREGUE
+- Para receptoras: busca todas as entregas recebidas e agrega os resíduos por categoria
+- Quantidades são somadas por tipo de categoria (campo `tipo` da categoria)
+- Limite de 1000 resíduos por consulta
+
+---
+
+### Obter Relatório do Usuário (Receptor)
+**GET** `http://localhost:8000/users/me/report/receptor`
+
+Gera relatório resumido do usuário autenticado (receptora), retornando resíduos recebidos agrupados por categoria e quantidade total. Esta é uma rota alternativa específica para receptoras.
+
+**Autenticação:** ✅ Requerida
+
+**Regras:**
+- Disponível para usuários com `role_id: "produtor"` ou `role_id: "receptor"`
+- Funcionalidade idêntica a `/users/me/report`, mantida por compatibilidade
+- Receptoras: retorna resíduos recebidos via entregas, agregados por categoria
+- Produtores: retorna resíduos com status COLETADO ou ENTREGUE, agregados por categoria
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "by_category": [
+    {
+      "categoria": "plastico",
+      "quantidade": 200.0
+    },
+    {
+      "categoria": "vidro",
+      "quantidade": 75.5
+    },
+    {
+      "categoria": "papel",
+      "quantidade": 110.0
+    }
+  ]
+}
+```
+
+**Resposta de Erro (403):**
+```json
+{
+  "detail": "Relatório disponível apenas para produtores ou receptoras."
+}
+```
+
+**Observações:**
+- Esta rota chama o mesmo serviço que `/users/me/report`
+- Mantida para fins de compatibilidade e especificidade de naming
+- Para receptoras: agrega resíduos de todas as entregas recebidas
+- Quantidades somadas por tipo de categoria
+
+---
+
 ### Listar Meus Endereços
 **GET** `http://localhost:8000/users/me/addresses`
 
