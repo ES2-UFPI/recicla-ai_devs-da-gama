@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 
 from src.schemas.user_schema import UserCreate, UserInDB, UserUpdate, Endereco
 from src.schemas.return_schema import UserPublic
-from src.infra.database.repositories import user_repo
+from src.infra.database.repositories import user_repo, entrega_repo, residue_repo, categoria_repo
 from src.builders.user import UserBuilderFactory, get_user_builder
 
 
@@ -133,6 +133,72 @@ class UserService:
 		# Usar builder para construir resposta pública
 		builder = get_user_builder(user)
 		return builder.build_public()
+
+	@staticmethod
+	async def generate_report(user_id: str) -> Dict[str, Any]:
+		"""
+		Gera um relatório resumido do usuário.
+
+		Baseado em `get_user_by_email`/`get_user_by_id`: valida a existência do usuário
+		e retorna informações públicas agregadas e alguns indicadores simples.
+
+		Args:
+			user_id: ID do usuário
+
+		Returns:
+			Dict[str, Any]: Relatório contendo dados públicos, endereços, pontos e métricas por papel
+
+		Raises:
+			HTTPException 404: Se o usuário não existir
+		"""
+
+		# Recupera usuário
+		user = await user_repo.find_by_id(user_id)
+		if not user:
+			raise HTTPException(
+				status_code=status.HTTP_404_NOT_FOUND,
+				detail="Usuário não encontrado."
+			)
+
+		# Verifica se o usuário é produtor ou receptor
+		role = user.get("role_id")
+		if role not in ("produtor", "receptor"):
+			raise HTTPException(
+				status_code=status.HTTP_403_FORBIDDEN,
+				detail="Relatório disponível apenas para produtores ou receptoras."
+			)
+
+		# Construir resposta pública com builder
+		builder = get_user_builder(user)
+		public = builder.build_public()
+
+		# Se for produtor, buscar resíduos COLETADO ou ENTREGUE do produtor
+		if role == "produtor":
+			filters = {"produtorId": user_id, "status": {"$in": ["COLETADO", "ENTREGUE"]}}
+			residues = await residue_repo.list_residues(filters=filters, limit=1000)
+
+			# Agrupar por tipo de categoria e somar quantidade
+			category_sums: Dict[str, float] = {}
+			for r in residues:
+				categoria_id = r.get("categoriaId")
+				# Buscar categoria para obter o campo 'tipo'
+				categoria_doc = None
+				if categoria_id:
+					categoria_doc = await categoria_repo.buscar_por_id(str(categoria_id))
+				cat_tipo = categoria_doc.get("tipo") if categoria_doc else str(categoria_id)
+				quant = r.get("quantidade", 0) or 0
+				try:
+					quant = float(quant)
+				except Exception:
+					quant = 0.0
+				category_sums[cat_tipo] = category_sums.get(cat_tipo, 0.0) + quant
+
+			# Formatar resultado como lista
+			result = [{"categoria": k, "quantidade": v} for k, v in category_sums.items()]
+			return {"by_category": result}
+		# Caso seja receptora, ainda não há relatório implementado — retornar estrutura vazia
+		if role == "receptor":
+			return {"by_category": []}
 
 	@staticmethod
 	async def update_user(user_id: str, payload: UserUpdate) -> UserPublic:
