@@ -139,12 +139,16 @@ async def get_current_user_info(user: dict = Depends(get_current_user)):
 	
 	# Retorna schema específico baseado no role
 	if "prod" in role_id:
+		# Converte points e ranking para int (caso venham como float do DB)
+		points = user.get("points", 0)
+		ranking = user.get("ranking")
+		
 		return ProdutorPublic(
 			**base_data,
 			is_business=user.get("is_business"),
 			cnpj=user.get("cnpj"),
-			points=user.get("points", 0),
-			ranking=user.get("ranking")
+			points=int(points) if points is not None else 0,
+			ranking=int(ranking) if ranking is not None else None
 		)
 	elif "col" in role_id:
 		return ColetorPublic(
@@ -158,10 +162,13 @@ async def get_current_user_info(user: dict = Depends(get_current_user)):
 		)
 	else:
 		# Fallback para role desconhecido
+		points = user.get("points", 0)
+		ranking = user.get("ranking")
+		
 		return ProdutorPublic(
 			**base_data,
 			is_business=user.get("is_business"),
 			cnpj=user.get("cnpj"),
-			points=user.get("points", 0),
-			ranking=user.get("ranking")
+			points=int(points) if points is not None else 0,
+			ranking=int(ranking) if ranking is not None else None
 		)
