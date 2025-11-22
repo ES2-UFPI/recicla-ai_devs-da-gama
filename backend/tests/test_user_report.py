@@ -38,10 +38,12 @@ async def test_generate_report_produtor(mock_user_repo, mock_residue_repo, mock_
     }
 
     # Dois resíduos em categorias diferentes e um resíduo adicional na mesma categoria
+    # Agora incluindo tipo_medida para testar agregação separada
     mock_residue_repo.list_residues.return_value = [
-        {"_id": "r1", "categoriaId": "cat1", "quantidade": 2},
-        {"_id": "r2", "categoriaId": "cat2", "quantidade": 3.5},
-        {"_id": "r3", "categoriaId": "cat1", "quantidade": 1}
+        {"_id": "r1", "categoriaId": "cat1", "quantidade": 2, "tipo_medida": "kg"},
+        {"_id": "r2", "categoriaId": "cat2", "quantidade": 3.5, "tipo_medida": "unidade"},
+        {"_id": "r3", "categoriaId": "cat1", "quantidade": 1, "tipo_medida": "kg"},
+        {"_id": "r4", "categoriaId": "cat1", "quantidade": 5, "tipo_medida": "unidade"}
     ]
 
     # Categoria nomes
@@ -59,9 +61,14 @@ async def test_generate_report_produtor(mock_user_repo, mock_residue_repo, mock_
 
     # Assert
     assert "by_category" in result
-    by_cat = {item["categoria"]: item["quantidade"] for item in result["by_category"]}
-    assert by_cat.get("plastico") == pytest.approx(3.0)
-    assert by_cat.get("papel") == pytest.approx(3.5)
+    
+    # Criar dicionário com chave composta (categoria, tipo_medida)
+    by_cat = {(item["categoria"], item["tipo_medida"]): item["quantidade"] for item in result["by_category"]}
+    
+    # Verificar agregações separadas por tipo_medida
+    assert by_cat.get(("plastico", "kg")) == pytest.approx(3.0)
+    assert by_cat.get(("plastico", "unidade")) == pytest.approx(5.0)
+    assert by_cat.get(("papel", "unidade")) == pytest.approx(3.5)
 
 
 @pytest.mark.asyncio
@@ -115,11 +122,11 @@ async def test_generate_report_receptor_aggregation(
         {"_id": "e2", "residuos_id": ["res3", "res2"]}
     ]
 
-    # Residues returned by id
+    # Residues returned by id - agora com tipo_medida
     residues_map = {
-        "res1": {"_id": "res1", "categoriaId": "cat1", "quantidade": 2},
-        "res2": {"_id": "res2", "categoriaId": "cat2", "quantidade": 4},
-        "res3": {"_id": "res3", "categoriaId": "cat1", "quantidade": 1.5}
+        "res1": {"_id": "res1", "categoriaId": "cat1", "quantidade": 2, "tipo_medida": "kg"},
+        "res2": {"_id": "res2", "categoriaId": "cat2", "quantidade": 4, "tipo_medida": "unidade"},
+        "res3": {"_id": "res3", "categoriaId": "cat1", "quantidade": 1.5, "tipo_medida": "unidade"}
     }
 
     async def find_by_id_side_effect(rid):
@@ -140,11 +147,16 @@ async def test_generate_report_receptor_aggregation(
     # Act
     result = await UserService.generate_report(receptor_id)
 
-    # Assert aggregated by category
+    # Assert aggregated by category AND tipo_medida
     assert "by_category" in result
-    by_cat = {item["categoria"]: item["quantidade"] for item in result["by_category"]}
-    assert by_cat.get("plastico") == pytest.approx(3.5)
-    assert by_cat.get("papel") == pytest.approx(4.0)
+    
+    # Criar dicionário com chave composta (categoria, tipo_medida)
+    by_cat = {(item["categoria"], item["tipo_medida"]): item["quantidade"] for item in result["by_category"]}
+    
+    # Verificar agregações separadas por tipo_medida
+    assert by_cat.get(("plastico", "kg")) == pytest.approx(2.0)
+    assert by_cat.get(("plastico", "unidade")) == pytest.approx(1.5)
+    assert by_cat.get(("papel", "unidade")) == pytest.approx(4.0)
 
     # Assert residues list present and contains unique residues fetched
     assert "residuos" in result

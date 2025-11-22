@@ -3,15 +3,17 @@ from typing import List
 
 
 class CategoryQuantity(BaseModel):
-    """Soma de quantidade por categoria."""
+    """Soma de quantidade por categoria e tipo de medida."""
     categoria: str = Field(..., description="Nome da categoria do resíduo")
-    quantidade: float = Field(..., description="Quantidade total (kg ou unidades) referente à categoria")
+    tipo_medida: str = Field(..., description="Tipo de medida: 'kg' ou 'unidade'")
+    quantidade: float = Field(..., description="Quantidade total referente à categoria e tipo de medida")
 
     model_config = {
         "from_attributes": True,
         "json_schema_extra": {
             "example": {
                 "categoria": "Plástico",
+                "tipo_medida": "kg",
                 "quantidade": 125.5
             }
         }
@@ -27,8 +29,8 @@ class RelatorioByCategoryResponse(BaseModel):
         "json_schema_extra": {
             "example": {
                 "by_category": [
-                    {"categoria": "Plástico", "quantidade": 125.5},
-                    {"categoria": "Papel", "quantidade": 42.0}
+                    {"categoria": "Plástico", "tipo_medida": "kg", "quantidade": 125.5},
+                    {"categoria": "Papel", "tipo_medida": "unidade", "quantidade": 42.0}
                 ]
             }
         }

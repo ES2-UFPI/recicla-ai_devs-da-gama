@@ -78,30 +78,12 @@ async def update_user(
 
 
 @router.get("/me/report", response_model=RelatorioByCategoryResponse)
-async def get_producer_report(current_user: dict = Depends(get_current_user)):
+async def get_user_report(current_user: dict = Depends(get_current_user)):
 	"""
-	Gera relatório do usuário autenticado (produtor).
+	Gera relatório do usuário autenticado.
 
 	Requer autenticação. Apenas o próprio usuário pode acessar seu relatório.
-	"""
-	# Verificar se o usuário está acessando seu próprio relatório
-	if current_user.get("id") != current_user.get("id"):
-		from fastapi import HTTPException
-		raise HTTPException(
-			status_code=status.HTTP_403_FORBIDDEN,
-			detail="Você só pode acessar seus próprios relatórios."
-		)
-
-	report = await UserService.generate_report(current_user.get("id"))
-	return report
-
-
-@router.get("/me/report/receptor", response_model=RelatorioByCategoryResponse)
-async def get_receptor_report(current_user: dict = Depends(get_current_user)):
-	"""
-	Gera relatório do usuário autenticado (receptora).
-
-	Requer autenticação. Apenas o próprio usuário pode acessar seu relatório.
+	Disponível para produtores e receptoras.
 	"""
 	# Verificar se o usuário está acessando seu próprio relatório
 	if current_user.get("id") != current_user.get("id"):
