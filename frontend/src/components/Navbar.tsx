@@ -32,7 +32,7 @@ const allNavLinks = [
   { label: 'Coletas', icon: <LocalShippingIcon fontSize="small" />, to: '/coletas', roles: ['coletor'] },
   { label: 'Recompensas', icon: <RedeemIcon fontSize="small" />, to: '/recompensas', roles: ['produtor'] },
   { label: 'Ranking', icon: <EmojiEventsIcon fontSize="small" />, to: '/ranking', roles: ['produtor'] },
-  { label: 'Relatórios', icon: <AssessmentIcon fontSize="small" />, to: '/relatorios', roles: ['produtor', 'receptor'] },
+  { label: 'Relatórios', icon: <AssessmentIcon fontSize="small" />, to: '/relatorio', roles: ['produtor', 'receptor'] },
   { label: 'Inventário', icon: <InventoryIcon fontSize="small" />, to: '/inventario', roles: ['coletor'] },
   { label: 'Entregas', icon: <RedeemIcon fontSize="small" />, to: '/entregas', roles: ['coletor'] },
 ];
