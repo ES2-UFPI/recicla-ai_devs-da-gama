@@ -16,6 +16,7 @@ import RealizarEntrega from '../pages/RealizarEntrega';
 import Ranking from '../pages/Ranking';
 import Recompensas from '../pages/Recompensa';
 import HistoricoResgateRecompensa from '../pages/HistoricoResgateRecompensa';
+import Relatorio from '../pages/Relatorio';
 
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
@@ -77,6 +78,14 @@ export function AppRoutes() {
         <ProtectedRoute>
           <RoleBasedRoute allowedRoles={['produtor']}>
             <HistoricoResgateRecompensa />
+          </RoleBasedRoute>
+        </ProtectedRoute>
+      } />
+      {/* Rota Relatório */}
+      <Route path="/relatorio" element={
+        <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={['produtor', 'receptor']}>
+            <Relatorio />
           </RoleBasedRoute>
         </ProtectedRoute>
       } />

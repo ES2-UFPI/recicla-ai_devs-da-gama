@@ -217,7 +217,7 @@ export const useRealizarEntrega = ({ receptoraId }: UseRealizarEntregaParams): U
       
       // Redirecionar após 2.5 segundos
       setTimeout(() => {
-        navigate('/dashboard-coletor');
+        navigate('/');
       }, 2500);
     } catch (err: any) {
       console.error('Erro ao realizar entrega:', err);
