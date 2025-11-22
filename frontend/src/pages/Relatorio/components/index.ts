@@ -3,3 +3,4 @@ export { SummaryCards } from './SummaryCards';
 export { EmptyState } from './EmptyState';
 export { RelatorioTable } from './RelatorioTable';
 export { SuccessMessage } from './SuccessMessage';
+export { ExportButtons } from './ExportButtons';

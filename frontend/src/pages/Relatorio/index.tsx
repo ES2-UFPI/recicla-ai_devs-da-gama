@@ -8,6 +8,7 @@ import {
   EmptyState,
   RelatorioTable,
   SuccessMessage,
+  ExportButtons,
 } from './components';
 
 export default function Relatorio() {
@@ -36,6 +37,12 @@ export default function Relatorio() {
           <EmptyState userRole={user?.role} />
         ) : (
           <>
+            <ExportButtons
+              data={reportData}
+              userName={user?.name || 'Usuário'}
+              userEmail={user?.email || ''}
+              userRole={user?.role || ''}
+            />
             <RelatorioTable data={reportData} />
             <SuccessMessage />
           </>
