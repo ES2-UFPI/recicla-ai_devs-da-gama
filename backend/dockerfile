@@ -21,4 +21,5 @@ ENV PYTHONPATH=/app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "server:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
+# Em produção, não use --reload. A porta é definida por variável de ambiente.
+CMD uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000}
