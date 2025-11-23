@@ -17,6 +17,7 @@ import Ranking from '../pages/Ranking';
 import Recompensas from '../pages/Recompensa';
 import HistoricoResgateRecompensa from '../pages/HistoricoResgateRecompensa';
 import Relatorio from '../pages/Relatorio';
+import NotFound from '../pages/NotFound';
 
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
@@ -165,6 +166,9 @@ export function AppRoutes() {
         </ProtectedRoute>
       } />
       */}
+
+      {/* Rota 404 - Página não encontrada */}
+      <Route path="*" element={<NotFound />} />
 
       {/* Redireciona rota raiz para login (ajuste conforme necessário) */}
       {/*<Route path="/" element={<Navigate to="/login" replace />} />*/}
