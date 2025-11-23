@@ -26,9 +26,14 @@ Thumbs.db
 
 # Env
 .env
+.env.production
+.env.local
 
 # Local data
 /tmp/
+
+# Render específico
+.render/
 
 /docs
 /scripts

@@ -22,6 +22,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",  # Vite dev
         "http://localhost:8000",  # Própria API
+        "https://*.onrender.com",  # Render.com
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -84,3 +85,8 @@ def shutdown_mongo():
         get_client().close()
     except Exception:
         pass
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
