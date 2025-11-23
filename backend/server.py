@@ -23,6 +23,7 @@ app.add_middleware(
         "http://localhost:5173",  # Vite dev
         "http://localhost:8000",  # Própria API
         "https://*.onrender.com",  # Render.com
+        "https://reciclaai-frontend.vercel.app",  # Vercel deployment
     ],
     allow_credentials=True,
     allow_methods=["*"],
