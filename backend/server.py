@@ -23,6 +23,7 @@ app.add_middleware(
         "http://localhost:5173",  # Vite dev
         "http://localhost:8000",  # Própria API
         "https://*.onrender.com",  # Render.com
+        "https://reciclaai-frontend.vercel.app",  # Vercel deployment
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -55,28 +56,44 @@ async def health():
 @app.get("/db/ping")
 async def db_ping():
     """
-    Realiza ping no cluster do MongoDB Atlas para validar conectividade.
-    Retorna informações detalhadas sobre o status do banco.
+    Verifica a conectividade com o MongoDB.
+    Útil para health checks e diagnóstico de problemas de conexão.
     """
     try:
-        result = await get_client().admin.command("ping")
+        client = get_client()
+        # Testa a conexão com timeout curto
+        result = await client.admin.command("ping")
+        
         if result.get("ok", 0) == 1:
-            return {
-                "ok": 1,
-                "message": "Conexão com MongoDB bem-sucedida.",
-                "details": result
-            }
+            # Tenta obter informações adicionais (útil para debug)
+            try:
+                server_info = await client.server_info()
+                return {
+                    "status": "connected",
+                    "message": "Conexão com MongoDB estabelecida com sucesso.",
+                    "server_version": server_info.get("version"),
+                    "using_atlas": os.getenv("USE_ATLAS", "false").lower() == "true"
+                }
+            except:
+                return {
+                    "status": "connected",
+                    "message": "Conexão com MongoDB estabelecida com sucesso."
+                }
         else:
             return {
-                "ok": 0,
+                "status": "error",
                 "message": "Falha ao conectar ao MongoDB.",
                 "details": result
             }
     except Exception as e:
+        import traceback
         return {
-            "ok": 0,
+            "status": "error",
             "message": "Erro ao conectar ao MongoDB.",
-            "error": str(e)
+            "error": str(e),
+            "error_type": type(e).__name__,
+            # Incluir traceback apenas se dev endpoints estiverem habilitados
+            "traceback": traceback.format_exc() if os.getenv("ENABLE_DEV_ENDPOINTS", "false").lower() == "true" else None
         }
 
 @app.on_event("shutdown")
