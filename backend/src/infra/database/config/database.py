@@ -1,5 +1,6 @@
 import os
 from typing import Optional
+import certifi
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
@@ -35,12 +36,24 @@ def get_client() -> AsyncIOMotorClient:
 	global _client
 	if _client is None:
 		mongo_uri = _resolve_mongo_uri()
-		_client = AsyncIOMotorClient(
-			mongo_uri,
-			serverSelectionTimeoutMS=5000,
-			connectTimeoutMS=5000,
-			appname=os.getenv("MONGO_APP_NAME", "recicla-ai-backend"),
-		)
+		use_atlas = os.getenv("USE_ATLAS", "false").lower() == "true"
+		
+		# Configurações base
+		client_options = {
+			"serverSelectionTimeoutMS": 30000,  # Aumentado para 30s
+			"connectTimeoutMS": 30000,
+			"socketTimeoutMS": 30000,
+			"appname": os.getenv("MONGO_APP_NAME", "recicla-ai-backend"),
+		}
+		
+		# Configurações adicionais para Atlas (TLS/SSL com certifi)
+		if use_atlas:
+			client_options.update({
+				"tls": True,
+				"tlsCAFile": certifi.where(),  # Usa certificados do certifi
+			})
+		
+		_client = AsyncIOMotorClient(mongo_uri, **client_options)
 	return _client
 
 

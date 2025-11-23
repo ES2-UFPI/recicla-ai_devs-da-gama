@@ -2,14 +2,17 @@ FROM python:3.11-slim
 
 # Configurar timezone para Brasília (America/Sao_Paulo)
 ENV TZ=America/Sao_Paulo
-RUN apt-get update && apt-get install -y \
+
+# Instalar dependências mínimas do sistema incluindo SSL/TLS atualizado
+RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     ca-certificates \
-    openssl && \
-    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
-    echo $TZ > /etc/timezone && \
-    update-ca-certificates && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    libssl3 \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && update-ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
