@@ -113,7 +113,7 @@ jobs:
         run: |
           docker compose ps
           docker compose logs backend
-          docker compose logs frontend
+          docker compose logs frontend-dev
       
       - name: Cleanup
         if: always()
