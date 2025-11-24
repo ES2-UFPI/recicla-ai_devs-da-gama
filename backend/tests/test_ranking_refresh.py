@@ -34,6 +34,14 @@ async def test_refresh_ranking_called_when_producer_points_updated(mocker):
     mocker.patch("src.service.coleta_service.residue_repo.atualizar_status", new_callable=AsyncMock)
     mocker.patch("src.service.coleta_service.user_repo.find_by_id", return_value=mock_produtor_db)
     mocker.patch("src.service.coleta_service.user_repo.update_user", new_callable=AsyncMock)
+    
+    # Mock dos métodos que atualizam pontos e ranking - devem retornar True
+    mocker.patch("src.service.coleta_service.user_repo.atualizar_pontos", return_value=True)
+    mocker.patch("src.service.coleta_service.user_repo.update_ranking", return_value=True)
+    
+    # Mock dos métodos auxiliares do ColetaService
+    mocker.patch.object(service, "_adicionar_residuos_ao_inventory", new_callable=AsyncMock)
+    mocker.patch.object(service, "_verificar_conclusao_agendamento", new_callable=AsyncMock)
 
     # Patch RankingService.refresh_ranking imported in ColetaService
     mock_refresh = mocker.patch("src.service.coleta_service.RankingService.refresh_ranking", new_callable=AsyncMock)
