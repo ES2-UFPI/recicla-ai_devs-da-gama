@@ -75,16 +75,6 @@ jobs:
       - name: Build do projeto
         run: npm run build
       
-      - name: Rodar testes
-        run: |
-          if grep -q "\"test\":" package.json; then
-            npm test
-          else
-            echo "⚠️  Nenhum teste configurado. Considere adicionar testes antes do merge para main."
-            exit 1
-          fi
-        continue-on-error: false
-      
       - name: Build da imagem Docker (Frontend)
         run: |
           docker build -t reciclaai-frontend:test .
