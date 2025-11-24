@@ -67,61 +67,6 @@ export function MapSelector({ onLocationSelect, initialPosition, hideSearchInput
   );
   const [mapKey, setMapKey] = useState(0); // Para forçar re-render do mapa
 
-  // Detectar se é mobile para usar proxy CORS
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-  // Helper: constrói URL de busca (Nominatim) com parâmetros corretos
-  const buildNominatimSearchUrl = (q: string) => {
-    const u = new URL('https://nominatim.openstreetmap.org/search');
-    u.searchParams.set('format', 'json');
-    u.searchParams.set('q', q);
-    u.searchParams.set('limit', '1');
-    u.searchParams.set('countrycodes', 'br');
-    return u.toString();
-  };
-
-  // Helper: tenta múltiplos proxies CORS no mobile
-  const fetchWithProxy = async (targetUrl: string, options?: RequestInit): Promise<Response> => {
-    // Desktop: tenta direto primeiro
-    if (!isMobile) {
-      try {
-        return await fetch(targetUrl, options);
-      } catch (e) {
-        console.warn('Falha no fetch direto, tentando proxies…', e);
-      }
-    }
-
-    // Ordem de proxies para tentar no mobile
-    const candidates: string[] = [
-      // corsproxy.io aceita a URL codificada como query única
-      `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-      // AllOrigins
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-      // isomorphic-git (não codificar a URL inteira)
-      `https://cors.isomorphic-git.org/${targetUrl}`,
-      // thingproxy (não codificar a URL inteira)
-      `https://thingproxy.freeboard.io/fetch/${targetUrl}`,
-    ];
-
-  let lastError: unknown = null;
-    for (const proxyUrl of candidates) {
-      try {
-        const res = await fetch(proxyUrl, { ...options, headers: undefined });
-        if (res.ok) {
-          console.log('✅ Proxy OK:', proxyUrl);
-          return res;
-        } else {
-          console.warn('⚠️ Proxy respondeu com status', res.status, '->', proxyUrl);
-          lastError = new Error(`Proxy status ${res.status}`);
-        }
-      } catch (e) {
-        console.warn('⚠️ Proxy falhou:', proxyUrl, e);
-        lastError = e;
-      }
-    }
-    throw lastError ?? new Error('Todos os proxies falharam');
-  };
-
   const center: [number, number] = mapCenter;
 
   // Função para buscar endereço
