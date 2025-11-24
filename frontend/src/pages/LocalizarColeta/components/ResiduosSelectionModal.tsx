@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -49,7 +49,19 @@ export function ResiduosSelectionModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Se a coleta for integral, pré-seleciona todos os resíduos e bloqueia alterações
+  useEffect(() => {
+    if (open) {
+      if (agendamento.coleta_integral) {
+        setSelectedResiduos(new Set(agendamento.residuos.map((r) => r.id)));
+      } else {
+        setSelectedResiduos(new Set());
+      }
+    }
+  }, [open, agendamento]);
+
   const handleToggleResiduo = (residuoId: string) => {
+    if (agendamento.coleta_integral) return; // Não permite alteração individual
     setSelectedResiduos((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(residuoId)) {
@@ -62,6 +74,7 @@ export function ResiduosSelectionModal({
   };
 
   const handleSelectAll = () => {
+    if (agendamento.coleta_integral) return; // Em integral, já está tudo selecionado
     if (selectedResiduos.size === agendamento.residuos.length) {
       setSelectedResiduos(new Set());
     } else {
@@ -160,7 +173,7 @@ export function ResiduosSelectionModal({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <RecyclingIcon />
           <Typography variant={isMobile ? 'subtitle1' : 'h6'} fontWeight={700}>
-            Selecionar Resíduos
+            {agendamento.coleta_integral ? 'Coleta Integral' : 'Selecionar Resíduos'}
           </Typography>
         </Box>
         <IconButton
@@ -193,14 +206,16 @@ export function ResiduosSelectionModal({
           <Typography variant="body2" color="text.secondary">
             {agendamento.residuos.length} resíduo(s) disponível(is)
           </Typography>
-          <Button
-            size="small"
-            variant={allSelected ? 'outlined' : 'contained'}
-            onClick={handleSelectAll}
-            startIcon={allSelected ? <RadioButtonUncheckedIcon /> : <CheckCircleIcon />}
-          >
-            {allSelected ? 'Desmarcar Todos' : 'Selecionar Todos'}
-          </Button>
+          {!agendamento.coleta_integral && (
+            <Button
+              size="small"
+              variant={allSelected ? 'outlined' : 'contained'}
+              onClick={handleSelectAll}
+              startIcon={allSelected ? <RadioButtonUncheckedIcon /> : <CheckCircleIcon />}
+            >
+              {allSelected ? 'Desmarcar Todos' : 'Selecionar Todos'}
+            </Button>
+          )}
         </Box>
 
         <Divider sx={{ mb: 2 }} />
@@ -240,6 +255,7 @@ export function ResiduosSelectionModal({
                       onChange={() => handleToggleResiduo(residuo.id)}
                       color="primary"
                       sx={{ p: 0.5 }}
+                      disabled={agendamento.coleta_integral}
                     />
                   }
                   label={
@@ -283,13 +299,19 @@ export function ResiduosSelectionModal({
         </FormGroup>
 
         {/* Alert de informação */}
-        {someSelected && (
+        {agendamento.coleta_integral && (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Coleta integral: você coletará TODOS os resíduos deste agendamento.
+          </Alert>
+        )}
+
+        {someSelected && !agendamento.coleta_integral && (
           <Alert severity="info" sx={{ mt: 2 }} icon={<LocalShippingIcon />}>
             {selectedResiduos.size} resíduo(s) selecionado(s) • Valor total estimado: R$ {valorTotal.toFixed(2)}
           </Alert>
         )}
 
-        {!someSelected && (
+        {!someSelected && !agendamento.coleta_integral && (
           <Alert severity="warning" sx={{ mt: 2 }}>
             Selecione pelo menos um resíduo para continuar
           </Alert>
@@ -326,7 +348,7 @@ export function ResiduosSelectionModal({
         <Button
           onClick={handleReservar}
           variant="contained"
-          disabled={!someSelected || loading}
+          disabled={(agendamento.coleta_integral ? !allSelected : !someSelected) || loading}
           fullWidth={isTablet}
           startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <LocalShippingIcon />}
           sx={{
@@ -335,7 +357,7 @@ export function ResiduosSelectionModal({
             fontWeight: 600,
           }}
         >
-          {loading ? 'Processando...' : (isMobile ? 'Reservar' : 'Reservar Resíduos para Coletar')}
+          {loading ? 'Processando...' : (agendamento.coleta_integral ? 'Reservar Coleta Integral' : (isMobile ? 'Reservar' : 'Reservar Resíduos para Coletar'))}
         </Button>
       </DialogActions>
     </Dialog>

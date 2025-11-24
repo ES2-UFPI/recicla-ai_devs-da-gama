@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, Field
 
 from src.schemas.coleta_schema import ColetaInDBSchema
+from src.schemas.residue_schema import ResidueResponse
 from src.service.coleta_service import ColetaService
 from src.infra.security.dependencies import get_current_user
 
@@ -220,3 +221,42 @@ async def obter_coleta(
     if not isinstance(coletor_id, str) or not coletor_id:
         raise HTTPException(401, "Usuário não autenticado ou ID inválido")
     return await coleta_service.buscar_coleta(coleta_id, coletor_id)
+
+
+@router.get(
+    "/inventory/me",
+    response_model=List[ResidueResponse],
+    summary="Obter inventory detalhado do coletor",
+    description="Retorna os dados completos dos resíduos que o coletor tem coletados (quantidade, categoria, valor, foto, etc).",
+)
+async def obter_meu_inventory(
+    current_user: dict = Depends(get_current_user),
+) -> List[ResidueResponse]:
+    """
+    Retorna o inventory detalhado do coletor autenticado.
+    
+    O inventory contém os dados completos de todos os resíduos que o coletor
+    coletou fisicamente (status COLETADO). Inclui quantidade, categoria, 
+    valor estimado, foto, e outros atributos úteis para o frontend.
+    
+    Exemplo de resposta:
+    [
+        {
+            "id": "60c72b2f9b1d4c3a4c8e4d3e",
+            "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
+            "categoriaId": "60c72b2f9b1d4c3a4c8e4d3b",
+            "quantidade": 10,
+            "tipo_medida": "unidade",
+            "foto": "http://example.com/garrafas.jpg",
+            "valorEstimado": 1.50,
+            "status": "COLETADO",
+            "dataCadastro": "2025-10-14T10:30:00Z"
+        }
+    ]
+    """
+    if current_user.get("role_id") != "coletor":
+        raise HTTPException(403, "Apenas coletores podem acessar o inventory")
+    coletor_id = current_user.get("id")
+    if not isinstance(coletor_id, str) or not coletor_id:
+        raise HTTPException(401, "Usuário não autenticado ou ID inválido")
+    return await coleta_service.get_coletor_inventory(coletor_id)

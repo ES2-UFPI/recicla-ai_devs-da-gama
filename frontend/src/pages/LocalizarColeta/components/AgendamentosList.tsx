@@ -88,7 +88,7 @@ export function AgendamentosList({
           <Card
             key={agendamento.id}
             id={`agendamento-${agendamento.id}`}
-            onClick={() => onItemClick(agendamento.id)}
+            onClick={() => agendamento.id && onItemClick(agendamento.id)}
             sx={{
               cursor: 'pointer',
               transition: 'all 0.2s',
@@ -107,12 +107,20 @@ export function AgendamentosList({
                 <Typography variant="h6" color="primary" fontWeight={700}>
                   {agendamento.local.apelido || 'Ponto de Coleta'}
                 </Typography>
-                <Chip
-                  icon={<MyLocationIcon />}
-                  label={`${agendamento.distancia_km.toFixed(2)} km`}
-                  color="primary"
-                  size="small"
-                />
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Chip
+                    label={agendamento.coleta_integral ? 'Coleta Integral' : 'Coleta Parcial'}
+                    color={agendamento.coleta_integral ? 'warning' : 'success'}
+                    size="small"
+                    variant="outlined"
+                  />
+                  <Chip
+                    icon={<MyLocationIcon />}
+                    label={`${agendamento.distancia_km.toFixed(2)} km`}
+                    color="primary"
+                    size="small"
+                  />
+                </Stack>
               </Box>
 
               {/* Endereço */}
@@ -138,67 +146,15 @@ export function AgendamentosList({
                 <AccessTimeIcon fontSize="small" color="action" />
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {agendamento.disponibilidade.slice(0, 2).map((slot, idx) => {
-                    // Converter UTC para horário local de Brasília para exibição
-                    try {
-                      const [dia, mes, ano] = slot.data.split('/');
-                      const [horaInicio, minutoInicio] = slot.hora_inicio.split(':');
-                      const [horaFim, minutoFim] = slot.hora_fim.split(':');
-                      
-                      // Criar Date UTC
-                      const dataHoraInicioUTC = new Date(Date.UTC(
-                        parseInt(ano),
-                        parseInt(mes) - 1,
-                        parseInt(dia),
-                        parseInt(horaInicio),
-                        parseInt(minutoInicio)
-                      ));
-                      
-                      const dataHoraFimUTC = new Date(Date.UTC(
-                        parseInt(ano),
-                        parseInt(mes) - 1,
-                        parseInt(dia),
-                        parseInt(horaFim),
-                        parseInt(minutoFim)
-                      ));
-                      
-                      // Formatar em horário local de Brasília
-                      const dataLocal = dataHoraInicioUTC.toLocaleDateString('pt-BR', {
-                        timeZone: 'America/Sao_Paulo',
-                        day: '2-digit',
-                        month: '2-digit',
-                      });
-                      
-                      const horaInicioLocal = dataHoraInicioUTC.toLocaleTimeString('pt-BR', {
-                        timeZone: 'America/Sao_Paulo',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      });
-                      
-                      const horaFimLocal = dataHoraFimUTC.toLocaleTimeString('pt-BR', {
-                        timeZone: 'America/Sao_Paulo',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      });
-                      
-                      return (
-                        <Chip
-                          key={idx}
-                          label={`${dataLocal} ${horaInicioLocal}-${horaFimLocal}`}
-                          size="small"
-                          variant="outlined"
-                        />
-                      );
-                    } catch (error) {
-                      // Fallback se houver erro na conversão
-                      return (
-                        <Chip
-                          key={idx}
-                          label={`${slot.data} ${slot.hora_inicio}-${slot.hora_fim}`}
-                          size="small"
-                          variant="outlined"
-                        />
-                      );
-                    }
+                    // Exibir diretamente como horário local (sem conversão de UTC)
+                    return (
+                      <Chip
+                        key={idx}
+                        label={`${slot.data} ${slot.hora_inicio}-${slot.hora_fim}`}
+                        size="small"
+                        variant="outlined"
+                      />
+                    );
                   })}
                   {agendamento.disponibilidade.length > 2 && (
                     <Chip
@@ -313,7 +269,7 @@ export function AgendamentosList({
                   },
                 }}
               >
-                Selecionar Resíduos para Coletar
+                {agendamento.coleta_integral ? 'Coleta Integral: Coletar Todos' : 'Selecionar Resíduos para Coletar'}
               </Button>
 
               {/* Link Google Maps */}

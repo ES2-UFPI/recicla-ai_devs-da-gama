@@ -18,7 +18,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         // Tenta buscar usuário atual
         // O interceptor do axios tentará refresh automaticamente se o access_token estiver expirado
-        const { data } = await api.get<{ name: string; email: string; role_id: string }>('/auth/me');
+        const { data } = await api.get<UserMeResponse>('/auth/me');
         setUser(mapUserFromMe(data));
       } catch {
         // Se falhou mesmo após tentativa de refresh, usuário não está autenticado
@@ -40,7 +40,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       password: credentials.password,
     });
     // Cookie httpOnly é definido pelo backend. Buscar usuário atual.
-    const { data: me } = await api.get<{ name: string; email: string; role_id: string }>('/auth/me');
+    const { data: me } = await api.get<UserMeResponse>('/auth/me');
     setUser(mapUserFromMe(me));
     // ⚠️ IMPORTANTE: Não manipular isLoading aqui!
     // O componente de Login já gerencia seu próprio loading state.
@@ -51,18 +51,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function register(data: RegisterData) {
     // O backend atual expõe criação de usuário em /users (não autentica automaticamente)
     // Mapear RegisterData -> UserCreate (backend): name, email, phone, password, role_id, cidade_id, estado_id
-    await api.post('/users', {
+    const payload: any = {
       name: data.name,
       email: data.email,
-      phone: data.telefone,
-      password: data.senha,
-      role_id: data.role,
-      cidade_id: data.cidade,
-      estado_id: data.estado,
-    });
+      phone: data.phone,
+      password: data.password,
+      role_id: data.role_id,
+      cidade_id: data.cidade_id,
+      estado_id: data.estado_id,
+    };
+
+    // Adicionar campos específicos de cada role
+    if (data.addresses) {
+      payload.addresses = data.addresses;
+    }
+    if (data.is_business !== undefined) {
+      payload.is_business = data.is_business;
+    }
+    if (data.cnpj) {
+      payload.cnpj = data.cnpj;
+    }
+    if (data.points !== undefined) {
+      payload.points = data.points;
+    }
+    if (data.ranking !== undefined) {
+      payload.ranking = data.ranking;
+    }
+    if (data.inventory !== undefined) {
+      payload.inventory = data.inventory;
+    }
+    if (data.accepted_material !== undefined) {
+      payload.accepted_material = data.accepted_material;
+    }
+
+    await api.post('/users', payload);
     // Após cadastro, opcionalmente fazer login automático
     try {
-      await login({ email: data.email, password: data.senha });
+      await login({ email: data.email, password: data.password });
     } catch {
       setUser(null);
     }
@@ -74,11 +99,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Logout via backend e limpa estado local
   async function logout() {
     try {
+      console.log('[AuthContext] Chamando API /auth/logout...');
       await api.post('/auth/logout');
-    } catch {
-      // mesmo em erro de rede, limpar estado local
-    } finally {
-      setUser(null);
+      console.log('[AuthContext] API /auth/logout completada com sucesso');
+    } catch (error) {
+      console.error('[AuthContext] Erro ao fazer logout:', error);
+      // mesmo em erro de rede, continua para limpar estado local
+    }
+    
+    // Sempre limpa o estado local após tentar logout no backend
+    console.log('[AuthContext] Limpando estado local (setUser(null))');
+    setUser(null);
+    console.log('[AuthContext] Logout concluído');
+  }
+
+  // Recarregar dados do usuário (útil após operações que alteram pontos)
+  async function refreshUser() {
+    try {
+      const { data } = await api.get<UserMeResponse>('/auth/me');
+      setUser(mapUserFromMe(data));
+    } catch (error) {
+      console.error('Erro ao recarregar dados do usuário:', error);
     }
   }
 
@@ -89,6 +130,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     register,
     logout,
+    refreshUser,
   };
 
   return (
@@ -99,17 +141,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
 }
 
 // Helpers
-function mapUserFromMe(me: { name: string; email: string; role_id: string }): User {
-  // Backend retorna apenas name, email, role_id no /auth/me atualmente.
-  // Preenchemos campos adicionais com valores vazios até que endpoints de perfil estejam disponíveis.
+interface UserMeResponse {
+  id: string;
+  name: string;
+  email: string;
+  role_id: string;
+  telefone?: string;
+  cidade_id?: string;
+  estado_id?: string;
+  points?: number;
+  ranking?: number;
+}
+
+function mapUserFromMe(me: UserMeResponse): User {
   return {
-    id: '',
+    id: me.id,
     name: me.name,
     email: me.email,
-    telefone: '',
+    telefone: me.telefone,
     role: mapRoleIdToRole(me.role_id),
-    estado: '',
-    cidade: '',
+    estado: me.estado_id || '',
+    cidade: me.cidade_id || '',
+    points: me.points,
+    ranking: me.ranking,
   };
 }
 

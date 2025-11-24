@@ -51,5 +51,17 @@ export const userService = {
   async getByEmail(email: string): Promise<User> {
     const response = await api.get(`/users/email/${email}`);
     return response.data;
+  },
+
+  // Obter relatório do usuário autenticado
+  async getMyReport(): Promise<{
+    by_category: Array<{
+      categoria: string;
+      tipo_medida: 'kg' | 'unidade';
+      quantidade: number;
+    }>;
+  }> {
+    const response = await api.get('/users/me/report');
+    return response.data;
   }
 };

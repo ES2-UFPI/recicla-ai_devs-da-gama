@@ -6,8 +6,54 @@ Esta documentação lista todas as rotas disponíveis no backend da aplicação 
 
 ---
 
-## 📑 Índice
+## Arquitetura de Usuários - User Builders
 
+O sistema implementa o **padrão Builder** para construção de usuários, garantindo validação e type-safety específica para cada role:
+
+### Tipos de Usuários (Roles)
+
+#### **Produtor** (`role_id: "produtor"`)
+- **Responsabilidade:** Gera resíduos e solicita coletas
+- **Builder:** `ProdutorBuilder`
+- **Campos Específicos:**
+  - `is_business`: boolean (empresa ou pessoa física)
+  - `cnpj`: string (obrigatório se `is_business = true`)
+  - `points`: int (pontos de gamificação)
+  - `ranking`: int (posição no ranking)
+- **Validações:**
+  - Deve ter pelo menos 1 endereço para solicitar coletas
+  - CNPJ obrigatório quando `is_business = true`
+
+#### **Coletor** (`role_id: "coletor"`)
+- **Responsabilidade:** Realiza coletas de resíduos
+- **Builder:** `ColetorBuilder`
+- **Campos Específicos:**
+  - `inventory`: list[string] (IDs de resíduos fisicamente coletados - status COLETADO)
+- **Validações:**
+  - Inventory deve ser uma lista válida
+  - Inventory é atualizado automaticamente ao coletar/cancelar resíduos
+
+#### **Receptor** (`role_id: "receptor"`)
+- **Responsabilidade:** Ponto de coleta que recebe resíduos
+- **Builder:** `ReceptorBuilder`
+- **Campos Específicos:**
+  - `accepted_material`: list[string] (tipos de materiais aceitos)
+- **Validações:**
+  - Deve ter pelo menos 1 endereço (ponto de coleta fixo)
+  - Deve especificar pelo menos 1 tipo de material aceito
+
+### Vantagens do User Builder Pattern
+
+✅ **Type-Safety:** Cada builder garante campos obrigatórios específicos  
+✅ **Validação Automática:** Regras de negócio validadas antes de persistir  
+✅ **Flexibilidade:** Fácil adicionar novos tipos de usuários  
+✅ **Manutenibilidade:** Lógica de construção centralizada e reutilizável  
+
+---
+
+## Índice
+
+- [Arquitetura de Usuários](#arquitetura-de-usuários---user-builders)
 - [Rotas Públicas](#rotas-públicas)
 - [Autenticação](#autenticação)
 - [Usuários](#usuários)
@@ -15,11 +61,14 @@ Esta documentação lista todas as rotas disponíveis no backend da aplicação 
 - [Categorias](#categorias)
 - [Agendamentos](#agendamentos)
 - [Coletas](#coletas)
+- [Entregas](#entregas)
+- [Recompensas](#recompensas)
+- [Ranking](#rankings)
 - [Desenvolvimento](#desenvolvimento)
 
 ---
 
-## 🌐 Rotas Públicas
+## Rotas Públicas
 
 ### Health Check
 **GET** `http://localhost:8000/health`
@@ -57,7 +106,7 @@ Verifica a conexão com o banco de dados MongoDB.
 
 ---
 
-## 🔐 Autenticação
+## Autenticação
 
 Todas as rotas de autenticação utilizam cookies HTTP-only para armazenar tokens JWT.
 
@@ -153,16 +202,41 @@ Retorna informações do usuário atualmente autenticado.
 
 ---
 
-## 👥 Usuários
+## Usuários
 
 ### Criar Usuário
 **POST** `http://localhost:8000/users`
 
-Cria um novo usuário no sistema (registro).
+Cria um novo usuário no sistema (registro) utilizando **User Builders** específicos para cada role.
 
 **Autenticação:** Não requerida
 
-**Corpo da Requisição:**
+**Arquitetura:**
+O sistema utiliza o padrão **Builder Pattern** para construir usuários de forma type-safe:
+- `ProdutorBuilder` - para produtores de resíduos
+- `ColetorBuilder` - para coletores
+- `ReceptorBuilder` - para pontos de coleta
+
+Cada builder valida campos obrigatórios específicos da role antes de persistir.
+
+---
+
+#### Criar Produtor
+
+**Campos Obrigatórios:**
+- `name`, `email`, `phone`, `password`
+- `role_id`: deve ser `"produtor"`
+- `addresses`: **obrigatório** (mínimo 1 endereço para solicitar coletas)
+- `cidade_id`, `estado_id`
+
+**Campos Específicos de Produtor:**
+- `is_business`: `boolean` (True = empresa, False = pessoa física)
+  - Se `is_business = true`, então `cnpj` é **obrigatório**
+- `cnpj`: `string` (CNPJ da empresa)
+- `points`: `int` (pontos de gamificação, padrão: 0)
+- `ranking`: `int` (posição no ranking, padrão: 0)
+
+**Exemplo - Produtor Pessoa Física:**
 ```json
 {
   "name": "João Silva",
@@ -170,8 +244,9 @@ Cria um novo usuário no sistema (registro).
   "phone": "(99) 99999-9999",
   "password": "Senha123!",
   "role_id": "produtor",
-  "cidade_id": "cidade_id_exemplo",
-  "estado_id": "estado_id_exemplo",
+  "cidade_id": "cidade_123",
+  "estado_id": "estado_456",
+  "is_business": false,
   "addresses": [
     {
       "apelido": "Casa",
@@ -186,18 +261,138 @@ Cria um novo usuário no sistema (registro).
 }
 ```
 
-**Requisitos de Senha:**
+**Exemplo - Produtor Empresa:**
+```json
+{
+  "name": "Empresa ABC Ltda",
+  "email": "contato@empresaabc.com",
+  "phone": "(11) 98888-7777",
+  "password": "Senha123!",
+  "role_id": "produtor",
+  "cidade_id": "cidade_123",
+  "estado_id": "estado_456",
+  "is_business": true,
+  "cnpj": "12.345.678/0001-90",
+  "addresses": [
+    {
+      "apelido": "Matriz",
+      "cep": "12345-678",
+      "logradouro": "Av. Principal",
+      "numero": "1000",
+      "latitude": "-23.5505",
+      "longitude": "-46.6333"
+    }
+  ]
+}
+```
+
+---
+
+#### Criar Coletor
+
+**Campos Obrigatórios:**
+- `name`, `email`, `phone`, `password`
+- `role_id`: deve ser `"coletor"`
+- `cidade_id`, `estado_id`
+
+**Campos Específicos de Coletor:**
+- `inventory`: `list[string]` (lista de IDs de resíduos fisicamente coletados, gerenciado automaticamente, padrão: [])
+- `addresses`: opcional (coletores podem ter endereços, mas não é obrigatório)
+
+**Observação:** O campo `inventory` é gerenciado automaticamente pelo sistema:
+- Resíduos são adicionados ao inventory quando coletados (ação `coletar_residuo`)
+- Resíduos são removidos do inventory quando a coleta é cancelada após iniciar
+- Resíduos rejeitados NUNCA entram no inventory (não foram fisicamente coletados)
+
+**Exemplo - Coletor:**
+```json
+{
+  "name": "Maria Coletora",
+  "email": "maria.coletora@example.com",
+  "phone": "(11) 97777-6666",
+  "password": "Senha123!",
+  "role_id": "coletor",
+  "cidade_id": "cidade_123",
+  "estado_id": "estado_456",
+  "inventory": [],
+  "addresses": [
+    {
+      "apelido": "Base de Operações",
+      "cep": "98765-432",
+      "logradouro": "Rua B",
+      "numero": "456",
+      "latitude": "-23.5600",
+      "longitude": "-46.6400"
+    }
+  ]
+}
+```
+
+---
+
+#### Criar Receptor
+
+**Campos Obrigatórios:**
+- `name`, `email`, `phone`, `password`
+- `role_id`: deve ser `"receptor"`
+- `addresses`: **obrigatório** (mínimo 1 endereço - ponto de coleta fixo)
+- `accepted_material`: **obrigatório** (lista com pelo menos 1 tipo de material aceito)
+- `cidade_id`, `estado_id`
+
+**Campos Específicos de Receptor:**
+- `accepted_material`: `list[string]` (ex: ["plástico", "papel", "metal", "vidro", "eletrônico"])
+
+**Exemplo - Receptor:**
+```json
+{
+  "name": "EcoPonto Central",
+  "email": "contato@ecoponto.com",
+  "phone": "(11) 96666-5555",
+  "password": "Senha123!",
+  "role_id": "receptor",
+  "cidade_id": "cidade_123",
+  "estado_id": "estado_456",
+  "accepted_material": ["plástico_id", "papel_id", "metal_id", "vidro_id"],
+  "addresses": [
+    {
+      "apelido": "Ponto de Coleta Principal",
+      "cep": "11111-222",
+      "logradouro": "Av. Reciclagem",
+      "numero": "500",
+      "latitude": "-23.5700",
+      "longitude": "-46.6500",
+      "complemento": "Galpão 3"
+    }
+  ]
+}
+```
+
+---
+
+**Requisitos de Senha (todos os roles):**
 - Mínimo 8 caracteres
 - Pelo menos 1 número
 - Pelo menos 1 letra maiúscula
 - Pelo menos 1 caractere especial (!, @, #, $, %, &, *)
 
-**Observação sobre endereços:**
+**Observações sobre Endereços:**
 - O campo `apelido` é opcional nos endereços
-- O ID do endereço é gerado automaticamente de forma incremental (1, 2, 3...)
+- O campo `id` é gerado automaticamente de forma incremental (1, 2, 3...)
 - Cada usuário tem sua própria numeração de endereços
+- **Não envie** o campo `id` no corpo da requisição ao criar endereços
+
+**Validações Automáticas (User Builders):**
+- ✅ Email único no sistema
+- ✅ Senha hash com bcrypt_sha256
+- ✅ Campos obrigatórios por role
+- ✅ CNPJ obrigatório se `is_business = true`
+- ✅ Receptor deve ter endereço e materiais aceitos
+- ✅ Produtor deve ter pelo menos um endereço
 
 **Resposta de Sucesso (201):**
+
+⚠️ **Importante:** A resposta contém apenas dados públicos do usuário através do schema `UserPublic`. Informações sensíveis como `password_hash` e campos internos **não são retornados**.
+
 ```json
 {
   "name": "João Silva",
@@ -215,6 +410,45 @@ Cria um novo usuário no sistema (registro).
       "complemento": "Apto 101"
     }
   ]
+}
+```
+
+> **Nota:** Campos específicos da role (como `points`, `ranking`, `inventory`, `accepted_material`) **não são retornados** na resposta pública por questões de segurança e privacidade. Esses dados são armazenados no banco de dados, mas não expostos publicamente.
+
+**Respostas de Erro:**
+
+**400 Bad Request** - Role inválida:
+```json
+{
+  "detail": "Role 'admin' não suportado. Use: produtor, coletor ou receptor."
+}
+```
+
+**400 Bad Request** - Validação de campos específicos:
+```json
+{
+  "detail": "CNPJ é obrigatório quando is_business é True"
+}
+```
+
+**400 Bad Request** - Produtor sem endereço:
+```json
+{
+  "detail": "Produtor deve ter pelo menos um endereço cadastrado"
+}
+```
+
+**400 Bad Request** - Receptor sem materiais aceitos:
+```json
+{
+  "detail": "Receptor deve especificar ao menos um tipo de material aceito"
+}
+```
+
+**409 Conflict** - Email duplicado:
+```json
+{
+  "detail": "E-mail já cadastrado."
 }
 ```
 
@@ -284,19 +518,67 @@ Retorna o perfil do usuário autenticado.
 ### Atualizar Meu Perfil
 **PUT** `http://localhost:8000/users/me`
 
-Atualiza dados do usuário autenticado.
+Atualiza dados do usuário autenticado utilizando **User Builders**.
 
 **Autenticação:** ✅ Requerida
 
+**Importante:** O sistema detecta automaticamente o tipo de usuário (Produtor, Coletor ou Receptor) e aplica as validações específicas através dos builders correspondentes.
+
 **Corpo da Requisição (todos os campos são opcionais):**
+
+**Campos Comuns (todos os roles):**
 ```json
 {
   "name": "João da Silva",
   "email": "novo.email@example.com",
   "phone": "(88) 88888-8888",
-  "password": "NovaSenha123!"   // Ainda será implementado um "Esqueci minha senha"
+  "password": "NovaSenha123!",
+  "cidade_id": "nova_cidade_123",
+  "estado_id": "novo_estado_456"
 }
 ```
+
+**Campos Específicos de Produtor:**
+```json
+{
+  "is_business": true,
+  "cnpj": "98.765.432/0001-10",
+  "points": 150,
+  "ranking": 5
+}
+```
+
+**Campos Específicos de Coletor:**
+```json
+{
+  "inventory": ["residuo_id_1", "residuo_id_2"]
+}
+```
+
+**Campos Específicos de Receptor:**
+```json
+{
+  "accepted_material": ["plástico", "papel", "metal", "vidro", "eletrônico"]
+}
+```
+
+**Exemplo Completo - Atualizar Produtor:**
+```json
+{
+  "name": "João da Silva Empresário",
+  "phone": "(11) 99999-8888",
+  "is_business": true,
+  "cnpj": "98.765.432/0001-10"
+}
+```
+
+**Validações Automáticas (User Builders):**
+- ✅ Se alterar email, verifica unicidade no sistema
+- ✅ Se Produtor alterar `is_business` para `true`, valida presença de `cnpj`
+- ✅ Senha é automaticamente hasheada com bcrypt_sha256
+- ✅ Campos específicos são validados conforme a role do usuário
+
+**Observação:** Não é possível alterar o `role_id` de um usuário após a criação.
 
 **Resposta de Sucesso (200):**
 ```json
@@ -307,6 +589,86 @@ Atualiza dados do usuário autenticado.
   "addresses": []
 }
 ```
+
+---
+
+### Obter Relatório do Usuário
+**GET** `http://localhost:8000/users/me/report`
+
+Gera relatório resumido do usuário autenticado, retornando resíduos agrupados por categoria e quantidade total.
+
+**Autenticação:** ✅ Requerida
+
+**Regras:**
+- Disponível para usuários com `role_id: "produtor"` ou `role_id: "receptor"`
+- **Produtores:** retorna resíduos próprios com status COLETADO ou ENTREGUE, agregados por categoria
+- **Receptoras:** retorna resíduos recebidos via entregas, agregados por categoria
+
+**Resposta de Sucesso (200) - Produtor:**
+```json
+{
+  "by_category": [
+    {
+      "categoria": "Plástico",
+      "tipo_medida": "kg",
+      "quantidade": 125.5
+    },
+    {
+      "categoria": "Papel",
+      "tipo_medida": "unidade",
+      "quantidade": 42.0
+    },
+    {
+      "categoria": "Metal",
+      "tipo_medida": "kg",
+      "quantidade": 18.0
+    }
+  ]
+}
+```
+
+**Resposta de Sucesso (200) - Receptora:**
+```json
+{
+  "by_category": [
+    {
+      "categoria": "Plástico",
+      "tipo_medida": "kg",
+      "quantidade": 200.0
+    },
+    {
+      "categoria": "Vidro",
+      "tipo_medida": "unidade",
+      "quantidade": 75.5
+    },
+    {
+      "categoria": "Vidro",
+      "tipo_medida": "kg",
+      "quantidade": 30.0
+    },
+    {
+      "categoria": "Papel",
+      "tipo_medida": "kg",
+      "quantidade": 110.0
+    }
+  ]
+}
+```
+
+**Resposta de Erro (403):**
+```json
+{
+  "detail": "Relatório disponível apenas para produtores ou receptoras."
+}
+```
+
+**Observações:**
+- **Para produtores:** busca resíduos onde `produtorId` corresponde ao usuário autenticado e `status` é COLETADO ou ENTREGUE
+- **Para receptoras:** busca todas as entregas recebidas (`receptora_id`) e agrega os resíduos por categoria
+- Quantidades são somadas por **tipo de categoria** E **tipo_medida** (não mistura kg com unidades)
+- Cada combinação única de `categoria + tipo_medida` gera uma entrada separada na lista
+- Limite de 1000 resíduos/entregas por consulta
+- O relatório se adapta automaticamente ao role do usuário autenticado
 
 ---
 
@@ -433,7 +795,7 @@ Remove um endereço do usuário.
 
 ---
 
-## ♻️ Resíduos
+## Resíduos
 
 ### Criar Resíduo
 **POST** `http://localhost:8000/residuos/`
@@ -716,7 +1078,7 @@ Atualiza o status de um resíduo (usado principalmente pela logística).
 
 ---
 
-## 📦 Categorias
+## Categorias
 
 ### Listar Categorias Ativas (Público)
 **GET** `http://localhost:8000/categorias/ativas`
@@ -752,7 +1114,7 @@ Lista todas as categorias ativas disponíveis para seleção.
 ### Listar Todas as Categorias (Admin)
 **GET** `http://localhost:8000/categorias/`
 
-Lista TODAS as categorias (ativas e inativas) - apenas administradores.
+Lista TODAS as categorias (ativas e inativas) - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -806,7 +1168,7 @@ Retorna detalhes de uma categoria específica.
 ### Criar Categoria (Admin)
 **POST** `http://localhost:8000/categorias/`
 
-Cria uma nova categoria - apenas administradores.
+Cria uma nova categoria - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -844,7 +1206,7 @@ Cria uma nova categoria - apenas administradores.
 ### Atualizar Categoria (Admin)
 **PUT** `http://localhost:8000/categorias/{categoria_id}`
 
-Atualiza dados de uma categoria - apenas administradores.
+Atualiza dados de uma categoria - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -877,7 +1239,7 @@ Atualiza dados de uma categoria - apenas administradores.
 ### Atualizar Preço da Categoria (Admin)
 **PATCH** `http://localhost:8000/categorias/{categoria_id}/preco?novo_preco=3.50`
 
-Atualiza apenas o preço de uma categoria - apenas administradores.
+Atualiza apenas o preço de uma categoria - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -903,7 +1265,7 @@ Atualiza apenas o preço de uma categoria - apenas administradores.
 ### Desativar Categoria (Admin)
 **DELETE** `http://localhost:8000/categorias/{categoria_id}`
 
-Desativa uma categoria (soft delete) - apenas administradores.
+Desativa uma categoria (soft delete) - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -928,7 +1290,7 @@ Desativa uma categoria (soft delete) - apenas administradores.
 ### Reativar Categoria (Admin)
 **POST** `http://localhost:8000/categorias/{categoria_id}/reativar`
 
-Reativa uma categoria previamente desativada - apenas administradores.
+Reativa uma categoria previamente desativada - Apenas GESTORES DE RECOMPENSAS.
 
 **Autenticação:** ✅ Requerida (role: admin)
 
@@ -948,7 +1310,7 @@ Reativa uma categoria previamente desativada - apenas administradores.
 
 ---
 
-## 📅 Agendamentos
+## Agendamentos
 
 ### Criar Agendamento
 **POST** `http://localhost:8000/schedules/`
@@ -1608,7 +1970,7 @@ No Content
 
 ---
 
-## � Coletas
+## Coletas
 
 Gerenciamento do fluxo completo de coleta de resíduos pelos coletores.
 
@@ -1707,6 +2069,7 @@ Marca a coleta como EM_ANDAMENTO (coletor chegou no local).
 - Coleta deve estar em estado PENDENTE
 - Atualiza data_hora para o momento atual
 - Muda estado para EM_ANDAMENTO
+- **NOTA:** Resíduos são adicionados ao inventory apenas quando efetivamente coletados (ver `coletar-residuo`)
 
 **Exemplo:** `http://localhost:8000/coletas/674a1b2c3d4e5f6g7h8i9j0k/iniciar`
 
@@ -1758,7 +2121,7 @@ Marca a coleta como EM_ANDAMENTO (coletor chegou no local).
 ### Coletar Resíduo
 **PATCH** `http://localhost:8000/coletas/{coleta_id}/coletar-residuo`
 
-Marca um ou mais resíduos como COLETADO (mantém na lista da coleta).
+Marca um ou mais resíduos como COLETADO, mantém na lista da coleta e **adiciona ao inventory do coletor**.
 
 **Autenticação:** ✅ Requerida (role: coletor)
 
@@ -1767,6 +2130,7 @@ Marca um ou mais resíduos como COLETADO (mantém na lista da coleta).
 - Todos os resíduos devem estar RESERVADO
 - Todos os resíduos devem pertencer à coleta
 - Atualiza resíduos para COLETADO
+- **Adiciona resíduos coletados ao inventory do coletor** (resíduos fisicamente coletados)
 - Mantém resíduos na lista `residuos_id`
 - Verifica se todos resíduos foram finalizados (auto-conclusão do agendamento)
 
@@ -1951,15 +2315,16 @@ Cancela uma coleta PENDENTE e libera os resíduos (RESERVADO → AGENDADO).
 ### Cancelar Coleta Após Chegar ao Local
 **POST** `http://localhost:8000/coletas/{coleta_id}/cancelar`
 
-Cancela uma coleta EM_ANDAMENTO e marca resíduos RESERVADO como CANCELADO.
+Cancela uma coleta EM_ANDAMENTO, marca resíduos RESERVADO como CANCELADO e **remove resíduos do inventory do coletor**.
 
 **Autenticação:** ✅ Requerida (role: coletor)
 
 **Regras:**
 - Coleta deve estar EM_ANDAMENTO
 - Muda estado para CANCELADA
-- Resíduos ainda RESERVADO → CANCELADO
+- Resíduos ainda RESERVADO → DESCARTADO
 - Resíduos já COLETADOS ou REJEITADOS não são alterados
+- **Remove todos os resíduos da coleta do inventory do coletor** (desfaz coletas realizadas)
 
 **Exemplo:** `http://localhost:8000/coletas/674a1b2c3d4e5f6g7h8i9j0k/cancelar`
 
@@ -2110,7 +2475,1201 @@ Obtém detalhes completos de uma coleta específica.
 
 ---
 
-## �🔧 Desenvolvimento
+### Obter Inventory do Coletor
+**GET** `http://localhost:8000/coletas/inventory/me`
+
+Retorna o inventory detalhado do coletor autenticado com dados completos dos resíduos fisicamente coletados.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Descrição:**
+- Retorna todos os resíduos que o coletor coletou fisicamente (status COLETADO)
+- Inclui dados completos: quantidade, categoria, valor estimado, foto, etc.
+- Útil para o coletor visualizar seu estoque atual de resíduos
+- **Performance otimizada:** 1 única requisição retorna todos os dados (não apenas IDs)
+
+**Exemplo:** `http://localhost:8000/coletas/inventory/me`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d3f",
+    "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
+    "categoriaId": "60c72b2f9b1d4c3a4c8e4d3b",
+    "quantidade": 10.0,
+    "tipo_medida": "unidade",
+    "foto": "http://example.com/garrafas.jpg",
+    "valorEstimado": 1.50,
+    "status": "COLETADO",
+    "dataCadastro": "2025-10-14T10:30:00Z"
+  },
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d40",
+    "produtorId": "60c72b2f9b1d4c3a4c8e4d3a",
+    "categoriaId": "60c72b2f9b1d4c3a4c8e4d3c",
+    "quantidade": 5.0,
+    "tipo_medida": "kg",
+    "foto": null,
+    "valorEstimado": 7.50,
+    "status": "COLETADO",
+    "dataCadastro": "2025-10-15T14:20:00Z"
+  }
+]
+```
+
+**Resposta quando inventory vazio (200):**
+```json
+[]
+```
+
+**Observações:**
+- Frontend recebe dados completos em 1 única requisição (evita N+1 queries)
+- Resíduos aparecem no inventory apenas após ação `coletar_residuo`
+- Resíduos rejeitados NUNCA aparecem no inventory
+- Inventory é atualizado automaticamente quando coleta é cancelada após iniciar
+
+---
+
+## Entregas
+
+O módulo de Entregas permite que coletores registrem a entrega de resíduos coletados para receptoras (ecopontos). 
+
+**Fluxo do Sistema:**
+1. Produtor cria resíduos → status: **DISPONIVEL**
+2. Coletor aceita agendamento → resíduos vão para: **AGENDADO** → **RESERVADO**
+3. Coletor coleta fisicamente → resíduos vão para: **COLETADO** (adicionados ao `inventory`)
+4. Coletor entrega na receptora → resíduos vão para: **ENTREGUE** (removidos do `inventory`)
+
+### Criar Entrega
+**POST** `http://localhost:8000/entregas`
+
+Registra uma entrega de resíduos do coletor para uma receptora (ecoponto).
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Regras de Autorização:**
+- ✅ **Coletor:** Pode criar entregas para seus resíduos coletados
+- ❌ **Produtor/Receptor:** Bloqueado
+
+**Fluxo Automático:**
+1. Valida que coletor tem os resíduos no `inventory`
+2. Valida que resíduos estão com status **COLETADO**
+3. Valida que receptora existe e é do tipo correto
+4. Cria registro da entrega no banco
+5. Atualiza status dos resíduos para **ENTREGUE**
+6. Remove resíduos do `inventory` do coletor
+7. Registra categorias dos resíduos entregues
+
+**Corpo da Requisição:**
+```json
+{
+  "receptora_id": "60c72b2f9b1d4c3a4c8e4d50",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3e",
+    "60c72b2f9b1d4c3a4c8e4d3f"
+  ],
+  "observacoes": "Entrega realizada com sucesso"
+}
+```
+
+**Campos:**
+- `receptora_id`: ID da receptora (ecoponto) que receberá os resíduos (obrigatório)
+- `residuos_id`: Array com IDs dos resíduos a entregar (obrigatório, mínimo 1)
+- `observacoes`: Observações sobre a entrega (opcional)
+
+**Validações Automáticas:**
+- ✅ Lista de resíduos não pode estar vazia
+- ✅ Todos os resíduos devem existir
+- ✅ Todos os resíduos devem estar no `inventory` do coletor
+- ✅ Todos os resíduos devem ter status **COLETADO**
+- ✅ Receptora deve existir e ter `role_id: "receptor"`
+
+**Resposta de Sucesso (201):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d60",
+  "data_hora": "2025-11-13T15:30:00Z",
+  "receptora_id": "60c72b2f9b1d4c3a4c8e4d50",
+  "coletor_id": "60c72b2f9b1d4c3a4c8e4d40",
+  "residuos_id": [
+    "60c72b2f9b1d4c3a4c8e4d3e",
+    "60c72b2f9b1d4c3a4c8e4d3f"
+  ],
+  "categorias_residuos_entregues": [
+    "plastico",
+    "papel"
+  ],
+  "observacoes": "Entrega realizada com sucesso"
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é coletor:
+```json
+{
+  "detail": "Apenas coletores podem criar entregas"
+}
+```
+
+**400 Bad Request** - Resíduo não está no inventory:
+```json
+{
+  "detail": "Resíduo '60c72b2f9b1d4c3a4c8e4d3e' não está no inventário do coletor"
+}
+```
+
+**404 Not Found** - Receptora não encontrada:
+```json
+{
+  "detail": "Receptora '60c72b2f9b1d4c3a4c8e4d50' não encontrada"
+}
+```
+
+---
+
+### Listar Minhas Entregas
+**GET** `http://localhost:8000/entregas`
+
+Lista todas as entregas realizadas pelo coletor autenticado.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Parâmetros de Query (opcionais):**
+- `skip`: Número de registros a pular (padrão: 0)
+- `limit`: Número máximo de registros (padrão: 100, máx: 1000)
+
+**Exemplo:** `http://localhost:8000/entregas?skip=0&limit=10`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d60",
+    "data_hora": "2025-11-13T15:30:00Z",
+    "receptora_id": "60c72b2f9b1d4c3a4c8e4d50",
+    "coletor_id": "60c72b2f9b1d4c3a4c8e4d40",
+    "residuos_id": ["60c72b2f9b1d4c3a4c8e4d3e", "60c72b2f9b1d4c3a4c8e4d3f"],
+    "categorias_residuos_entregues": ["plastico", "papel"],
+    "observacoes": "Entrega realizada com sucesso"
+  }
+]
+```
+
+**Observações:**
+- Retorna apenas entregas do coletor autenticado
+- Ordenado por `data_hora` (mais recente primeiro)
+- Lista vazia `[]` se não houver entregas
+
+---
+
+### Obter Sumário de Entregas
+**GET** `http://localhost:8000/entregas/sumario`
+
+Retorna estatísticas agregadas das entregas agrupadas por categoria e tipo de medida.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Exemplo:** `http://localhost:8000/entregas/sumario`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "categoriaId": "plastico",
+    "tipo_medida": "kg",
+    "quantidade_total": 150.5
+  },
+  {
+    "categoriaId": "papel",
+    "tipo_medida": "unidade",
+    "quantidade_total": 75.0
+  }
+]
+```
+
+**Casos de Uso:**
+- 📊 Dashboard do coletor mostrando total reciclado por categoria
+- 🎖️ Sistema de badges baseado em quantidade entregue
+- 📈 Relatórios de impacto ambiental
+- 🏆 Ranking de coletores
+
+**Observações:**
+- Agrupa por `categoriaId` e `tipo_medida`
+- Soma todas as quantidades entregues pelo coletor
+- Útil para gamificação e estatísticas
+
+---
+
+### Buscar Receptoras Próximas
+**POST** `http://localhost:8000/entregas/buscar-receptoras`
+
+Busca receptoras (ecopontos) próximas da localização atual do coletor.
+
+**Autenticação:** ✅ Requerida (role: coletor)
+
+**Descrição:**
+Permite que o coletor encontre receptoras disponíveis para entrega de resíduos dentro de um raio específico. Usa a fórmula de Haversine para calcular distâncias geográficas e retorna resultados ordenados por proximidade.
+
+**Algoritmo:**
+1. Valida que usuário é coletor
+2. Busca todas as receptoras no sistema
+3. Calcula distância usando fórmula de Haversine (baseada no primeiro endereço)
+4. Filtra por raio especificado
+5. Opcionalmente filtra por materiais aceitos
+6. Ordena por distância (mais próximas primeiro)
+
+**Corpo da Requisição:**
+```json
+{
+  "latitude": -23.5505,
+  "longitude": -46.6333,
+  "raio": 5.0,
+  "materiais_aceitos": ["plástico", "papel"]
+}
+```
+
+**Campos:**
+- `latitude`: Latitude da localização atual do coletor (obrigatório, entre -90 e 90)
+- `longitude`: Longitude da localização atual do coletor (obrigatório, entre -180 e 180)
+- `raio`: Raio de busca em quilômetros (obrigatório, máximo 100km)
+- `materiais_aceitos`: Lista de materiais para filtrar receptoras (opcional)
+
+**Validações Automáticas:**
+- ✅ Latitude deve estar entre -90 e 90 graus
+- ✅ Longitude deve estar entre -180 e 180 graus
+- ✅ Raio deve ser maior que 0 e no máximo 100km
+- ✅ Apenas coletores autenticados podem acessar
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d50",
+    "name": "Ecoponto Central",
+    "email": "ecoponto@example.com",
+    "phone": "(11) 98765-4321",
+    "accepted_material": ["plástico", "papel", "metal"],
+    "addresses": [
+      {
+        "id": 1,
+        "apelido": "Principal",
+        "cep": "12345-678",
+        "logradouro": "Rua Verde",
+        "numero": "100",
+        "latitude": "-23.5505",
+        "longitude": "-46.6333",
+        "complemento": "Galpão 2"
+      }
+    ],
+    "distancia_km": 2.5
+  },
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d51",
+    "name": "Ecoponto Sustentável",
+    "email": "sustentavel@example.com",
+    "phone": "(11) 91234-5678",
+    "accepted_material": ["plástico", "vidro", "papel"],
+    "addresses": [
+      {
+        "id": 1,
+        "apelido": "Sede",
+        "cep": "12345-679",
+        "logradouro": "Avenida Ecológica",
+        "numero": "200",
+        "latitude": "-23.5520",
+        "longitude": "-46.6340",
+        "complemento": null
+      }
+    ],
+    "distancia_km": 4.3
+  }
+]
+```
+
+**Resposta quando não há receptoras no raio (200):**
+```json
+[]
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é coletor:
+```json
+{
+  "detail": "Apenas coletores podem buscar receptoras próximas"
+}
+```
+
+**422 Unprocessable Entity** - Validação de dados falhou:
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "raio"],
+      "msg": "ensure this value is less than or equal to 100",
+      "type": "value_error.number.not_le"
+    }
+  ]
+}
+```
+
+**Casos de Uso:**
+- 📍 Coletor visualiza ecopontos próximos para planejar rota de entrega
+- 🔍 Filtrar receptoras que aceitam tipos específicos de materiais
+- 🗺️ Mapa interativo mostrando receptoras disponíveis
+- 📊 Otimização de logística de entrega
+
+**Observações:**
+- Distância é calculada usando fórmula de Haversine (great-circle distance)
+- Resultados ordenados por distância (mais próxima primeiro)
+- Filtro de materiais é opcional - se omitido, retorna todas as receptoras no raio
+- Usa o primeiro endereço cadastrado da receptora para calcular distância
+- Receptoras sem endereço ou com coordenadas inválidas são ignoradas
+- Máximo de 100km de raio para evitar sobrecarga
+
+**Exemplo de Integração com Mapa:**
+```javascript
+// Frontend React
+async function buscarReceptoras() {
+  const position = await navigator.geolocation.getCurrentPosition();
+  
+  const response = await fetch('http://localhost:8000/entregas/buscar-receptoras', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      raio: 10.0,
+      materiais_aceitos: ['plástico', 'papel']
+    })
+  });
+  
+  const receptoras = await response.json();
+  // Renderizar marcadores no mapa
+  receptoras.forEach(r => addMarker(r.addresses[0].latitude, r.addresses[0].longitude));
+}
+```
+
+---
+
+## Recompensas
+
+O módulo de Recompensas permite que produtores visualizem prêmios disponíveis para resgate usando seus pontos acumulados no sistema de gamificação. Administradores podem gerenciar o catálogo completo de recompensas.
+
+**Sistema de Pontos:**
+- Produtores ganham pontos ao reciclar materiais
+- Pontos são usados para resgatar recompensas
+- Recompensas têm estoque limitado
+- Soft delete mantém histórico de resgates
+
+### Listar Recompensas Ativas
+**GET** `http://localhost:8000/recompensas/ativas`
+
+Lista todas as recompensas disponíveis para resgate (ativas).
+
+**Autenticação:** ❌ Não requerida (endpoint público)
+
+**Parâmetros de Query (opcionais):**
+- `com_estoque`: Se `true`, retorna apenas recompensas com estoque > 0 (padrão: false)
+- `skip`: Quantidade de registros a pular (padrão: 0)
+- `limit`: Quantidade máxima de registros (padrão: 100, máx: 100)
+
+**Exemplo:** `http://localhost:8000/recompensas/ativas?com_estoque=true&limit=10`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d3e",
+    "nome": "Vale-compra R$ 50,00",
+    "tipo": "voucher",
+    "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+    "pontos_necessarios": 500,
+    "foto_url": "https://example.com/vale50.jpg",
+    "estoque": 100,
+    "parceiro": "Supermercado Verde",
+    "data_cadastro": "2025-11-18T10:30:00Z",
+    "ativo": true
+  },
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d3f",
+    "nome": "Ecobag Reutilizável",
+    "tipo": "produto",
+    "descricao": "Ecobag de algodão orgânico",
+    "pontos_necessarios": 200,
+    "foto_url": null,
+    "estoque": 50,
+    "parceiro": null,
+    "data_cadastro": "2025-11-18T11:00:00Z",
+    "ativo": true
+  }
+]
+```
+
+**Casos de Uso:**
+- 🎁 Mostrar catálogo de recompensas disponíveis
+- 📱 Exibir opções de resgate para produtores
+- 💰 Consultar pontos necessários para cada recompensa
+- 📊 Filtrar apenas recompensas em estoque
+
+**Observações:**
+- Endpoint público - não requer autenticação
+- Retorna apenas recompensas com `ativo=true`
+- Lista vazia `[]` se não houver recompensas ativas
+
+---
+
+### Obter Detalhes de uma Recompensa
+**GET** `http://localhost:8000/recompensas/{recompensa_id}`
+
+Retorna os detalhes completos de uma recompensa específica.
+
+**Autenticação:** ✅ Requerida
+
+**Regras de Autorização:**
+- ✅ **Qualquer usuário autenticado** pode acessar
+- Produtores usam para ver detalhes antes de resgatar
+
+**Exemplo:** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "nome": "Vale-compra R$ 50,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 500,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 100,
+  "parceiro": "Supermercado Verde",
+  "data_cadastro": "2025-11-18T10:30:00Z",
+  "ativo": true
+}
+```
+
+**Erros Comuns:**
+
+**401 Unauthorized** - Usuário não autenticado:
+```json
+{
+  "detail": "Não autenticado"
+}
+```
+
+**404 Not Found** - Recompensa não encontrada:
+```json
+{
+  "detail": "Recompensa não encontrada"
+}
+```
+
+---
+
+### [GESTOR] Listar Todas as Recompensas
+**GET** `http://localhost:8000/recompensas/`
+
+Lista TODAS as recompensas do sistema (ativas e inativas).
+
+**Autenticação:** ✅ Requerida (role: admin)
+
+**Parâmetros de Query (opcionais):**
+- `skip`: Quantidade de registros a pular (padrão: 0)
+- `limit`: Quantidade máxima de registros (padrão: 100, máx: 100)
+
+**Exemplo:** `http://localhost:8000/recompensas/?skip=0&limit=20`
+
+**Resposta de Sucesso (200):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d3e",
+    "nome": "Vale-compra R$ 50,00",
+    "tipo": "voucher",
+    "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+    "pontos_necessarios": 500,
+    "foto_url": "https://example.com/vale50.jpg",
+    "estoque": 100,
+    "parceiro": "Supermercado Verde",
+    "data_cadastro": "2025-11-18T10:30:00Z",
+    "ativo": true
+  },
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d3f",
+    "nome": "Desconto 20% - Produto Descontinuado",
+    "tipo": "desconto",
+    "descricao": "Cupom de desconto que foi descontinuado",
+    "pontos_necessarios": 300,
+    "foto_url": null,
+    "estoque": 0,
+    "parceiro": "Loja Antiga",
+    "data_cadastro": "2025-10-01T09:00:00Z",
+    "ativo": false
+  }
+]
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é administrador:
+```json
+{
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
+}
+```
+
+**Observações:**
+- Usado no painel administrativo para gerenciar recompensas
+- Retorna recompensas ativas E inativas
+- Permite visualizar todo o histórico de recompensas
+
+---
+
+### [GESTOR] Criar Nova Recompensa
+**POST** `http://localhost:8000/recompensas/`
+
+Cria uma nova recompensa no sistema de gamificação.
+
+**Autenticação:** ✅ Requerida (role: admin)
+
+**Corpo da Requisição:**
+```json
+{
+  "nome": "Vale-compra R$ 50,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 500,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 100,
+  "parceiro": "Supermercado Verde",
+  "ativo": true
+}
+```
+
+**Campos:**
+- `nome`: Nome da recompensa (obrigatório, 3-100 caracteres)
+- `tipo`: Tipo da recompensa (obrigatório) - valores: `produto`, `desconto`, `voucher`, `cupom`
+- `descricao`: Descrição detalhada (obrigatório, mínimo 10 caracteres)
+- `pontos_necessarios`: Pontos necessários para resgate (obrigatório, deve ser > 0)
+- `foto_url`: URL da foto da recompensa (opcional)
+- `estoque`: Quantidade disponível (opcional, padrão: 999, não pode ser negativo)
+- `parceiro`: Nome do parceiro que oferece a recompensa (opcional)
+- `ativo`: Se a recompensa está ativa (opcional, padrão: true)
+
+**Validações Automáticas:**
+- ✅ Nome não pode estar vazio (3-100 caracteres)
+- ✅ Tipo deve ser válido: `produto`, `desconto`, `voucher`, `cupom`
+- ✅ Descrição deve ter pelo menos 10 caracteres
+- ✅ Pontos necessários deve ser maior que zero
+- ✅ Estoque não pode ser negativo
+
+**Resposta de Sucesso (201):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "nome": "Vale-compra R$ 50,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 500,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 100,
+  "parceiro": "Supermercado Verde",
+  "data_cadastro": "2025-11-18T10:30:00Z",
+  "ativo": true
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é administrador:
+```json
+{
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
+}
+```
+
+**422 Unprocessable Entity** - Validação falhou:
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "pontos_necessarios"],
+      "msg": "ensure this value is greater than 0",
+      "type": "value_error.number.not_gt"
+    }
+  ]
+}
+```
+
+**Casos de Uso:**
+- 🎁 Adicionar nova recompensa para produtores resgatarem
+- 🎉 Criar promoções especiais
+- 🤝 Cadastrar parcerias com empresas
+
+---
+
+### [GESTOR] Atualizar Recompensa
+**PUT** `http://localhost:8000/recompensas/{recompensa_id}`
+
+Atualiza os dados de uma recompensa existente.
+
+**Autenticação:** ✅ Requerida (role: admin)
+
+**Exemplo:** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e`
+
+**Corpo da Requisição:**
+```json
+{
+  "nome": "Vale-compra R$ 100,00",
+  "pontos_necessarios": 1000,
+  "estoque": 50
+}
+```
+
+**Campos Atualizáveis (todos opcionais):**
+- `nome`: Renomear a recompensa (3-100 caracteres)
+- `tipo`: Alterar tipo (`produto`, `desconto`, `voucher`, `cupom`)
+- `descricao`: Alterar descrição (mínimo 10 caracteres)
+- `pontos_necessarios`: Ajustar pontos necessários (> 0)
+- `foto_url`: Atualizar foto
+- `estoque`: Ajustar estoque (não pode ser negativo)
+- `parceiro`: Atualizar parceiro
+- `ativo`: Ativar/desativar
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "nome": "Vale-compra R$ 100,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 1000,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 50,
+  "parceiro": "Supermercado Verde",
+  "data_cadastro": "2025-11-18T10:30:00Z",
+  "ativo": true
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é administrador:
+```json
+{
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
+}
+```
+
+**404 Not Found** - Recompensa não encontrada:
+```json
+{
+  "detail": "Recompensa não encontrada"
+}
+```
+
+**Observações:**
+- ⚠️ Alterar pontos necessários NÃO afeta resgates já realizados
+- Apenas campos enviados são atualizados (partial update)
+
+---
+
+### [GESTOR] Atualizar Estoque da Recompensa
+**PATCH** `http://localhost:8000/recompensas/{recompensa_id}/estoque`
+
+Atualiza o estoque de uma recompensa (incremento ou decremento).
+
+**Autenticação:** ✅ Requerida (role: admin)
+
+**Parâmetros de Query:**
+- `quantidade`: Quantidade a adicionar (positivo) ou remover (negativo) - obrigatório
+
+**Exemplo (adicionar estoque):** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e/estoque?quantidade=50`
+
+**Exemplo (remover estoque):** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e/estoque?quantidade=-10`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "nome": "Vale-compra R$ 50,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 500,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 150,
+  "parceiro": "Supermercado Verde",
+  "data_cadastro": "2025-11-18T10:30:00Z",
+  "ativo": true
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é administrador:
+```json
+{
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
+}
+```
+
+**404 Not Found** - Recompensa não encontrada:
+```json
+{
+  "detail": "Recompensa não encontrada"
+}
+```
+
+**Casos de Uso:**
+- 📦 Adicionar mais unidades ao estoque
+- 🔧 Remover unidades (ajuste manual)
+- ✅ Corrigir inconsistências de estoque
+
+**Observações:**
+- Endpoint auxiliar para facilitar ajuste de estoque sem enviar todos os campos
+- Quantidade positiva: incrementa estoque
+- Quantidade negativa: decrementa estoque
+
+---
+
+### [GESTOR] Desativar Recompensa
+**DELETE** `http://localhost:8000/recompensas/{recompensa_id}`
+
+Desativa uma recompensa (soft delete).
+
+**Autenticação:** ✅ Requerida (role: admin)
+
+**Exemplo:** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "nome": "Vale-compra R$ 50,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 500,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 100,
+  "parceiro": "Supermercado Verde",
+  "data_cadastro": "2025-11-18T10:30:00Z",
+  "ativo": false
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é administrador:
+```json
+{
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
+}
+```
+
+**404 Not Found** - Recompensa não encontrada:
+```json
+{
+  "detail": "Recompensa não encontrada"
+}
+```
+
+**Observações - Benefícios do Soft Delete:**
+- 🗂️ Resgates antigos mantêm referência à recompensa
+- 📊 Histórico permanece consistente
+- ♻️ Recompensa pode ser reativada no futuro
+- 📈 Estatísticas não são afetadas
+- ❌ Recompensas inativas NÃO aparecem na lista pública
+
+**IMPORTANTE:** A recompensa NÃO é deletada do banco, apenas marcada como `ativo=false`.
+
+---
+
+### [GESTOR] Reativar Recompensa
+**POST** `http://localhost:8000/recompensas/{recompensa_id}/reativar`
+
+Reativa uma recompensa previamente desativada.
+
+**Autenticação:** ✅ Requerida (role: admin)
+
+**Exemplo:** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e/reativar`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "nome": "Vale-compra R$ 50,00",
+  "tipo": "voucher",
+  "descricao": "Vale-compra de R$ 50,00 para usar em lojas parceiras",
+  "pontos_necessarios": 500,
+  "foto_url": "https://example.com/vale50.jpg",
+  "estoque": 100,
+  "parceiro": "Supermercado Verde",
+  "data_cadastro": "2025-11-18T10:30:00Z",
+  "ativo": true
+}
+```
+
+**Erros Comuns:**
+
+**403 Forbidden** - Usuário não é administrador:
+```json
+{
+  "detail": "Acesso negado. Apenas GESTORES DE RECOMPENSAS podem realizar esta ação."
+}
+```
+
+**404 Not Found** - Recompensa não encontrada:
+```json
+{
+  "detail": "Recompensa não encontrada"
+}
+```
+
+**Observações:**
+- Após reativação, a recompensa volta a aparecer na lista pública (`/recompensas/ativas`)
+- Produtores podem resgatar a recompensa novamente
+
+---
+
+### [PRODUTOR] Resgatar Recompensa
+**POST** `http://localhost:8000/recompensas/{recompensa_id}/resgatar`
+
+Executa o resgate de uma recompensa usando pontos do produtor autenticado.
+
+**Autenticação:** ✅ Requerida (role: produtor)
+
+**Exemplo:** `http://localhost:8000/recompensas/60c72b2f9b1d4c3a4c8e4d3e/resgatar`
+
+**Fluxo de Execução:**
+1. ✅ Valida que recompensa existe, está ativa e tem estoque > 0
+2. ✅ Valida que produtor tem pontos suficientes
+3. ✅ Debita pontos do produtor (operação atômica)
+4. ✅ Decrementa estoque da recompensa (operação atômica)
+5. ✅ Salva registro permanente no histórico de resgates
+6. 🔄 Implementa rollback automático em caso de falha
+
+**Resposta de Sucesso (201 Created):**
+```json
+{
+  "id": "60c72b2f9b1d4c3a4c8e4d40",
+  "recompensa_id": "60c72b2f9b1d4c3a4c8e4d3e",
+  "produtor_id": "60c72b2f9b1d4c3a4c8e4d3f",
+  "pontos_gastos": 500,
+  "data_resgate": "2025-11-19T14:30:00Z"
+}
+```
+
+**Erros Comuns:**
+
+**400 Bad Request** - Pontos insuficientes:
+```json
+{
+  "detail": "Pontos insuficientes. Você tem 200 pontos, mas precisa de 500 pontos"
+}
+```
+
+**400 Bad Request** - Recompensa inativa:
+```json
+{
+  "detail": "Recompensa não está disponível para resgate"
+}
+```
+
+**400 Bad Request** - Sem estoque:
+```json
+{
+  "detail": "Recompensa sem estoque disponível"
+}
+```
+
+**404 Not Found** - Recompensa não encontrada:
+```json
+{
+  "detail": "Recompensa não encontrada"
+}
+```
+
+**404 Not Found** - Produtor não encontrado:
+```json
+{
+  "detail": "Produtor não encontrado"
+}
+```
+
+**500 Internal Server Error** - Erro ao debitar pontos:
+```json
+{
+  "detail": "Erro ao debitar pontos do produtor"
+}
+```
+
+**500 Internal Server Error** - Erro ao atualizar estoque (com rollback):
+```json
+{
+  "detail": "Erro ao atualizar estoque da recompensa"
+}
+```
+
+**Observações:**
+- ⚠️ **O resgate é DEFINITIVO** (não pode ser cancelado)
+- ✅ Os pontos são debitados imediatamente e de forma atômica
+- ✅ O estoque é decrementado automaticamente
+- ✅ O histórico fica registrado permanentemente
+- 🔄 Se falhar após debitar pontos, **rollback automático** devolve os pontos
+- 🔒 Cada produtor só pode resgatar com seus próprios pontos
+- 📊 Registro do resgate é usado para auditoria e estatísticas
+
+---
+
+### [PRODUTOR] Listar Meus Resgates
+**GET** `http://localhost:8000/recompensas/meus-resgates`
+
+Lista o histórico de resgates do produtor autenticado.
+
+**Autenticação:** ✅ Requerida (role: produtor)
+
+**Parâmetros de Query (opcionais):**
+- `skip`: Quantidade de registros a pular (padrão: 0)
+- `limit`: Quantidade máxima de registros (padrão: 100, máx: 100)
+
+**Exemplo:** `http://localhost:8000/recompensas/meus-resgates?skip=0&limit=10`
+
+**Resposta de Sucesso (200 OK):**
+```json
+[
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d40",
+    "recompensa_id": "60c72b2f9b1d4c3a4c8e4d3e",
+    "produtor_id": "60c72b2f9b1d4c3a4c8e4d3f",
+    "pontos_gastos": 500,
+    "data_resgate": "2025-11-19T14:30:00Z"
+  },
+  {
+    "id": "60c72b2f9b1d4c3a4c8e4d41",
+    "recompensa_id": "60c72b2f9b1d4c3a4c8e4d3a",
+    "produtor_id": "60c72b2f9b1d4c3a4c8e4d3f",
+    "pontos_gastos": 200,
+    "data_resgate": "2025-11-15T10:15:00Z"
+  }
+]
+```
+
+**Erros Comuns:**
+
+**401 Unauthorized** - Usuário não autenticado:
+```json
+{
+  "detail": "Usuário não autenticado"
+}
+```
+
+**Observações:**
+- 📅 Lista ordenada por data **decrescente** (mais recente primeiro)
+- 🔒 Cada produtor visualiza apenas seus próprios resgates
+- 📊 Útil para comprovação de resgates e auditoria
+- ♾️ Histórico permanente (resgates nunca são deletados)
+- 📄 Suporta paginação para otimizar performance
+
+---
+
+## Rankings
+
+O módulo de Rankings permite visualizar a classificação dos produtores baseada em seus pontos acumulados de reciclagem. Os rankings são calculados com base no campo `ranking` (que só aumenta e nunca decresce), diferente do campo `points` (saldo atual que pode variar).
+
+**Sistema de Pontuação:**
+- **`points`:** Saldo atual do produtor (aumenta ao reciclar, diminui ao resgatar recompensas)
+- **`ranking`:** Pontuação acumulada para classificação (apenas aumenta, nunca diminui)
+- Rankings são atualizados automaticamente quando resíduos são coletados
+- Suporta rankings por nível: global, estadual e municipal
+
+### Obter Ranking
+**GET** `http://localhost:8000/rankings/`
+
+Retorna o ranking de produtores baseado no nível especificado (global, estado ou cidade).
+
+**Autenticação:** ❌ Não requerida (endpoint público)
+
+**Parâmetros de Query:**
+- `level`: Nível do ranking (padrão: "global")
+  - `global` - Ranking de todos os produtores
+  - `estado` - Ranking por estado (requer parâmetro `code`)
+  - `cidade` - Ranking por cidade (requer parâmetro `code`)
+- `code`: Código do estado ou cidade quando `level` é "estado" ou "cidade" (opcional)
+- `limit`: Quantidade de posições no top ranking (padrão: 10)
+
+**Exemplo (Ranking Global):** `http://localhost:8000/rankings/?level=global&limit=20`
+
+**Exemplo (Ranking Estadual):** `http://localhost:8000/rankings/?level=estado&code=PI&limit=10`
+
+**Exemplo (Ranking Municipal):** `http://localhost:8000/rankings/?level=cidade&code=2211001&limit=10`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "level": "global",
+  "code": null,
+  "top_users": [
+    {
+      "user_id": "60c72b2f9b1d4c3a4c8e4d3e",
+      "name": "João Silva",
+      "ranking": 15000,
+      "position": 1
+    },
+    {
+      "user_id": "60c72b2f9b1d4c3a4c8e4d3f",
+      "name": "Maria Santos",
+      "ranking": 12500,
+      "position": 2
+    },
+    {
+      "user_id": "60c72b2f9b1d4c3a4c8e4d40",
+      "name": "Carlos Oliveira",
+      "ranking": 10200,
+      "position": 3
+    }
+  ],
+  "total_users": 3,
+  "last_updated": "2025-11-20T14:30:00Z"
+}
+```
+
+**Resposta quando ranking está vazio (200):**
+```json
+{
+  "level": "global",
+  "code": null,
+  "top_users": [],
+  "total_users": 0,
+  "last_updated": "2025-11-20T14:30:00Z"
+}
+```
+
+**Casos de Uso:**
+- 🏆 Exibir top produtores recicladores
+- 📊 Dashboard com rankings regionais
+- 🎮 Gamificação e engajamento de usuários
+- 📈 Estatísticas de reciclagem por região
+
+**Observações:**
+- Endpoint público - não requer autenticação
+- Rankings são cacheados para melhor performance
+- Usa o campo `ranking` (pontuação acumulada) para ordenação
+- `code` é obrigatório quando `level` é "estado" ou "cidade"
+- Rankings estaduais usam código UF (ex: "PI", "SP", "RJ")
+- Rankings municipais usam código IBGE (ex: "2211001" para Teresina/PI)
+
+---
+
+### Recalcular Ranking (Admin)
+**POST** `http://localhost:8000/rankings/refresh`
+
+Recalcula e atualiza o cache do ranking para o nível especificado. Endpoint administrativo ou para uso por jobs/cron.
+
+**Autenticação:** ❌ Não requerida (mas recomendado adicionar autenticação em produção)
+
+**Parâmetros de Query:**
+- `level`: Nível do ranking a recalcular (padrão: "global")
+  - `global` - Recalcula ranking global
+  - `estado` - Recalcula ranking estadual (requer `code`)
+  - `cidade` - Recalcula ranking municipal (requer `code`)
+- `code`: Código do estado ou cidade quando aplicável (opcional)
+- `limit`: Quantidade de posições no top ranking (padrão: 10)
+
+**Exemplo (Recalcular Global):** `http://localhost:8000/rankings/refresh?level=global`
+
+**Exemplo (Recalcular Estadual):** `http://localhost:8000/rankings/refresh?level=estado&code=PI`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "level": "global",
+  "code": null,
+  "top_users": [
+    {
+      "user_id": "60c72b2f9b1d4c3a4c8e4d3e",
+      "name": "João Silva",
+      "ranking": 15000,
+      "position": 1
+    },
+    {
+      "user_id": "60c72b2f9b1d4c3a4c8e4d3f",
+      "name": "Maria Santos",
+      "ranking": 12500,
+      "position": 2
+    }
+  ],
+  "total_users": 2,
+  "last_updated": "2025-11-20T14:35:00Z"
+}
+```
+
+**Casos de Uso:**
+- 🔄 Atualização manual de rankings
+- ⏰ Jobs agendados (cron) para recalcular periodicamente
+- 🔧 Manutenção e correção de inconsistências
+- 🚀 Forçar atualização após migração de dados
+
+**Observações:**
+- Recalcula rankings baseado nos valores atuais do campo `ranking` dos usuários
+- Atualiza cache automaticamente
+- **Recomendação:** Adicionar autenticação admin em produção
+- **Performance:** Pode ser lento com muitos usuários - executar em background
+
+---
+
+### Obter Posição do Usuário no Ranking
+**GET** `http://localhost:8000/rankings/position/{user_id}`
+
+Retorna a posição específica de um usuário em um determinado ranking.
+
+**Autenticação:** ❌ Não requerida (endpoint público)
+
+**Parâmetros de Path:**
+- `user_id`: ID do usuário (obrigatório)
+
+**Parâmetros de Query:**
+- `level`: Nível do ranking (padrão: "global")
+  - `global` - Posição no ranking global
+  - `estado` - Posição no ranking estadual (requer `code`)
+  - `cidade` - Posição no ranking municipal (requer `code`)
+- `code`: Código do estado ou cidade quando aplicável (opcional)
+
+**Exemplo (Posição Global):** `http://localhost:8000/rankings/position/60c72b2f9b1d4c3a4c8e4d3e?level=global`
+
+**Exemplo (Posição Estadual):** `http://localhost:8000/rankings/position/60c72b2f9b1d4c3a4c8e4d3e?level=estado&code=PI`
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "position": 5
+}
+```
+
+**Resposta quando usuário não está no ranking (200):**
+```json
+{
+  "position": -1
+}
+```
+
+**Casos de Uso:**
+- 👤 Mostrar posição do usuário logado no perfil
+- 📊 Dashboard personalizado com posição atual
+- 🎯 Gamificação - "Você está em 5º lugar!"
+- 📈 Acompanhamento de progresso no ranking
+
+**Observações:**
+- Retorna `-1` se usuário não estiver no ranking
+- Usa ranking cacheado para melhor performance
+- Baseado no campo `ranking` (pontuação acumulada)
+- Útil para exibir posição individual sem carregar todo o ranking
+
+---
+
+## Desenvolvimento
 
 ⚠️ **ATENÇÃO:** Estas rotas devem ser DESABILITADAS em produção!
 
@@ -2230,6 +3789,6 @@ Todas as datas seguem o formato ISO 8601: `YYYY-MM-DDTHH:mm:ssZ`
 
 ---
 
-**Documentação gerada em:** 16 de outubro de 2025  
 **Versão da API:** 0.1.0  
 **Desenvolvido por:** Equipe Devs da Gama - ReciclaAI
+

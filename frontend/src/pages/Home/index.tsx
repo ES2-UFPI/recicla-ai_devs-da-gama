@@ -53,7 +53,7 @@ export default function Home() {
 							size="large"
 							startIcon={<AssessmentIcon />}
 							sx={{ fontWeight: 600 }}
-							href="/relatorios"
+							href="/relatorio"
 						>
 							Relatório de Reciclagem
 						</Button>

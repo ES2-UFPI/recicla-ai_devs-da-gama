@@ -16,8 +16,6 @@ import {
   DialogContentText,
   DialogActions,
   TextField,
-  Checkbox,
-  FormControlLabel,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
@@ -32,7 +30,7 @@ import { useCategorias } from '../LocalizarColeta/hooks/useCategorias';
 import MapaDeslocamento from '../ColetaAtiva/components/MapaDeslocamento';
 import AvaliacaoResiduos from '../ColetaAtiva/components/AvaliacaoResiduos';
 
-type EstadoPagina = 'deslocamento' | 'avaliacao' | 'entrega' | 'info';
+type EstadoPagina = 'deslocamento' | 'avaliacao' | 'finalizada' | 'info';
 
 export default function ColetaDetalhes() {
   const { id } = useParams<{ id: string }>();
@@ -47,9 +45,6 @@ export default function ColetaDetalhes() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [avaliacaoFinalizada, setAvaliacaoFinalizada] = useState(false);
-  // Estado para seleção dos resíduos coletados
-  const [residuosSelecionados, setResiduosSelecionados] = useState<string[]>([]);
   
   // Estados do diálogo de cancelamento
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -85,8 +80,7 @@ export default function ColetaDetalhes() {
         // Verificar se todos os resíduos já foram avaliados
         const todosAvaliados = detalhes.every(r => r.status === 'COLETADO' || r.status === 'REJEITADO');
         if (todosAvaliados) {
-          setEstado('entrega');
-          setAvaliacaoFinalizada(true);
+          setEstado('finalizada');
         } else {
           setEstado('avaliacao');
         }
@@ -171,8 +165,7 @@ export default function ColetaDetalhes() {
     // Verificar se todos os resíduos foram avaliados
     const todosAvaliados = detalhes.every(r => r.status === 'COLETADO' || r.status === 'REJEITADO');
     if (todosAvaliados) {
-      setEstado('entrega');
-      setAvaliacaoFinalizada(true);
+      setEstado('finalizada');
     }
   };
 
@@ -183,15 +176,9 @@ export default function ColetaDetalhes() {
       const todosAvaliados = detalhes.every(r => r.status === 'COLETADO' || r.status === 'REJEITADO');
       
       if (todosAvaliados) {
-        setEstado('entrega');
-        setAvaliacaoFinalizada(true);
+        setEstado('finalizada');
       }
     }
-  };
-
-  const handleEntregarResiduos = () => {
-    // TODO: Implementar lógica de entrega
-    console.log('Entrega de resíduos - a ser implementado');
   };
 
   const getEstadoColor = (estadoColeta: string): 'warning' | 'primary' | 'error' | 'default' => {
@@ -422,86 +409,60 @@ export default function ColetaDetalhes() {
             onColetaAtualizada={handleColetaAtualizada}
             onFinalizar={handleFinalizarAvaliacao}
           />
-        ) : estado === 'entrega' ? (
+        ) : estado === 'finalizada' ? (
           <>
-            {/* Tela de Entrega - Após avaliação completa */}
+            {/* Tela de Visualização Final - Após avaliação completa */}
             <Alert severity="success" sx={{ mb: 3 }}>
-              ✅ Todos os resíduos foram avaliados! Agora você pode preparar a entrega.
+              ✅ Coleta finalizada com sucesso! Veja abaixo o resumo da avaliação.
             </Alert>
 
-            <Card sx={{ mb: 3, boxShadow: 3 }}>
-              <CardContent>
-                <Typography variant="h6" fontWeight={600} gutterBottom>
-                  📦 Resíduos para Entrega
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Selecione os resíduos que serão entregues:
-                </Typography>
+            {/* Resíduos Coletados */}
+            {residuos.filter(r => r.status === 'COLETADO').length > 0 && (
+              <Card sx={{ mb: 3, boxShadow: 3 }}>
+                <CardContent>
+                  <Typography variant="h6" fontWeight={600} gutterBottom color="success.main">
+                    ✅ Resíduos Coletados
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Os seguintes resíduos foram avaliados e coletados:
+                  </Typography>
 
-                {residuos.filter(r => r.status === 'COLETADO').length === 0 ? (
-                  <Alert severity="warning">
-                    Nenhum resíduo foi coletado. Todos foram rejeitados.
-                  </Alert>
-                ) : (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {residuos
                       .filter(r => r.status === 'COLETADO')
                       .map((residuo, index) => {
                         const categoria = getCategoriaById(residuo.categoriaId);
-                        const checked = residuosSelecionados.includes(residuo.id);
                         return (
                           <Card
                             key={residuo.id}
                             sx={{
                               border: 2,
-                              borderColor: checked ? 'primary.main' : 'success.main',
-                              bgcolor: checked ? 'primary.50' : 'success.50',
-                              transition: 'border-color 0.2s',
+                              borderColor: 'success.main',
+                              bgcolor: 'success.50',
                             }}
                           >
                             <CardContent sx={{ py: 2 }}>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Box sx={{ flex: 1 }}>
-                                  <Typography variant="body1" fontWeight={600}>
-                                    {index + 1}. {categoria?.tipo || 'Categoria desconhecida'}
-                                  </Typography>
-                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                                    <Chip
-                                      label={`${residuo.quantidade} ${residuo.tipo_medida}`}
-                                      size="small"
-                                      color="primary"
-                                      variant="outlined"
-                                    />
-                                    <Chip
-                                      label={`R$ ${residuo.valorEstimado.toFixed(2)}`}
-                                      size="small"
-                                      color="success"
-                                      variant="filled"
-                                    />
-                                    <Chip
-                                      label="COLETADO"
-                                      size="small"
-                                      color="success"
-                                      variant="outlined"
-                                    />
-                                  </Box>
-                                </Box>
-                                <FormControlLabel
-                                  sx={{ ml: 2, minWidth: 120 }}
-                                  control={
-                                    <Checkbox
-                                      color="primary"
-                                      checked={checked}
-                                      onChange={() =>
-                                        setResiduosSelecionados((prev) =>
-                                          checked
-                                            ? prev.filter(id => id !== residuo.id)
-                                            : [...prev, residuo.id]
-                                        )
-                                      }
-                                    />
-                                  }
-                                  label={checked ? 'Selecionado' : 'Selecionar'}
+                              <Typography variant="body1" fontWeight={600}>
+                                {index + 1}. {categoria?.tipo || 'Categoria desconhecida'}
+                              </Typography>
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                                <Chip
+                                  label={`${residuo.quantidade} ${residuo.tipo_medida}`}
+                                  size="small"
+                                  color="primary"
+                                  variant="outlined"
+                                />
+                                <Chip
+                                  label={`R$ ${residuo.valorEstimado.toFixed(2)}`}
+                                  size="small"
+                                  color="success"
+                                  variant="filled"
+                                />
+                                <Chip
+                                  label="COLETADO"
+                                  size="small"
+                                  color="success"
+                                  variant="outlined"
                                 />
                               </Box>
                             </CardContent>
@@ -509,11 +470,11 @@ export default function ColetaDetalhes() {
                         );
                       })}
                   </Box>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
-            {/* Resumo dos resíduos rejeitados */}
+            {/* Resíduos Rejeitados */}
             {residuos.filter(r => r.status === 'REJEITADO').length > 0 && (
               <Card sx={{ mb: 3, boxShadow: 3, borderColor: 'error.main', border: 1 }}>
                 <CardContent>
@@ -521,24 +482,26 @@ export default function ColetaDetalhes() {
                     ❌ Resíduos Rejeitados
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Os seguintes resíduos foram rejeitados:
+                    Os seguintes resíduos foram rejeitados durante a avaliação:
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                     {residuos
                       .filter(r => r.status === 'REJEITADO')
-                      .map((residuo) => {
+                      .map((residuo, index) => {
                         const categoria = getCategoriaById(residuo.categoriaId);
                         return (
-                          <Box key={residuo.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Chip
-                              label={categoria?.tipo || 'Categoria desconhecida'}
-                              size="small"
-                              color="error"
-                              variant="outlined"
-                            />
-                            <Typography variant="caption" color="text.secondary">
-                              {residuo.quantidade} {residuo.tipo_medida}
-                            </Typography>
+                          <Box key={residuo.id} sx={{ p: 1.5, bgcolor: 'error.50', borderRadius: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="body2" fontWeight={600}>
+                                {index + 1}. {categoria?.tipo || 'Categoria desconhecida'}
+                              </Typography>
+                              <Chip
+                                label={`${residuo.quantidade} ${residuo.tipo_medida}`}
+                                size="small"
+                                color="error"
+                                variant="outlined"
+                              />
+                            </Box>
                           </Box>
                         );
                       })}
@@ -547,28 +510,55 @@ export default function ColetaDetalhes() {
               </Card>
             )}
 
-            {/* Botão de Entregar */}
-            {residuos.filter(r => r.status === 'COLETADO').length > 0 && (
-              <Button
-                variant="contained"
-                color="primary"
-                size="large"
-                fullWidth
-                onClick={handleEntregarResiduos}
-                sx={{ py: 2, fontWeight: 600, fontSize: '1.1rem' }}
-                disabled={residuosSelecionados.length === 0}
-              >
-                🚚 Entregar
-              </Button>
+            {/* Mensagem caso todos tenham sido rejeitados */}
+            {residuos.filter(r => r.status === 'COLETADO').length === 0 && (
+              <Alert severity="warning" sx={{ mb: 3 }}>
+                Nenhum resíduo foi coletado. Todos foram rejeitados durante a avaliação.
+              </Alert>
             )}
 
+            {/* Resumo Total */}
+            <Card sx={{ mb: 3, bgcolor: 'primary.50', boxShadow: 3 }}>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  📊 Resumo da Coleta
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  <Chip
+                    label={`Total: ${residuos.length} resíduos`}
+                    color="primary"
+                    variant="filled"
+                  />
+                  <Chip
+                    label={`Coletados: ${residuos.filter(r => r.status === 'COLETADO').length}`}
+                    color="success"
+                    variant="filled"
+                  />
+                  <Chip
+                    label={`Rejeitados: ${residuos.filter(r => r.status === 'REJEITADO').length}`}
+                    color="error"
+                    variant="filled"
+                  />
+                  <Chip
+                    label={`Valor Total: R$ ${residuos
+                      .filter(r => r.status === 'COLETADO')
+                      .reduce((sum, r) => sum + r.valorEstimado, 0)
+                      .toFixed(2)}`}
+                    color="success"
+                    variant="filled"
+                  />
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Botão de Voltar */}
             <Button
-              variant="outlined"
+              variant="contained"
               color="primary"
               size="large"
               fullWidth
               onClick={() => navigate('/coletas')}
-              sx={{ mt: 2, py: 1.5, fontWeight: 600 }}
+              sx={{ py: 2, fontWeight: 600, fontSize: '1.1rem' }}
             >
               Voltar para Minhas Coletas
             </Button>

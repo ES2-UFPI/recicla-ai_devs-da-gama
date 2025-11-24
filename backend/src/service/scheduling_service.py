@@ -82,6 +82,15 @@ class SchedulingService:
             if existente:
                 raise HTTPException(409, "Já existe agendamento PENDENTE para um dos resíduos informados.")
 
+        # Validação defensiva dos slots de disponibilidade (além do Pydantic)
+        # Garante que mesmo se a validação do schema for contornada, a regra de negócio será aplicada
+        for idx, slot in enumerate(dados.disponibilidade, start=1):
+            try:
+                slot.validar_slot()
+            except ValueError as e:
+                # Propaga como 422 Unprocessable Entity com mensagem amigável
+                raise HTTPException(status_code=422, detail=f"Erro no slot {idx}: {str(e)}")
+
         # Buscar endereço completo do produtor
         local_dict = await self._buscar_endereco_produtor(produtor_id, dados.address_id)
         
@@ -95,6 +104,7 @@ class SchedulingService:
             disponibilidade=disponibilidade_dicts,  # Armazena como lista de dicts
             local=local_dict,  # Armazena endereço completo como dict
             observacoes=dados.observacoes,
+            coleta_integral=dados.coleta_integral,  # Incluir campo coleta_integral
         )
         doc = scheduling_obj.model_dump(by_alias=True, exclude_none=True)
         # Remover id se vier como None para evitar problemas
@@ -228,6 +238,12 @@ class SchedulingService:
         
         # Converter disponibilidade para formato de armazenamento se fornecida
         if dados.disponibilidade is not None:
+            # Validação defensiva também na atualização
+            for idx, slot in enumerate(dados.disponibilidade, start=1):
+                try:
+                    slot.validar_slot()
+                except ValueError as e:
+                    raise HTTPException(status_code=422, detail=f"Erro no slot {idx}: {str(e)}")
             updates["disponibilidade"] = [slot.model_dump() for slot in dados.disponibilidade]
         
         # Buscar novo endereço se address_id foi fornecido

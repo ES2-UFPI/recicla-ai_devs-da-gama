@@ -98,7 +98,7 @@ export default function Coleta() {
     try {
       // Backend retorna em UTC, converter para horário local de Brasília
       const data = new Date(dataISO);
-      return data.toLocaleDateString('pt-BR', {
+      return data.toLocaleString('pt-BR', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
@@ -273,7 +273,7 @@ export default function Coleta() {
 
                   {/* Observações */}
                   {coleta.observacoes && (
-                    <Alert severity="info" icon={false} sx={{ fontSize: '0.875rem' }} sx={{ mb: 2 }}>
+                    <Alert severity="info" icon={false} sx={{ fontSize: '0.875rem', mb: 2 }}>
                       <strong>Observações:</strong> {coleta.observacoes}
                     </Alert>
                   )}

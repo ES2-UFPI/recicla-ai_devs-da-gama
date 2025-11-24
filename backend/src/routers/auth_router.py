@@ -11,7 +11,7 @@ from src.schemas.auth_schema import (
 	LogoutResponse,
 	RefreshResponse
 )
-from src.schemas.return_schema import UserPublic
+from src.schemas.return_schema import UserPublic, ProdutorPublic, ColetorPublic, ReceptorPublic
 from src.service.auth_service import AuthService
 from src.infra.security.dependencies import get_current_user
 
@@ -99,16 +99,20 @@ async def refresh(
 	return RefreshResponse(message="Token renovado com sucesso")
 
 
-@router.get("/me", response_model=UserPublic)
+@router.get("/me")
 async def get_current_user_info(user: dict = Depends(get_current_user)):
 	"""
 	Endpoint para obter informações do usuário autenticado.
 	
 	**Protegido:** Requer access_token válido em cookie.
 	
-	Retorna dados públicos do usuário atualmente autenticado.
-	Útil para o frontend verificar o estado de autenticação
-	e obter informações do usuário logado.
+	Retorna dados do usuário atualmente autenticado, incluindo campos
+	sensíveis que apenas o próprio usuário deve ter acesso.
+	
+	Retorna schema específico baseado no role:
+	- produtor -> ProdutorPublic (com points, ranking, cnpj, etc)
+	- coletor -> ColetorPublic (com inventory)
+	- receptor -> ReceptorPublic (com accepted_material)
 	
 	**Exemplo de uso:**
 	```javascript
@@ -119,8 +123,52 @@ async def get_current_user_info(user: dict = Depends(get_current_user)):
 	  .catch(() => console.log('Não autenticado'))
 	```
 	"""
-	return UserPublic(
-		name=user["name"],
-		email=user["email"],
-		role_id=user["role_id"]
-	)
+	role_id = user.get("role_id", "").lower()
+	user_id = str(user.get("_id", user.get("id", "")))
+	
+	# Campos comuns a todos os tipos
+	base_data = {
+		"id": user_id,
+		"name": user["name"],
+		"email": user["email"],
+		"role_id": user["role_id"],
+		"telefone": user.get("phone"),
+		"cidade_id": user.get("cidade_id"),
+		"estado_id": user.get("estado_id"),
+	}
+	
+	# Retorna schema específico baseado no role
+	if "prod" in role_id:
+		# Converte points e ranking para int (caso venham como float do DB)
+		points = user.get("points", 0)
+		ranking = user.get("ranking")
+		
+		return ProdutorPublic(
+			**base_data,
+			is_business=user.get("is_business"),
+			cnpj=user.get("cnpj"),
+			points=int(points) if points is not None else 0,
+			ranking=int(ranking) if ranking is not None else None
+		)
+	elif "col" in role_id:
+		return ColetorPublic(
+			**base_data,
+			inventory=user.get("inventory", [])
+		)
+	elif "rec" in role_id:
+		return ReceptorPublic(
+			**base_data,
+			accepted_material=user.get("accepted_material", [])
+		)
+	else:
+		# Fallback para role desconhecido
+		points = user.get("points", 0)
+		ranking = user.get("ranking")
+		
+		return ProdutorPublic(
+			**base_data,
+			is_business=user.get("is_business"),
+			cnpj=user.get("cnpj"),
+			points=int(points) if points is not None else 0,
+			ranking=int(ranking) if ranking is not None else None
+		)

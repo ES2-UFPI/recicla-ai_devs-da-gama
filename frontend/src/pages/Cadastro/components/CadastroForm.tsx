@@ -9,7 +9,20 @@ import {
   validateSenha,
   validateConfirmacaoSenha,
 } from '../validation';
-import type { Role, CadastroFormData } from '../types';
+import type { RoleType } from '../types';
+
+type Role = { value: RoleType; label: string };
+
+interface CadastroFormData {
+  nome: string;
+  email: string;
+  telefone: string;
+  senha: string;
+  confirmacaoSenha: string;
+  role: RoleType | '';
+  cidade: string;
+  estado: string;
+}
 
 const fallbackRoles: Role[] = [
   { value: 'produtor', label: 'Produtor' },
@@ -106,11 +119,11 @@ export function CadastroForm() {
     const registerData = {
       name: form.nome,
       email: form.email,
-      senha: form.senha,
-      telefone: form.telefone,
-      role: form.role,
-      cidade: form.cidade,
-      estado: form.estado,
+      password: form.senha,
+      phone: form.telefone,
+      role_id: form.role as RoleType,
+      cidade_id: form.cidade,
+      estado_id: form.estado,
     };
     setLoading(true);
     try {

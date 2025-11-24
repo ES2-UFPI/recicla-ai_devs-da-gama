@@ -50,16 +50,11 @@ export default function LocalizarColeta() {
       return;
     }
 
-    // Obter data/hora atual no horário local (Brasília)
-    const now = new Date();
-    
-    // Converter para UTC antes de enviar ao backend
-    const nowUTC = now.toISOString();
-    const dateUTC = new Date(nowUTC);
-    
-    // Formatar data e hora em UTC no formato que o backend espera
-    const dataAtual = `${String(dateUTC.getUTCDate()).padStart(2, '0')}/${String(dateUTC.getUTCMonth() + 1).padStart(2, '0')}/${dateUTC.getUTCFullYear()}`;
-    const horaAtual = `${String(dateUTC.getUTCHours()).padStart(2, '0')}:${String(dateUTC.getUTCMinutes()).padStart(2, '0')}`;
+  // Obter data/hora atual no horário LOCAL (não converter para UTC)
+  // O backend espera data_busca e hora_busca no fuso de Brasília, como strings
+  const now = new Date();
+  const dataAtual = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+  const horaAtual = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
     const resultado = await buscarAgendamentosDisponiveis({
       latitude: userLocation[0],

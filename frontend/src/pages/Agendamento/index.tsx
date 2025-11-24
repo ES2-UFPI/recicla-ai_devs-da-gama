@@ -60,59 +60,11 @@ const statusLabelMap: Record<string, string> = {
   concluido: 'CONCLUÍDO',
 };
 
-// Função para formatar disponibilidade (converte UTC para horário local)
+// Função para formatar disponibilidade (sem conversão de timezone)
+// Backend armazena e retorna horários no fuso de Brasília (strings dd/mm/aaaa e HH:mm)
 const formatarDisponibilidade = (disponibilidade: DisponibilidadeSlot[]): string => {
   return disponibilidade
-    .map((slot) => {
-      // Backend retorna em UTC (formato: dd/mm/yyyy HH:mm)
-      // Precisamos converter para horário local do navegador para exibição
-      try {
-        const [dia, mes, ano] = slot.data.split('/');
-        const [horaInicio, minutoInicio] = slot.hora_inicio.split(':');
-        const [horaFim, minutoFim] = slot.hora_fim.split(':');
-        
-        // Criar Date UTC - backend envia tudo em UTC
-        const dataHoraInicioUTC = new Date(Date.UTC(
-          parseInt(ano),
-          parseInt(mes) - 1,
-          parseInt(dia),
-          parseInt(horaInicio),
-          parseInt(minutoInicio)
-        ));
-        
-        const dataHoraFimUTC = new Date(Date.UTC(
-          parseInt(ano),
-          parseInt(mes) - 1,
-          parseInt(dia),
-          parseInt(horaFim),
-          parseInt(minutoFim)
-        ));
-        
-        // Formatar em horário local do navegador (Brasília: UTC-3)
-        // toLocaleDateString e toLocaleTimeString já convertem automaticamente para o timezone local do navegador
-        const dataLocal = dataHoraInicioUTC.toLocaleDateString('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        });
-        
-        const horaInicioLocal = dataHoraInicioUTC.toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-        
-        const horaFimLocal = dataHoraFimUTC.toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-        
-        return `${dataLocal}: ${horaInicioLocal} - ${horaFimLocal}`;
-      } catch (error) {
-        // Fallback se houver erro na conversão
-        console.error('Erro ao converter timezone:', error);
-        return `${slot.data}: ${slot.hora_inicio} - ${slot.hora_fim}`;
-      }
-    })
+    .map((slot) => `${slot.data}: ${slot.hora_inicio} - ${slot.hora_fim}`)
     .join(' | ');
 };
 
@@ -136,6 +88,7 @@ export function Agendamento() {
   const [disponibilidade, setDisponibilidade] = useState<DisponibilidadeSlot[]>([]);
   const [observacoes, setObservacoes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [permitirParcial, setPermitirParcial] = useState(true); // UI controla coleta_integral
 
   // Carregar agendamentos e resíduos ao montar o componente
   useEffect(() => {
@@ -181,6 +134,9 @@ export function Agendamento() {
       setSelectedResiduosIds(agendamento.residuosId);
       setDisponibilidade(agendamento.disponibilidade);
       setObservacoes(agendamento.observacoes || '');
+      // coleta_integral True => não permite parcial
+      // permitirParcial deve ser o inverso
+      setPermitirParcial(!agendamento.coleta_integral);
     } else {
       resetForm();
     }
@@ -193,6 +149,7 @@ export function Agendamento() {
     setSelectedResiduosIds([]);
     setDisponibilidade([]);
     setObservacoes('');
+    setPermitirParcial(true);
   };
 
   const handleCloseDialog = () => {
@@ -202,17 +159,26 @@ export function Agendamento() {
 
   const handleSave = async () => {
     try {
-      // Validações
+      // Validações no frontend
       if (selectedResiduosIds.length === 0) {
-        setError('Selecione pelo menos um resíduo');
+        setError('⚠️ Selecione pelo menos um resíduo para agendar a coleta');
         return;
       }
       if (!selectedAddressId) {
-        setError('Selecione um endereço');
+        setError('⚠️ Selecione um endereço para a coleta');
         return;
       }
       if (disponibilidade.length === 0) {
-        setError('Adicione pelo menos um horário de disponibilidade');
+        setError('⚠️ Adicione pelo menos um horário de disponibilidade');
+        return;
+      }
+
+      // Validação adicional: verificar se todos os slots têm data, hora início e fim
+      const slotsInvalidos = disponibilidade.some(
+        slot => !slot.data || !slot.hora_inicio || !slot.hora_fim
+      );
+      if (slotsInvalidos) {
+        setError('⚠️ Preencha todos os campos de data, hora de início e hora de fim nos horários de disponibilidade');
         return;
       }
 
@@ -224,6 +190,7 @@ export function Agendamento() {
         disponibilidade,
         address_id: selectedAddressId,
         observacoes: observacoes || undefined,
+        coleta_integral: !permitirParcial,
       };
 
       if (editingId) {
@@ -236,13 +203,65 @@ export function Agendamento() {
         setSuccessMessage('Agendamento criado com sucesso!');
       }
 
-      // Recarregar dados
+      // Recarregar dados e fechar diálogo apenas em caso de sucesso
       await fetchData();
       handleCloseDialog();
     } catch (err) {
       console.error('Erro ao salvar agendamento:', err);
-      const error = err as { response?: { data?: { detail?: string } } };
-      setError(error.response?.data?.detail || 'Erro ao salvar agendamento');
+      
+      // Tratamento detalhado de erros
+      const error = err as { 
+        response?: { 
+          data?: { 
+            detail?: string | { msg: string; type: string }[];
+          };
+          status?: number;
+        };
+        message?: string;
+      };
+
+      let mensagemErro = 'Erro ao salvar agendamento. Tente novamente.';
+
+      // Se o erro vier do backend com mensagem específica
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        
+        // Se for um array de erros de validação do Pydantic
+        if (Array.isArray(detail)) {
+          const erros = detail.map(e => e.msg).join('; ');
+          mensagemErro = `❌ Erro de validação: ${erros}`;
+        } 
+        // Se for uma string de erro
+        else if (typeof detail === 'string') {
+          // Verificar erros comuns e torná-los mais amigáveis
+          if (detail.includes('passado') || detail.includes('past')) {
+            mensagemErro = '🕐 A data/horário selecionado já passou. Por favor, escolha uma data/horário futura.';
+          } else if (detail.includes('início') && detail.includes('fim')) {
+            mensagemErro = '⏰ O horário de início deve ser anterior ao horário de fim.';
+          } else if (detail.includes('formato') || detail.includes('format')) {
+            mensagemErro = '📅 Formato de data ou horário inválido. Use o formato correto (dd/mm/aaaa e hh:mm).';
+          } else if (detail.includes('tolerância') || detail.includes('tolerance')) {
+            mensagemErro = '⏳ ' + detail;
+          } else {
+            mensagemErro = `❌ ${detail}`;
+          }
+        }
+      }
+      // Se for erro de rede ou timeout
+      else if (error.message?.includes('Network') || error.message?.includes('timeout')) {
+        mensagemErro = '🌐 Erro de conexão. Verifique sua internet e tente novamente.';
+      }
+      // Se for erro 400 (bad request)
+      else if (error.response?.status === 400) {
+        mensagemErro = '⚠️ Dados inválidos. Verifique os campos preenchidos e tente novamente.';
+      }
+      // Se for erro 401/403 (não autorizado)
+      else if (error.response?.status === 401 || error.response?.status === 403) {
+        mensagemErro = '🔒 Você não tem permissão para realizar esta ação. Faça login novamente.';
+      }
+
+      setError(mensagemErro);
+      // NÃO fecha o diálogo para permitir correção
     } finally {
       setSubmitting(false);
     }
@@ -278,59 +297,16 @@ export function Agendamento() {
     return status === 'pendente' || status === 'aceito';
   };
 
-  // Converter DisponibilidadeSlot UTC (dd/mm/aaaa) para FaixaDisponibilidade local (YYYY-MM-DD)
+  // Converter DisponibilidadeSlot (dd/mm/aaaa) para FaixaDisponibilidade (YYYY-MM-DD) sem mudar horário
   const convertToFaixaDisponibilidade = (disponibilidades: DisponibilidadeSlot[]) => {
     return disponibilidades.map((slot) => {
-      try {
-        // Backend retorna em UTC no formato dd/mm/yyyy HH:mm
-        const [dia, mes, ano] = slot.data.split('/');
-        const [horaInicio, minutoInicio] = slot.hora_inicio.split(':');
-        const [horaFim, minutoFim] = slot.hora_fim.split(':');
-        
-        // Criar Date UTC - backend envia tudo em UTC
-        const dataHoraInicioUTC = new Date(Date.UTC(
-          parseInt(ano),
-          parseInt(mes) - 1,
-          parseInt(dia),
-          parseInt(horaInicio),
-          parseInt(minutoInicio)
-        ));
-        
-        const dataHoraFimUTC = new Date(Date.UTC(
-          parseInt(ano),
-          parseInt(mes) - 1,
-          parseInt(dia),
-          parseInt(horaFim),
-          parseInt(minutoFim)
-        ));
-        
-        // Converter para horário local do navegador (Brasília: UTC-3)
-        // getFullYear/getMonth/getDate/getHours/getMinutes já retornam valores no timezone local
-        const anoLocal = dataHoraInicioUTC.getFullYear();
-        const mesLocal = String(dataHoraInicioUTC.getMonth() + 1).padStart(2, '0');
-        const diaLocal = String(dataHoraInicioUTC.getDate()).padStart(2, '0');
-        const dataYYYYMMDD = `${anoLocal}-${mesLocal}-${diaLocal}`;
-        
-        const horaInicioLocal = `${String(dataHoraInicioUTC.getHours()).padStart(2, '0')}:${String(dataHoraInicioUTC.getMinutes()).padStart(2, '0')}`;
-        const horaFimLocal = `${String(dataHoraFimUTC.getHours()).padStart(2, '0')}:${String(dataHoraFimUTC.getMinutes()).padStart(2, '0')}`;
-        
-        return {
-          data: dataYYYYMMDD,
-          horarioInicio: horaInicioLocal,
-          horarioFim: horaFimLocal,
-        };
-      } catch (error) {
-        // Fallback se houver erro na conversão
-        console.error('Erro ao converter timezone na edição:', error);
-        const [dia, mes, ano] = slot.data.split('/');
-        const dataYYYYMMDD = `${ano}-${mes}-${dia}`;
-        
-        return {
-          data: dataYYYYMMDD,
-          horarioInicio: slot.hora_inicio,
-          horarioFim: slot.hora_fim,
-        };
-      }
+      const [dia, mes, ano] = slot.data.split('/');
+      const dataYYYYMMDD = `${ano}-${mes}-${dia}`;
+      return {
+        data: dataYYYYMMDD,
+        horarioInicio: slot.hora_inicio,
+        horarioFim: slot.hora_fim,
+      };
     });
   };
 
@@ -381,13 +357,6 @@ export function Agendamento() {
           </Button>
         </Box>
 
-        {/* Error alert */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-
         {/* Loading state */}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -420,12 +389,20 @@ export function Agendamento() {
                         mb: 2,
                       }}
                     >
-                      <Chip
-                        label={statusLabelMap[agendamento.status] || agendamento.status || 'Desconhecido'}
-                        color={statusColorMap[agendamento.status] || 'default'}
-                        size="small"
-                        sx={{ fontWeight: 600 }}
-                      />
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          label={statusLabelMap[agendamento.status] || agendamento.status || 'Desconhecido'}
+                          color={statusColorMap[agendamento.status] || 'default'}
+                          size="small"
+                          sx={{ fontWeight: 600 }}
+                        />
+                        <Chip
+                          label={agendamento.coleta_integral ? 'Coleta Integral' : 'Coleta Parcial'}
+                          color={agendamento.coleta_integral ? 'warning' : 'success'}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Stack>
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         {/* Botão Editar - apenas para pendentes */}
                         {isEditable && (
@@ -621,6 +598,48 @@ export function Agendamento() {
 
               <Box sx={{ height: '1px', bgcolor: 'divider', my: 2 }} />
 
+              {/* Coleta Parcial/Integral */}
+              <Box>
+                <Stack spacing={1}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Chip
+                      size="small"
+                      color={permitirParcial ? 'success' : 'warning'}
+                      label={permitirParcial ? 'Coleta Parcial Permitida' : 'Coleta Integral'}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {permitirParcial
+                        ? 'Coletores podem selecionar apenas parte dos resíduos.'
+                        : 'Coletores devem coletar TODOS os resíduos deste agendamento.'}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" alignItems="flex-start" spacing={1}>
+                    <Button
+                      variant={permitirParcial ? 'contained' : 'outlined'}
+                      size="small"
+                      onClick={() => setPermitirParcial(true)}
+                    >
+                      Permitir coleta parcial
+                    </Button>
+                    <Button
+                      variant={!permitirParcial ? 'contained' : 'outlined'}
+                      size="small"
+                      color="warning"
+                      onClick={() => setPermitirParcial(false)}
+                    >
+                      Exigir coleta integral
+                    </Button>
+                  </Stack>
+                  <Alert severity={permitirParcial ? 'info' : 'warning'}>
+                    {permitirParcial
+                      ? 'Com coleta parcial, diferentes coletores podem retirar resíduos em momentos distintos.'
+                      : 'Com coleta integral, apenas coletores que aceitarem TODOS os resíduos poderão recolher.'}
+                  </Alert>
+                </Stack>
+              </Box>
+
+              <Box sx={{ height: '1px', bgcolor: 'divider', my: 2 }} />
+
               {/* Observações */}
               <TextField
                 label="Observações (opcional)"
@@ -633,6 +652,13 @@ export function Agendamento() {
                 size="small"
                 placeholder="Informações adicionais sobre a coleta (ex: portão azul, interfone 101)"
               />
+
+              {/* Alerta de erro - exibido no final do dialog */}
+              {error && (
+                <Alert severity="error" onClose={() => setError(null)}>
+                  {error}
+                </Alert>
+              )}
             </Stack>
           </DialogContent>
           <DialogActions sx={{ p: 2, gap: 1, borderTop: '1px solid', borderColor: 'divider' }}>

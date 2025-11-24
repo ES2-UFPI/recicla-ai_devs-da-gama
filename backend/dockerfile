@@ -1,5 +1,19 @@
 FROM python:3.11-slim
 
+# Configurar timezone para Brasília (America/Sao_Paulo)
+ENV TZ=America/Sao_Paulo
+
+# Instalar dependências mínimas do sistema incluindo SSL/TLS atualizado
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tzdata \
+    ca-certificates \
+    libssl3 \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && update-ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copiar requirements e instalar dependências
@@ -9,6 +23,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código da aplicação
 COPY . .
 
+# Configurar PYTHONPATH para incluir o diretório atual
+ENV PYTHONPATH=/app
+
 EXPOSE 8000
 
-CMD ["uvicorn", "server:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
+# Em produção, não use --reload. A porta é definida por variável de ambiente.
+CMD uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000}

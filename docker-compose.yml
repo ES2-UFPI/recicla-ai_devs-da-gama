@@ -13,6 +13,9 @@ services:
       - ./backend:/app
     env_file:
       - ./backend/.env
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     networks:
       - app-network
 
@@ -56,10 +59,14 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=admin123
       - MONGO_INITDB_DATABASE=ReciclaAi
     volumes:
-      - ./data/db:/data/db
+      - mongodb_data:/data/db
     networks:
       - app-network
 
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local

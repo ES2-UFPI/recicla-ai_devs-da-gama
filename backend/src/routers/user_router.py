@@ -1,6 +1,8 @@
 from fastapi import APIRouter, status, Depends
 from typing import List, Dict, Any
 
+from src.schemas.relatorio_schema import RelatorioByCategoryResponse
+
 from src.schemas.user_schema import UserCreate, UserUpdate, Endereco
 from src.schemas.return_schema import UserPublic
 from src.service.user_service import UserService
@@ -49,8 +51,7 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
 	return UserPublic(
 		name=current_user["name"],
 		email=current_user["email"],
-		role_id=current_user["role_id"],
-		addresses=current_user.get("addresses", [])
+		role_id=current_user["role_id"]
 	)
 
 
@@ -74,6 +75,26 @@ async def update_user(
 		)
 
 	return await UserService.update_user(current_user.get("id"), payload)
+
+
+@router.get("/me/report", response_model=RelatorioByCategoryResponse)
+async def get_user_report(current_user: dict = Depends(get_current_user)):
+	"""
+	Gera relatório do usuário autenticado.
+
+	Requer autenticação. Apenas o próprio usuário pode acessar seu relatório.
+	Disponível para produtores e receptoras.
+	"""
+	# Verificar se o usuário está acessando seu próprio relatório
+	if current_user.get("id") != current_user.get("id"):
+		from fastapi import HTTPException
+		raise HTTPException(
+			status_code=status.HTTP_403_FORBIDDEN,
+			detail="Você só pode acessar seus próprios relatórios."
+		)
+
+	report = await UserService.generate_report(current_user.get("id"))
+	return report
 
 
 @router.get("/me/addresses", response_model=List[Endereco])

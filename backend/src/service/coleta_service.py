@@ -6,10 +6,17 @@ from src.infra.database.repositories import (
     coleta_repo,
     residue_repo,
     scheduling_repo,
+    user_repo,
 )
+import asyncio
+from src.service.ranking_service import RankingService
 
 from src.schemas.coleta_schema import (
     ColetaInDBSchema,
+)
+
+from src.schemas.residue_schema import (
+    ResidueResponse,
 )
 
 from src.infra.database.models.enums import (
@@ -42,12 +49,33 @@ class ColetaService:
         """
         Cria uma nova coleta e reserva os resíduos selecionados.
 
-        Regras:
+        Regras de negócio:
         - Agendamento existe e está PENDENTE
         - Todos resíduos existem e estão AGENDADO
         - Todos resíduos pertencem ao agendamento
+        - **Coleta Integral**: Se agendamento tem coleta_integral=True,
+          o coletor DEVE aceitar TODOS os resíduos. Coleta parcial será rejeitada
+          com HTTP 400.
+        - **Coleta Parcial**: Se agendamento tem coleta_integral=False (padrão),
+          o coletor pode aceitar apenas alguns resíduos.
         - Cria Coleta em estado PENDENTE
         - Atualiza resíduos para RESERVADO (Observer em residue_repo)
+        
+        Args:
+            agendamento_id: ID do agendamento a ser aceito
+            residuos_ids: Lista de IDs dos resíduos que o coletor deseja coletar
+            coletor_id: ID do usuário coletor autenticado
+        
+        Returns:
+            ColetaInDBSchema: Dados da coleta criada
+        
+        Raises:
+            HTTPException 404: Agendamento não encontrado
+            HTTPException 400: Agendamento não está PENDENTE
+            HTTPException 400: Coleta integral exige todos os resíduos
+            HTTPException 400: Resíduo não pertence ao agendamento
+            HTTPException 404: Resíduo não encontrado
+            HTTPException 409: Resíduo não está AGENDADO
         """
         agendamento = await scheduling_repo.find_by_id(agendamento_id)
         if not agendamento:
@@ -56,8 +84,25 @@ class ColetaService:
         if agendamento.get("status") != StatusAgendamento.PENDENTE:
             raise HTTPException(400, "Agendamento não está PENDENTE")
 
-        # Validar pertencimento e status dos resíduos
+        # ============================================================
+        # VALIDAÇÃO DE COLETA INTEGRAL
+        # ============================================================
+        # Quando o produtor marca um agendamento como "coleta_integral=True",
+        # significa que TODOS os resíduos devem ser coletados juntos.
+        #
+        # Se coleta_integral=False (padrão), o coletor pode escolher
+        # coletar apenas alguns resíduos (coleta parcial).
+        # ============================================================
         agendamento_residuos: List[str] = agendamento.get("residuosId", [])
+        coleta_integral: bool = agendamento.get("coleta_integral", False)
+        
+        if coleta_integral and len(residuos_ids) < len(agendamento_residuos):
+            raise HTTPException(
+                400,
+                "Este agendamento exige coleta integral. Todos os resíduos devem ser coletados."
+            )
+
+        # Validar pertencimento e status dos resíduos
         for rid in residuos_ids:
             if rid not in agendamento_residuos:
                 raise HTTPException(400, f"Resíduo {rid} não pertence ao agendamento")
@@ -108,6 +153,9 @@ class ColetaService:
         """
         Marca coleta como EM_ANDAMENTO (coletor chegou no local).
         Atualiza data_hora para o momento atual (início da verificação).
+        
+        Nota: Os resíduos são adicionados ao inventory apenas quando 
+        efetivamente coletados via coletar_residuo().
         """
         coleta = await coleta_repo.find_by_id(coleta_id)
         if not coleta:
@@ -137,7 +185,8 @@ class ColetaService:
         observacao: Optional[str] = None,
     ) -> ColetaInDBSchema:
         """
-        Marca um ou mais resíduos como COLETADO e mantém seus IDs em residuos_id.
+        Marca um ou mais resíduos como COLETADO, mantém seus IDs em residuos_id
+        e adiciona ao inventory do coletor (resíduos fisicamente coletados).
         """
         coleta = await coleta_repo.find_by_id(coleta_id)
         if not coleta:
@@ -168,6 +217,71 @@ class ColetaService:
                 usuario_id=coletor_id,
                 detalhes={"coleta_id": coleta_id, "acao": "coletar_residuo"},
             )
+
+        # Adicionar pontos dos resíduos para o Produtor
+        produtores_atualizados = set()
+        for residuo_id in residuos_ids:
+            residuo = await residue_repo.find_by_id(residuo_id)
+            if not residuo:
+                continue
+            
+            # Buscar produtor associado ao resíduo
+            produtor_id = residuo.get("produtorId")
+            if not produtor_id:
+                continue
+
+            pontos_residuo = residuo.get("valorEstimado", 0)
+            
+            # Atualizar points (saldo atual - pode aumentar/diminuir)
+            sucesso_points = await user_repo.atualizar_pontos(
+                user_id=produtor_id,
+                pontos_delta=pontos_residuo
+            )
+            
+            # Atualizar ranking (acumulador - só aumenta, nunca decresce)
+            # Buscar ranking atual do produtor
+            produtor = await user_repo.find_by_id(produtor_id)
+            if produtor:
+                ranking_atual = produtor.get("ranking", 0)
+                novo_ranking = ranking_atual + pontos_residuo
+                
+                sucesso_ranking = await user_repo.update_ranking(
+                    user_id=produtor_id,
+                    new_ranking=novo_ranking
+                )
+                
+                if sucesso_points and sucesso_ranking:
+                    # Memorizar produtor para atualizar rankings após loop
+                    produtores_atualizados.add(produtor_id)
+            
+        # Atualizar rankings dos produtores que tiveram pontos alterados.
+        # Vamos atualizar o ranking global e também o ranking por estado/cidade
+        # para cada produtor afetado.
+        if produtores_atualizados:
+            # Evita atualizações duplicadas: global apenas uma vez
+            tasks = []
+            # Atualizar ranking global uma vez
+            tasks.append(RankingService.refresh_ranking(level="global"))
+
+            # Recarregar ranking por região para cada produtor (estado e cidade)
+            for pid in produtores_atualizados:
+                produtor = await user_repo.find_by_id(pid)
+                if not produtor:
+                    continue
+                estado = produtor.get("estado_id")
+                cidade = produtor.get("cidade_id")
+                # Atualizar ranking estadual (se existir)
+                if estado:
+                    tasks.append(RankingService.refresh_ranking(level="estado", code=estado))
+                # Atualizar ranking por cidade (se existir)
+                if cidade:
+                    tasks.append(RankingService.refresh_ranking(level="cidade", code=cidade))
+
+            # Executa atualizações de forma concorrente
+            await asyncio.gather(*tasks)
+
+        # Adicionar resíduos coletados ao inventory do coletor
+        await self._adicionar_residuos_ao_inventory(coletor_id, residuos_ids)
 
         # Anexar observação se houver
         if observacao:
@@ -290,6 +404,7 @@ class ColetaService:
     ) -> ColetaInDBSchema:
         """
         Cancela coleta APÓS chegar ao local (EM_ANDAMENTO -> CANCELADA) e marca resíduos ainda RESERVADO como CANCELADO.
+        Remove os resíduos da coleta do inventory do coletor.
         """
         coleta = await coleta_repo.find_by_id(coleta_id)
         if not coleta:
@@ -298,6 +413,10 @@ class ColetaService:
             raise HTTPException(403, "Você não pode cancelar esta coleta")
         if coleta.get("estado") != "EM_ANDAMENTO":
             raise HTTPException(400, "A coleta precisa estar EM_ANDAMENTO para cancelamento após chegar ao local")
+
+        # Remover resíduos do inventory do coletor
+        residuos_ids = coleta.get("residuos_id", [])
+        await self._remover_residuos_do_inventory(coletor_id, residuos_ids)
 
         await coleta_repo.update_estado(coleta_id, EstadoColeta.CANCELADA)
         if motivo:
@@ -322,6 +441,18 @@ class ColetaService:
             raise HTTPException(500, "Erro ao recuperar coleta atualizada")
         return ColetaInDBSchema(**atual)
 
+    async def cancelar_apos_chegar_local(
+        self,
+        coleta_id: str,
+        coletor_id: str,
+        motivo: str,
+    ) -> ColetaInDBSchema:
+        """
+        Alias para cancelar_coleta_apos_local.
+        Mantido para compatibilidade com testes e código existente.
+        """
+        return await self.cancelar_coleta_apos_local(coleta_id, coletor_id, motivo)
+
     async def listar_coletas_coletor(
         self,
         coletor_id: str,
@@ -344,6 +475,103 @@ class ColetaService:
         return ColetaInDBSchema(**coleta)
 
     # ==================== AUXILIARES ====================
+
+    # Constante para evitar magic strings
+    _INVENTORY_FIELD = "inventory"
+
+    async def _get_coletor(self, coletor_id: str) -> Dict[str, Any]:
+        """
+        Busca coletor por ID e valida sua existência.
+        Método auxiliar para evitar duplicação de código.
+        
+        Args:
+            coletor_id: ID do coletor
+            
+        Returns:
+            Dict com dados do coletor
+            
+        Raises:
+            HTTPException 404: Se coletor não for encontrado
+        """
+        coletor = await user_repo.find_by_id(coletor_id)
+        if not coletor:
+            raise HTTPException(404, "Coletor não encontrado")
+        return coletor
+
+    async def _adicionar_residuos_ao_inventory(
+        self,
+        coletor_id: str,
+        residuos_ids: List[str]
+    ) -> None:
+        """
+        Adiciona resíduos ao inventory do coletor.
+        
+        Args:
+            coletor_id: ID do coletor
+            residuos_ids: Lista de IDs de resíduos a serem adicionados
+        """
+        coletor = await self._get_coletor(coletor_id)
+        
+        # Pegar inventory atual (ou inicializar como lista vazia)
+        inventory_atual = coletor.get(self._INVENTORY_FIELD, [])
+        
+        # Adicionar novos resíduos (evitar duplicatas)
+        inventory_atualizado = list(set(inventory_atual + residuos_ids))
+        
+        # Atualizar no banco
+        await user_repo.update_user(coletor_id, {self._INVENTORY_FIELD: inventory_atualizado})
+
+    async def _remover_residuos_do_inventory(
+        self,
+        coletor_id: str,
+        residuos_ids: List[str]
+    ) -> None:
+        """
+        Remove resíduos do inventory do coletor.
+        
+        Args:
+            coletor_id: ID do coletor
+            residuos_ids: Lista de IDs de resíduos a serem removidos
+        """
+        coletor = await self._get_coletor(coletor_id)
+        
+        # Pegar inventory atual
+        inventory_atual = coletor.get(self._INVENTORY_FIELD, [])
+        
+        # Remover os resíduos especificados
+        inventory_atualizado = [rid for rid in inventory_atual if rid not in residuos_ids]
+        
+        # Atualizar no banco
+        await user_repo.update_user(coletor_id, {self._INVENTORY_FIELD: inventory_atualizado})
+
+    async def get_coletor_inventory(self, coletor_id: str) -> List[ResidueResponse]:
+        """
+        Retorna o inventory detalhado do coletor.
+        
+        Busca todos os resíduos que estão no inventory e retorna
+        seus dados completos (quantidade, categoria, valor, foto, etc).
+        
+        Args:
+            coletor_id: ID do coletor
+            
+        Returns:
+            Lista de ResidueResponse com dados completos dos resíduos
+        """
+        coletor = await self._get_coletor(coletor_id)
+        residuos_ids = coletor.get(self._INVENTORY_FIELD, [])
+        
+        # Se inventory vazio, retorna lista vazia
+        if not residuos_ids:
+            return []
+        
+        # Buscar dados completos de cada resíduo
+        residuos_completos = []
+        for residuo_id in residuos_ids:
+            residuo = await residue_repo.find_by_id(residuo_id)
+            if residuo:  # Só adiciona se encontrou (pode ter sido deletado)
+                residuos_completos.append(ResidueResponse(**residuo))
+        
+        return residuos_completos
 
     async def _verificar_conclusao_agendamento(self, agendamento_id: Optional[str]):
         """

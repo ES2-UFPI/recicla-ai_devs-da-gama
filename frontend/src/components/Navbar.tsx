@@ -23,6 +23,7 @@ import RedeemIcon from '@mui/icons-material/Redeem';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import RecyclingIcon from '@mui/icons-material/Recycling';
+import InventoryIcon from '@mui/icons-material/Inventory';
 
 // Definição de todos os links possíveis com seus roles
 const allNavLinks = [
@@ -30,8 +31,10 @@ const allNavLinks = [
   { label: 'Agendamentos', icon: <CalendarMonthIcon fontSize="small" />, to: '/agendamentos', roles: ['produtor'] },
   { label: 'Coletas', icon: <LocalShippingIcon fontSize="small" />, to: '/coletas', roles: ['coletor'] },
   { label: 'Recompensas', icon: <RedeemIcon fontSize="small" />, to: '/recompensas', roles: ['produtor'] },
-  { label: 'Ranking', icon: <EmojiEventsIcon fontSize="small" />, to: '/ranking', roles: ['produtor', 'coletor'] },
-  { label: 'Relatórios', icon: <AssessmentIcon fontSize="small" />, to: '/relatorios', roles: ['produtor', 'receptor'] },
+  { label: 'Ranking', icon: <EmojiEventsIcon fontSize="small" />, to: '/ranking', roles: ['produtor'] },
+  { label: 'Relatórios', icon: <AssessmentIcon fontSize="small" />, to: '/relatorio', roles: ['produtor', 'receptor'] },
+  { label: 'Inventário', icon: <InventoryIcon fontSize="small" />, to: '/inventario', roles: ['coletor'] },
+  { label: 'Entregas', icon: <RedeemIcon fontSize="small" />, to: '/entregas', roles: ['coletor'] },
 ];
 
 export function Navbar() {
@@ -110,10 +113,16 @@ export function Navbar() {
     setUserMenuAnchor(null);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     handleCloseUserMenu();
-    logout();
-    navigate('/login');
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Erro no logout:', error);
+    } finally {
+      // Sempre redireciona, mesmo se houver erro
+      navigate('/login');
+    }
   };
 
   const isActiveRoute = (path: string) => location.pathname === path;
