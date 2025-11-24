@@ -65,7 +65,7 @@ export default function Cadastro() {
       await register(registerData);
       
       // Redirecionar após sucesso
-      navigate('/dashboard');
+      navigate('/');
     } catch (err: unknown) {
       // Tratamento de erros
       if (err && typeof err === 'object' && 'response' in err) {
