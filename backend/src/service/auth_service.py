@@ -24,7 +24,6 @@ from src.infra.security.token_blacklist import token_blacklist
 pwd_ctx = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 
 # Configurações de cookies do .env
-COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN", "localhost")
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 
 # Converter string do .env para tipo literal aceito pelo FastAPI
@@ -109,6 +108,7 @@ class AuthService:
 		refresh_token = create_refresh_token(user_id)
 		
 		# Configura cookies HTTP-only
+		# Nota: NÃO usamos 'domain' para permitir cookies cross-domain com CORS
 		response.set_cookie(
 			key="access_token",
 			value=access_token,
@@ -116,8 +116,7 @@ class AuthService:
 			secure=COOKIE_SECURE,  # Apenas HTTPS em produção
 			samesite=COOKIE_SAMESITE,  # CSRF protection
 			max_age=ACCESS_TOKEN_COOKIE_MAX_AGE,  # 15 minutos em segundos
-			path="/",
-			domain=COOKIE_DOMAIN
+			path="/"
 		)
 		
 		response.set_cookie(
@@ -127,8 +126,7 @@ class AuthService:
 			secure=COOKIE_SECURE,
 			samesite=COOKIE_SAMESITE,
 			max_age=REFRESH_TOKEN_COOKIE_MAX_AGE,  # 7 dias em segundos
-			path="/",
-			domain=COOKIE_DOMAIN
+			path="/"
 		)
 		
 		# Retorna dados públicos do usuário
@@ -192,8 +190,7 @@ class AuthService:
 			secure=COOKIE_SECURE,
 			samesite=COOKIE_SAMESITE,
 			max_age=ACCESS_TOKEN_COOKIE_MAX_AGE,  # 15 minutos em segundos
-			path="/",
-			domain=COOKIE_DOMAIN
+			path="/"
 		)
 	
 	@staticmethod
@@ -221,14 +218,17 @@ class AuthService:
 			if exp:
 				token_blacklist.add(refresh_token, exp)
 		
-		# Remove cookies (seta max_age=0)
+		# Remove cookies - DEVE usar os MESMOS parâmetros do set_cookie
+		# para que o navegador reconheça e delete corretamente
 		response.delete_cookie(
 			key="access_token",
 			path="/",
-			domain=COOKIE_DOMAIN
+			secure=COOKIE_SECURE,
+			samesite=COOKIE_SAMESITE
 		)
 		response.delete_cookie(
 			key="refresh_token",
 			path="/",
-			domain=COOKIE_DOMAIN
+			secure=COOKIE_SECURE,
+			samesite=COOKIE_SAMESITE
 		)
