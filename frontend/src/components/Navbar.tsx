@@ -113,10 +113,16 @@ export function Navbar() {
     setUserMenuAnchor(null);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     handleCloseUserMenu();
-    logout();
-    navigate('/login');
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Erro no logout:', error);
+    } finally {
+      // Sempre redireciona, mesmo se houver erro
+      navigate('/login');
+    }
   };
 
   const isActiveRoute = (path: string) => location.pathname === path;
