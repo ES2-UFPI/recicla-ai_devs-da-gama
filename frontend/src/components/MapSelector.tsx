@@ -6,6 +6,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import api from '../services/api';
 
 // Fix para os ícones padrão do Leaflet não aparecerem
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -122,9 +123,6 @@ export function MapSelector({ onLocationSelect, initialPosition, hideSearchInput
   };
 
   const center: [number, number] = mapCenter;
-  const API_BASE = (typeof import.meta !== 'undefined' && 'env' in import.meta && (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_API_BASE_URL)
-    ? (import.meta as unknown as { env: Record<string, string | undefined> }).env.VITE_API_BASE_URL!
-    : 'http://localhost:8000';
 
   // Função para buscar endereço
   const handleSearchAddress = async () => {
@@ -135,21 +133,9 @@ export function MapSelector({ onLocationSelect, initialPosition, hideSearchInput
 
     setSearching(true);
     try {
-      // 1) Tenta backend local (mais rápido e estável)
-      const backendUrl = `${API_BASE}/geo/search?q=${encodeURIComponent(searchQuery)}`;
-      let response = await fetch(backendUrl, { credentials: 'include' });
-      
-      // 2) Se backend indisponível, usa Nominatim com fallback de proxies no mobile
-      if (!response.ok) {
-        const nominatimUrl = buildNominatimSearchUrl(searchQuery);
-        response = await fetchWithProxy(nominatimUrl);
-      }
-
-      if (!response.ok) {
-        throw new Error('Erro ao buscar endereço');
-      }
-
-  const data = await response.json();
+      // Buscar via API base
+      const response = await api.get(`/geo/search?q=${encodeURIComponent(searchQuery)}`);
+      const data = response.data;
 
       if (data.length === 0) {
         alert('Endereço não encontrado. Tente ser mais específico (ex: Rua, número, cidade).');

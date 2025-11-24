@@ -31,6 +31,7 @@ import { Navbar } from '../../components/Navbar';
 import { GlobalStyles } from '../../styles/GlobalStyles';
 import type { ResiduoDetalhado } from '../../services/residuo.service';
 import { useCategorias } from '../LocalizarColeta/hooks/useCategorias';
+import api from '../../services/api';
 
 interface ResiduoComColeta extends ResiduoDetalhado {
   coletaId: string;
@@ -63,15 +64,8 @@ export default function Inventario() {
 
       try {
         // Buscar inventário completo do coletor (rota otimizada que retorna dados completos)
-        const response = await fetch('http://localhost:8000/coletas/inventory/me', {
-          credentials: 'include', // Envia cookies de autenticação
-        });
-
-        if (!response.ok) {
-          throw new Error('Erro ao buscar inventário');
-        }
-
-        const residuosDetalhados: ResiduoDetalhado[] = await response.json();
+        const response = await api.get<ResiduoDetalhado[]>('/coletas/inventory/me');
+        const residuosDetalhados = response.data;
 
         // Mapear resíduos com informações adicionais para exibição
         const residuosComColeta: ResiduoComColeta[] = residuosDetalhados.map(residuo => ({

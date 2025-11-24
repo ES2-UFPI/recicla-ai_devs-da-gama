@@ -99,12 +99,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Logout via backend e limpa estado local
   async function logout() {
     try {
+      console.log('[AuthContext] Chamando API /auth/logout...');
       await api.post('/auth/logout');
-    } catch {
-      // mesmo em erro de rede, limpar estado local
-    } finally {
-      setUser(null);
+      console.log('[AuthContext] API /auth/logout completada com sucesso');
+    } catch (error) {
+      console.error('[AuthContext] Erro ao fazer logout:', error);
+      // mesmo em erro de rede, continua para limpar estado local
     }
+    
+    // Sempre limpa o estado local após tentar logout no backend
+    console.log('[AuthContext] Limpando estado local (setUser(null))');
+    setUser(null);
+    console.log('[AuthContext] Logout concluído');
   }
 
   // Recarregar dados do usuário (útil após operações que alteram pontos)
